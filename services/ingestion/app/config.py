@@ -1,2 +1,15 @@
-# pydantic-settings 기반 환경변수 설정.
-# SOURCE_TYPE, SAMPLE_FPS, FRAME_STORAGE_PATH, REDIS_URL 등을 관리한다.
+# config.py
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    SOURCE_TYPE: str = "file"
+    SOURCE_PATH: str = "./sample/fall.mp4"  # 로컬 기본값
+    RTSP_URL: str = ""
+    CAMERA_ID: str = "video0"
+    SAMPLE_FPS: int = 5
+    FRAME_STORAGE_PATH: str = "./frames/"
+
+    class Config:
+        env_file = ".env"
+
+config = Settings()
