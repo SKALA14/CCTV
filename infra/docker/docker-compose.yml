@@ -30,9 +30,9 @@ services:
       context: ../../services/ingestion
     environment:
       SOURCE_TYPE: file
-      SOURCE_PATH: /data/sample.mp4
+      SOURCE_PATH: /sample/fall.mp4
       SAMPLE_FPS: "1.0"
-      FRAME_STORAGE_PATH: /frames
+      FRAME_STORAGE_PATH: /frames/
       REDIS_URL: redis://redis:6379
     volumes:
       - ./../../data:/data:ro        # 테스트 영상 마운트
