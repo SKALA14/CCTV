@@ -32,9 +32,9 @@ dist/
 # =====================
 # 프레임 저장소 (로컬 볼륨)
 # =====================
-frames/*.jpg
-frames/*.jpeg
-frames/*.png
+frames/**/*.jpg
+frames/**/*.jpeg
+frames/**/*.png
 
 # =====================
 # IDE
