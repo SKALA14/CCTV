@@ -1,3 +1,4 @@
-# Redis Streams frames 채널 소비자.
-# Consumer Group 방식으로 메시지를 수신해 처리 완료 시 XACK를 보낸다.
-# 장애 재시작 시 미처리 메시지를 자동으로 재처리할 수 있다.
+# 프레임 소비자 모듈.
+# 로컬 영상 저장소(mp4 파일)에서 프레임을 읽어 inference 파이프라인에 전달한다.
+# OpenCV로 영상을 열고, config의 SAMPLE_FPS 간격마다 프레임을 추출해 yield한다.
+# 추후 Redis Streams 소비자로 교체하거나 병렬 실행할 수 있도록 인터페이스를 분리한다.
