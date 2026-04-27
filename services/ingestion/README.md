@@ -35,7 +35,11 @@ Redis Streams : frames
 | `REDIS_URL` | `redis://redis:6379` | Redis 연결 URL |
 
 ## 실행 방법
-- 가상환경 생성 및 실행
-- `pip install -r requirements.txt`
 - `cd services/ingestion`
+- 가상환경 생성 및 실행(python 3.11)
+- `pip install -r requirements.txt`
 - `python -m app.main` or `python3`
+
+- main.py의 line11 을 변경하여 영상 소스 선택
+- .env.example 복제(.env 생성)
+- 본인 로컬 경로와 영상 소스 링크 설정
