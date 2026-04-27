@@ -1,0 +1,14 @@
+{
+  "frame": "fire_anomaly_20260427_135600_0001.jpg",
+  "timestamp": "2026-04-27T13:56:00",
+  "anomaly_type": "fire_anomaly",
+  "detections": [
+    {
+      "track_id": null,
+      "class": "fire",
+      "conf": 0.4143,
+      "bbox": [1011, 50, 1866, 737],
+      "keypoints": null
+    }
+  ]
+}

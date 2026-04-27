@@ -1,0 +1,14 @@
+{
+  "frame": "smoke_anomaly_20260427_140610_0001.jpg",
+  "timestamp": "2026-04-27T14:06:10",
+  "anomaly_type": "smoke_anomaly",
+  "detections": [
+    {
+      "track_id": null,
+      "class": "smoke",
+      "conf": 0.2352,
+      "bbox": [1195, 18, 1914, 557],
+      "keypoints": null
+    }
+  ]
+}
