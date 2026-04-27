@@ -33,3 +33,9 @@ Redis Streams : frames
 | `SAMPLE_FPS` | `1.0` | 초당 추출 프레임 수 |
 | `FRAME_STORAGE_PATH` | `/frames` | 프레임 저장 경로 |
 | `REDIS_URL` | `redis://redis:6379` | Redis 연결 URL |
+
+## 실행 방법
+- 가상환경 생성 및 실행
+- `pip install -r requirements.txt`
+- `cd services/ingestion`
+- `python -m app.main`
