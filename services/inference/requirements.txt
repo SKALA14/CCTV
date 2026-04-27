@@ -1,4 +1,4 @@
-openai
-redis
-pydantic-settings
-jinja2
+openai~=1.58.0
+redis[hiredis]~=5.2.0
+pydantic-settings~=2.7.0
+jinja2~=3.1.0

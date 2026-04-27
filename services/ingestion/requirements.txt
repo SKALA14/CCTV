@@ -1,6 +1,12 @@
+<<<<<<< Updated upstream
 opencv-python-headless
 redis
 pydantic-settings
 numpy
 opencv-python
 yt-dlp
+=======
+opencv-python-headless~=4.10.0
+redis[hiredis]~=5.2.0
+pydantic-settings~=2.7.0
+>>>>>>> Stashed changes
