@@ -9,7 +9,7 @@ from config import config
 _client: _redis.Redis | None = None
 
 
-def get_client() -> _redis.Redis: # 
+def get_client() -> _redis.Redis:
     global _client
     if _client is None:
         _client = _redis.from_url(config.REDIS_URL, decode_responses=True)
