@@ -38,4 +38,4 @@ Redis Streams : frames
 - 가상환경 생성 및 실행
 - `pip install -r requirements.txt`
 - `cd services/ingestion`
-- `python -m app.main`
+- `python -m app.main` or `python3`
