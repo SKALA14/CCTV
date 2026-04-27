@@ -1,4 +1,7 @@
-# Redis 연결 및 Streams 유틸 (XREADGROUP / XADD / XACK)
+# Redis 연결과 Streams 유틸 함수를 정의한다.
+# 정의: get_client·ensure_group·xreadgroup·xadd·xack·mark_processed.
+# 입력: config.REDIS_URL (연결), stream/group/consumer 문자열 (각 함수 인자).
+# 출력: 메시지 리스트(xreadgroup), msg_id(xadd), ACK 카운트(xack), 삭제 대상 여부 bool(mark_processed).
 
 import redis as _redis
 from config import config
@@ -6,7 +9,7 @@ from config import config
 _client: _redis.Redis | None = None
 
 
-def get_client() -> _redis.Redis:
+def get_client() -> _redis.Redis: # 
     global _client
     if _client is None:
         _client = _redis.from_url(config.REDIS_URL, decode_responses=True)
