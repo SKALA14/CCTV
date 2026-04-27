@@ -1,3 +1,7 @@
+# 환경변수를 읽어 서비스 전체에서 공유할 설정값을 정의한다.
+# 정의: REDIS_URL·스트림명·OPENAI_API_KEY·YOLO_MODEL_PATH·VLM_BUFFER_SIZE 등.
+# 입력: 환경변수 또는 .env 파일.
+# 출력: config 싱글턴 — 다른 파일에서 `from config import config` 로 임포트.
 from pydantic_settings import BaseSettings
 
 
