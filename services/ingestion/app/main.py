@@ -2,6 +2,7 @@
 # FileSource → FpsSampler → FramePublisher 순서로 실행한다.
 
 from .sources.file import FileSource
+from .sources.youtube import YouTubeSource
 from .sampler import FpsSampler
 from .publisher import FramePublisher
 
