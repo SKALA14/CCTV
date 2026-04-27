@@ -2,6 +2,7 @@
 # 정의: YOLOModel 클래스 — __init__(모델 로드), predict(추론).
 # 입력: predict(image_path: str) — JPEG 파일 절대경로.
 # 출력: list[dict] — [{"class": "person", "confidence": 0.92, "bbox": [x1,y1,x2,y2]}, ...].
+<<<<<<< HEAD
 
 from ultralytics import YOLO
 from config import config
@@ -20,3 +21,5 @@ class GeneralYOLO:
     
     def predict(self, frame_path):
         ...
+=======
+>>>>>>> c97d5194f1de9a997e76d77cbbb2a07a9e63263d
