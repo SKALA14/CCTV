@@ -3,6 +3,7 @@
 # 입력: predict(image_path: str) — JPEG 파일 절대경로.
 # 출력: list[dict] — [{"class": "person", "confidence": 0.92, "bbox": [x1,y1,x2,y2]}, ...].
 
+<<<<<<< HEAD
 import cv2
 import json
 from pathlib import Path
@@ -222,3 +223,22 @@ if __name__ == "__main__":
                 )
 
                 print(json.dumps(general_payload, ensure_ascii=False, indent=2))
+=======
+from ultralytics import YOLO
+from config import config
+
+
+class EmergencyYOLO:
+    def __init__(self):
+        self.model = YOLO(config.EMERGENCY_MODEL_PATH).to(config.DEVICE)
+    
+    def predict(self, frame_path):
+        ...
+
+class GeneralYOLO:
+    def __init__(self):
+        self.model = YOLO(config.GENERAL_MODEL_PATH).to(config.DEVICE)
+    
+    def predict(self, frame_path):
+        ...
+>>>>>>> 08f4e7eb69f42d8c6ad87ffe8efb33b70c107f36

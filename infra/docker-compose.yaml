@@ -1,0 +1,66 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  ingestion:
+    build:
+      context: ../services/ingestion
+    environment:
+      SOURCE_TYPE: file
+      SOURCE_PATH: /data/fall.mp4
+      SAMPLE_FPS: "1.0"
+      FRAME_STORAGE_PATH: /frames/
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - ./../sample:/data:ro
+      - frames_vol:/frames
+    depends_on:
+      - redis
+
+  inference:
+    build:
+      context: ../services/inference
+    environment:
+      REDIS_URL: redis://redis:6379
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: gpt-4o
+      PROMPT_DIR: /service/prompts
+      FRAME_STORAGE_PATH: /frames
+      FRAMES_STREAM: frames
+      EVENTS_STREAM: events
+      ALERTS_STREAM: alerts
+      EMERGENCY_MODEL_PATH: yolov8n.pt
+      GENERAL_MODEL_PATH: yolov8n.pt
+      DEVICE: cpu
+    volumes:
+      - frames_vol:/frames          # cleaner가 삭제하므로 ro 제거
+    depends_on:
+      - redis
+
+  backend:
+    build:
+      context: ../services/backend
+    ports:
+      - "8000:8000"
+    environment:
+      REDIS_URL: redis://redis:6379
+      EVENTS_STREAM: events
+      ALERTS_STREAM: alerts
+    depends_on:
+      - redis
+
+  frontend:
+    build:
+      context: ../services/frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  redis_data:
+  frames_vol:
