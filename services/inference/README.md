@@ -1,36 +1,47 @@
-# inference 서비스
-
-## 역할
-Redis Streams `frames` 채널에서 프레임 경로를 수신하고,
-해당 이미지를 VLM(Vision Language Model)에 전달해 장면 설명·이상 여부를 분석한 뒤
-결과를 `events` 채널에 발행한다.
-
-## 데이터 흐름
 ```
-Redis Streams : frames
-    │  프레임 경로 수신
-    ▼
-이미지 파일 로드 (로컬 볼륨)
-    │
-    ▼
-VLM 호출 (MVP: OpenAI Vision API)
-    │  prompts/*.j2 Jinja2 템플릿으로 프롬프트 구성
-    ▼
-결과 파싱 (description / is_anomaly / confidence)
-    │
-    ▼
-Redis Streams : events
+main.py
+  │
+  ├── init_consumer_groups()       # redis_client.py
+  │
+  ├── Process(emergency_pipeline)  # pipelines/emergency.py
+  │     └── models/yolo.py/EmergencyYOLO         # YOLO 추론
+  │
+  ├── Process(general_pipeline)    # pipelines/general.py
+  │     ├── models/yolo.py/GeneralYOLO
+  │     ├── models/vlm.py          # GPT-4o 호출
+  │     └── prompts/               # VLM 프롬프트 템플릿
+  │
+  └── Process(cleaner_process)     # cleaner.py
+  ```
+
+## 현재 변경 사항
+
+- 현재 YOLO 관련 수정은 `services/inference/models/yolo.py` 기준으로 작업 중
+- 아직 `main.py`와 연결되지 않았고, `yolo.py` 파일 단독 실행으로만 테스트 가능
+- `EmergencyYOLO`, `GeneralYOLO` 추론 결과를 JSON 형태로 확인할 수 있도록 테스트 코드가 포함되어 있음
+
+## 실행 방법
+
+`services/inference` 디렉토리에서 아래 명령으로 실행
+
+```bash
+python models/yolo.py
 ```
 
-## 핵심 설계 포인트
-- `vlm.py`는 VLM 백엔드를 추상화. MVP는 OpenAI Vision API, 추후 로컬 모델(Qwen2-VL 등)로 교체 가능.
-- 프롬프트는 `prompts/` 디렉토리의 Jinja2 `.j2` 파일로 관리. 코드 수정 없이 프롬프트 튜닝 가능.
-- `consumer.py`는 Redis Consumer Group 방식으로 수신. 장애 재시작 시 미처리 메시지 재처리 가능.
+테스트 이미지는 현재 `../../frames/video0/*.jpg` 경로를 기준으로 읽음
 
-## 환경변수
-| 변수 | 기본값 | 설명 |
-|------|--------|------|
-| `REDIS_URL` | `redis://redis:6379` | Redis 연결 URL |
-| `OPENAI_API_KEY` | (필수) | OpenAI API 키 |
-| `OPENAI_MODEL` | `gpt-4o` | 사용할 OpenAI 모델 |
-| `PROMPT_DIR` | `/service/prompts` | 프롬프트 템플릿 디렉토리 |
+## 추후 변경 필요 사항
+
+- `main.py` 또는 실제 pipeline 진입 경로와 `yolo.py` 연결
+- VLM 입력 구조와 YOLO detection 출력 구조 통일
+- downstream 모듈에서 바로 사용할 수 있도록 payload 스키마 확정
+
+## 주의 사항
+
+- 현재 테스트 코드는 `yolo.py`의 `__main__` 블록에서만 실행됨
+- 모델 파일 경로(`models/fire.pt`, `models/yolo26m-pose.pt`, `models/yolo26m.pt`)가 현재 작업 위치 기준으로 맞아야 함
+- 테스트 이미지 폴더가 없으면 추론이 실행되지 않음
+
+## 문서 반영 원칙
+
+- inference 디렉토리 내 구현/실행 방식이 바뀌면 이 README도 함께 업데이트
