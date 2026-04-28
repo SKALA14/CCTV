@@ -15,7 +15,9 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = "gpt-4o"
     PROMPT_DIR: str = "./prompts"
 
-    YOLO_MODEL_PATH: str = "yolov8n.pt"
+    EMERGENCY_MODEL_PATH: str = "yolov8n.pt"
+    GENERAL_MODEL_PATH: str = "yolov8n.pt"
+    DEVICE: str = "cpu"
     VLM_BUFFER_SIZE: int = 8  # VLM 호출 전 버퍼링할 프레임 수
 
     CAMERA_ID: str = "video0"
