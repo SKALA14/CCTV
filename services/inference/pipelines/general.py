@@ -42,6 +42,7 @@ def build_output_payload(frame_path: str, anomaly_type: str, detections: list[di
         "detections": formatted_detections
     }
 
+
 def run():
     # (msg_id, frame_path, camera_id) 튜플을 누적
     buffer: deque[tuple[str, str, str]] = deque()
