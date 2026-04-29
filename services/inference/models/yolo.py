@@ -28,7 +28,7 @@ class FireYOLO:
     FIRE_CLASSES = {"fire", "smoke"}
 
     def __init__(self):
-        self.model = YOLO("fire.pt")
+        self.model = YOLO("models/fire.pt")
 
     def predict(self, frame, h: int, w: int) -> list[dict]:
         results = self.model(frame, conf=0.15, imgsz=960, verbose=False)
@@ -61,7 +61,7 @@ class PoseYOLO:
     _CONF_THRESH      = 0.3
 
     def __init__(self):
-        self.model = YOLO("yolo26m-pose.pt")
+        self.model = YOLO("models/yolo26m-pose.pt")
 
     @staticmethod
     def _is_fallen(pts, cf, bbox) -> bool:
@@ -129,6 +129,8 @@ class PoseYOLO:
                 "track_id":    track_id,
                 "anomaly_type": "fallen" if fallen else "person",
                 "confidence":  round(float(box.conf[0].item()), 4),
+                "bbox":        clamp_bbox(box.xyxy[0].tolist(), h, w),
+                "keypoints":   results[0].keypoints.data[idx].tolist(),
             })
 
         return detections

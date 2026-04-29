@@ -12,7 +12,7 @@ def build_output_payload(frame_path: str, anomaly_type: str, detections: list[di
     for idx, det in enumerate(detections, start=1):
         formatted_detections.append({
             "track_id": det.get("track_id", idx),
-            "class": det["class"],
+            "class": det["anomaly_type"],
             "conf": det["confidence"],
         })
 

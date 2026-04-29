@@ -9,6 +9,8 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
+import cv2
+
 from config import config
 from models.yolo import EmergencyYOLO
 from redis_client import xreadgroup, xadd, xack, mark_processed
@@ -17,7 +19,42 @@ logger = logging.getLogger(__name__)
 
 GROUP    = "emergency"
 CONSUMER = "emergency-worker"
-FALL_CONFIRM_FRAMES = 5  # 몇 프레임 연속 감지 시 알람 발송
+FALL_CONFIRM_FRAMES = 5
+
+# 라벨 색상: anomaly_type → BGR
+_COLORS = {
+    "fallen": (0, 0, 255),
+    "fire":   (0, 128, 255),
+    "smoke":  (128, 128, 128),
+    "person": (0, 255, 0),
+}
+
+
+def _annotate_and_save(frame_path: str, detections: list[dict]) -> None:
+    frame = cv2.imread(frame_path)
+    if frame is None:
+        return
+
+    for det in detections:
+        bbox     = det.get("bbox")
+        track_id = det.get("track_id")
+        atype    = det.get("anomaly_type", "person")
+
+        if not bbox:
+            continue
+
+        x1, y1, x2, y2 = map(int, bbox)
+        color = _COLORS.get(atype, (255, 255, 255))
+        label = f"id:{track_id} {atype}" if track_id is not None else atype
+
+        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+        cv2.putText(frame, label, (x1, y1 - 6),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2)
+
+    cv2.imwrite(frame_path, frame)
+    
+CONSUMER = "emergency-worker"
+FALL_CONFIRM_FRAMES = 5
 
 
 def run():
@@ -32,8 +69,8 @@ def run():
 
     while True:
         messages = xreadgroup(config.FRAMES_STREAM, GROUP, CONSUMER)
-
         for msg_id, fields in messages:
+            print("Received message")
             frame_path = fields.get("frame_path", "")
             camera_id  = fields.get("camera_id", config.CAMERA_ID)
 
@@ -80,6 +117,9 @@ def run():
             for tid in gone_ids:
                 del fall_counter[tid]
                 alerted_ids.discard(tid) 
+
+            if config.ANNOTATE_FRAMES and detections:
+                _annotate_and_save(frame_path, detections)
 
             xack(config.FRAMES_STREAM, GROUP, msg_id)
             mark_processed(frame_path)
