@@ -2,5 +2,5 @@ opencv-python-headless
 redis
 pydantic-settings
 numpy
-opencv-python
+opencv-python-headless
 yt-dlp
