@@ -26,6 +26,7 @@ class Settings(BaseSettings):
 
     CAMERA_ID: str = "video0"
     FRAME_STORAGE_PATH: str = "./frames"
+    ANNOTATE_FRAMES: bool = True  # True면 bbox·id를 프레임에 그려서 덮어씀
 
     class Config:
         env_file = ".env"
