@@ -47,77 +47,87 @@ def build_output_payload(frame_path: str, anomaly_type: str, detections: list[di
 
 
 # ======================================================
-# 1. Emergency Pipeline Class
-# 불꽃, 연기, 화재 + 쓰러짐/추락 후보
+# 1-a. 화재/연기 탐지
+# ======================================================
+class FireYOLO:
+    FIRE_CLASSES = {"fire", "smoke"}
+
+    def __init__(self):
+        self.model = YOLO("models/fire.pt")
+        print("✅ FireYOLO 로드 완료 (fire.pt)")
+
+    def predict(self, frame, h: int, w: int) -> list[dict]:
+        results = self.model(frame, conf=0.15, imgsz=960, verbose=False)
+        detections = []
+
+        if results[0].boxes is None:
+            return detections
+
+        for box in results[0].boxes:
+            cls_id = int(box.cls[0].item())
+            class_name = self.model.names[cls_id]
+            if class_name in self.FIRE_CLASSES:
+                detections.append({
+                    "track_id": None,
+                    "class": class_name,
+                    "confidence": round(float(box.conf[0].item()), 4),
+                    "bbox": clamp_bbox(box.xyxy[0].tolist(), h, w),
+                    "keypoints": None,
+                })
+
+        return detections
+
+
+# ======================================================
+# 1-b. 포즈(쓰러짐/추락) 탐지
+# ======================================================
+class PoseYOLO:
+    def __init__(self):
+        self.model = YOLO("models/yolo26m-pose.pt")
+        print("✅ PoseYOLO 로드 완료 (yolo26m-pose.pt)")
+
+    def predict(self, frame, h: int, w: int) -> list[dict]:
+        results = self.model(frame, conf=0.5, imgsz=960, verbose=False)
+        detections = []
+
+        if results[0].boxes is None:
+            return detections
+
+        for idx, box in enumerate(results[0].boxes):
+            cls_id = int(box.cls[0].item())
+            if self.model.names[cls_id] != "person":
+                continue
+
+            keypoints = None
+            if results[0].keypoints is not None:
+                keypoints = results[0].keypoints.data[idx].tolist()
+
+            detections.append({
+                "track_id": idx + 1,
+                "class": "person",
+                "confidence": round(float(box.conf[0].item()), 4),
+                "bbox": clamp_bbox(box.xyxy[0].tolist(), h, w),
+                "keypoints": keypoints,
+            })
+
+        return detections
+
+
+# ======================================================
+# 1. Emergency Pipeline — FireYOLO + PoseYOLO 조합
 # ======================================================
 class EmergencyYOLO:
     def __init__(self):
-        self.fire_model = YOLO("models/fire.pt")
-        self.pose_model = YOLO("models/yolo26m-pose.pt")
-
-        self.fire_classes = {"fire", "smoke"}
-
-        print("✅ EmergencyYOLO 로드 완료 (fire.pt, yolo26m-pose.pt)")
+        self.fire = FireYOLO()
+        self.pose = PoseYOLO()
 
     def predict(self, image_path: str) -> list[dict]:
         frame = cv2.imread(image_path)
-
         if frame is None:
             return []
 
         h, w = frame.shape[:2]
-        detections = []
-
-        # [1] 화재/연기 탐지
-        fire_results = self.fire_model(
-            frame,
-            conf=0.15,
-            imgsz=960,
-            verbose=False
-        )
-
-        if fire_results[0].boxes is not None:
-            for box in fire_results[0].boxes:
-                cls_id = int(box.cls[0].item())
-                class_name = self.fire_model.names[cls_id]
-
-                if class_name in self.fire_classes:
-                    detections.append({
-                        "track_id": None,
-                        "class": class_name,
-                        "confidence": round(float(box.conf[0].item()), 4),
-                        "bbox": clamp_bbox(box.xyxy[0].tolist(), h, w),
-                        "keypoints": None
-                    })
-
-        # [2] 포즈 탐지
-        pose_results = self.pose_model(
-            frame,
-            conf=0.5,
-            imgsz=960,
-            verbose=False
-        )
-
-        if pose_results[0].boxes is not None:
-            for idx, box in enumerate(pose_results[0].boxes):
-                cls_id = int(box.cls[0].item())
-                class_name = self.pose_model.names[cls_id]
-
-                if class_name == "person":
-                    keypoints = None
-
-                    if pose_results[0].keypoints is not None:
-                        keypoints = pose_results[0].keypoints.data[idx].tolist()
-
-                    detections.append({
-                        "track_id": idx + 1,
-                        "class": "person",
-                        "confidence": round(float(box.conf[0].item()), 4),
-                        "bbox": clamp_bbox(box.xyxy[0].tolist(), h, w),
-                        "keypoints": keypoints
-                    })
-
-        return detections
+        return self.fire.predict(frame, h, w) + self.pose.predict(frame, h, w)
 
 
 # ===================================================
