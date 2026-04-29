@@ -6,6 +6,7 @@
 import multiprocessing
 import logging
 
+from redis_client import init_consumer_groups
 from pipelines.emergency import run as emergency_run
 from pipelines.general import run as general_run
 from cleaner import cleaner_process
@@ -20,6 +21,8 @@ WORKERS = [
 
 
 def main():
+    init_consumer_groups()
+    
     processes = [
         multiprocessing.Process(target=fn, name=name, daemon=True)
         for name, fn in WORKERS
