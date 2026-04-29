@@ -45,15 +45,8 @@ def run():
         target_event = resolve_target_event(camera_id)
         prompt = get_prompt_for_event(target_event, camera_id)
 
-        # 신뢰도 최고 탐지 객체를 가진 프레임 → 대표 프레임 선택
-        representative = max(
-            buffer,
-            key=lambda t: max((d["conf"] for d in t[3]["detections"]), default=0.0),
-        )
-
-        # 대표 프레임(최고 신뢰도)을 첫 번째에 배치 → _predict에서 detail=high 적용
-        rep_path    = representative[1]
-        frame_paths = [rep_path] + [fp for _, fp, _, _ in buffer if fp != rep_path]
+        # 버퍼 수신 순서(시간 순) 그대로 유지 → VLM이 시간적 흐름을 파악할 수 있도록
+        frame_paths = [fp for _, fp, _, _ in buffer]
 
         result = vlm.analyze(frame_paths, prompt)
 
