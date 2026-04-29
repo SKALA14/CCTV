@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     CAMERA_ID: str = "video0"
     SAMPLE_FPS: int = 5
     FRAME_STORAGE_PATH: str = "./frames/"
+    REDIS_URL: str = "redis://redis:6379"
+    FRAMES_STREAM: str = "frames"
 
     class Config:
         env_file = ".env"
