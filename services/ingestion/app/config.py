@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     SOURCE_TYPE: str = "file"
     SOURCE_PATH: str = "./sample/fall.mp4"  # 로컬 기본값
-    YT_URL: str
+    YT_URL: str = ""
     RTSP_URL: str = ""
     CAMERA_ID: str = "video0"
     SAMPLE_FPS: int = 5
