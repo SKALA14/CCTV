@@ -2,3 +2,4 @@ openai
 redis
 pydantic-settings
 jinja2
+ultralytics
