@@ -16,11 +16,17 @@ def get_client() -> _redis.Redis: #
     return _client
 
 
-def ensure_group(stream: str, group: str) -> None:
+def _ensure_group(stream: str, group: str) -> None:
     try:
         get_client().xgroup_create(stream, group, id="0", mkstream=True)
     except _redis.exceptions.ResponseError:
         pass  # 이미 존재하는 그룹
+
+
+def init_consumer_groups() -> None:
+    """서비스 시작 시 필요한 모든 스트림·그룹을 한 번에 선언한다."""
+    _ensure_group(config.FRAMES_STREAM, "emergency")
+    _ensure_group(config.FRAMES_STREAM, "general")
 
 
 def xreadgroup(
@@ -48,12 +54,14 @@ def xack(stream: str, group: str, *msg_ids: str) -> int:
 
 
 def mark_processed(frame_path: str, total: int = 2) -> bool:
-    """두 파이프라인이 모두 ACK 하면 True 반환 → 파일 삭제 대상."""
     r = get_client()
     key = f"ack_count:{frame_path}"
-    count = r.incr(key)
-    if count == 1:
-        r.expire(key, 3600)
+    
+    pipe = r.pipeline()
+    pipe.incr(key)
+    pipe.expire(key, 3600)
+    count, _ = pipe.execute()
+    
     if count >= total:
         r.delete(key)
         r.rpush("delete_queue", frame_path)
