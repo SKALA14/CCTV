@@ -10,7 +10,7 @@ from pathlib import Path
 
 from config import config
 from models.yolo import EmergencyYOLO
-from redis_client import xreadgroup, xadd, xack, mark_processed, init_consumer_groups
+from redis_client import xreadgroup, xadd, xack, mark_processed
 
 logger = logging.getLogger(__name__)
 
@@ -19,26 +19,24 @@ CONSUMER = "emergency-worker"
 
 
 def build_output_payload(frame_path: str, anomaly_type: str, detections: list[dict]) -> dict:
-    formatted = [
-        {
-            "track_id": det.get("track_id"),
-            "class": det["class"],
-            "conf": det["confidence"],
-            "bbox": det["bbox"],
-            "keypoints": det.get("keypoints"),
-        }
-        for det in detections
-    ]
     return {
         "frame": Path(frame_path).name,
         "timestamp": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
         "anomaly_type": anomaly_type,
-        "detections": formatted,
+        "detections": [
+            {
+                "track_id": det.get("track_id"),
+                "class": det["class"],
+                "conf": det["confidence"],
+                "bbox": det["bbox"],
+                "keypoints": det.get("keypoints"),
+            }
+            for det in detections
+        ],
     }
 
 
 def run():
-    init_consumer_groups()
     model = EmergencyYOLO()
     logger.info("emergency pipeline started")
 
