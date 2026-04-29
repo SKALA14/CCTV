@@ -5,14 +5,18 @@
 
 import time
 import logging
-from pathlib import Path
 from collections import deque
-from datetime import datetime
 
 from config import config
 from models import vlm
+<<<<<<< HEAD
+from models.yolo import GeneralYOLO, build_output_payload
+from prompts.target_event_prompts import get_prompt_for_event
+=======
 from utils.builder import build_output_payload
+>>>>>>> 8e49691eacbeecec6dd43ed2645b5efeabd6f3a4
 from redis_client import xreadgroup, xadd, xack, mark_processed
+from utils.channel_target_event import resolve_target_event
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +25,10 @@ CONSUMER = "general-worker"
 
 
 def run():
-    # (msg_id, frame_path, camera_id) 튜플을 누적
-    buffer: deque[tuple[str, str, str]] = deque()
+    yolo = GeneralYOLO()
+
+    # (msg_id, frame_path, camera_id, payload) 튜플을 누적
+    buffer: deque[tuple[str, str, str, dict]] = deque()
     logger.info("general pipeline started")
 
     while True:
@@ -30,26 +36,33 @@ def run():
 
         for msg_id, fields in messages:
             frame_path = fields.get("frame_path", "")
-            camera_id = fields.get("camera_id", config.CAMERA_ID)
-            buffer.append((msg_id, frame_path, camera_id))
+            camera_id  = fields.get("camera_id", config.CAMERA_ID)
+
+            detections = yolo.predict(frame_path)
+            payload    = build_output_payload(frame_path, "general_yolo_candidate", detections)
+            buffer.append((msg_id, frame_path, camera_id, payload))
 
         if len(buffer) < config.VLM_BUFFER_SIZE:
             continue
 
-        frame_paths = [fp for _, fp, _ in buffer]
-        camera_id = buffer[-1][2]
+        camera_id   = buffer[-1][2]
+        target_event = resolve_target_event(camera_id)
+        prompt = get_prompt_for_event(target_event, camera_id)
 
-        result = vlm.analyze(frame_paths, camera_id)
+        # 버퍼 수신 순서(시간 순) 그대로 유지 → VLM이 시간적 흐름을 파악할 수 있도록
+        frame_paths = [fp for _, fp, _, _ in buffer]
+
+        result = vlm.analyze(frame_paths, prompt)
 
         xadd(config.EVENTS_STREAM, {
-            "camera_id": camera_id,
+            "camera_id":   camera_id,
             "description": result["description"],
-            "is_anomaly": str(result["is_anomaly"]),
-            "timestamp": str(time.time()),
+            "is_anomaly":  str(result["is_anomaly"]),
+            "timestamp":   str(time.time()),
         })
         logger.info("event published: camera=%s anomaly=%s", camera_id, result["is_anomaly"])
 
-        for msg_id, frame_path, _ in buffer:
+        for msg_id, frame_path, _, _ in buffer:
             xack(config.FRAMES_STREAM, GROUP, msg_id)
             mark_processed(frame_path)
 

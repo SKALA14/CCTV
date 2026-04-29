@@ -1,12 +1,18 @@
 // 이벤트 유형 목록 (VLM 탐지 대상)
 export const GENERAL_OPTIONS = [
-    '쓰러짐 / 추락',
-    '화재 / 연기',
-    '침입',
-    '폭행',
-    '안전복장 미착용',
-    '침수',
+    'PPE (안전 장비 미착용)',
+    '넘어짐 / 쓰러짐',
+    '위험구역 침범',
+    '화재',
 ]
+
+// 내부 target_event key
+export const TARGET_EVENT_KEYS = {
+    PPE: 'ppe',
+    FALL: 'fall',
+    INTRUSION: 'intrusion',
+    FIRE: 'fire',
+}
 
 // 위험도 레벨
 export const DANGER_LEVELS = {

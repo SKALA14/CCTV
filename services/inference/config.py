@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o"
     PROMPT_DIR: str = "./prompts"
+    CAMERA_TARGET_EVENT_MAP: str = "{}"  # JSON: {"cam_01":"intrusion","cam_02":"fire"}
 
     EMERGENCY_MODEL_PATH: str = "yolov8n.pt"
     GENERAL_MODEL_PATH: str = "yolov8n.pt"
