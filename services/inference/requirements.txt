@@ -3,3 +3,4 @@ redis
 pydantic-settings
 jinja2
 ultralytics
+opencv-python-headless
