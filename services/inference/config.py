@@ -17,8 +17,6 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = "gpt-4o"
     PROMPT_DIR: str = "./prompts"
 
-    EMERGENCY_MODEL_PATH: str = "yolov8n.pt"
-    GENERAL_MODEL_PATH: str = "yolov8n.pt"
     DEVICE: str = "cpu"
 
     CAMERA_ID: str = "video99"

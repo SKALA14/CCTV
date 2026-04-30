@@ -6,7 +6,6 @@
 import logging
 import time
 from collections import deque
-from datetime import datetime
 from pathlib import Path
 
 import cv2
@@ -64,6 +63,7 @@ def run():
             print("Received message")
             frame_path = fields.get("frame_path", "")
             camera_id  = fields.get("camera_id", config.CAMERA_ID)
+            timestamp  = fields.get("timestamp", "")
 
             if not frame_path: # 경로가 존재하지 않는 경우 
                 xack(config.FRAMES_STREAM, GROUP, msg_id)
@@ -78,7 +78,7 @@ def run():
                     xadd(config.ALERTS_STREAM, {
                         "camera_id": camera_id,
                         "frame": Path(frame_path).name,
-                        "timestamp": str(datetime.now()),
+                        "timestamp": timestamp,
                         "anomaly_type": anomaly_type,
                         "danger_level": "critical",
                         "description": "화재 위험 감지",
@@ -101,7 +101,7 @@ def run():
                         xadd(config.ALERTS_STREAM, {
                             "camera_id":    camera_id,
                             "frame":        Path(frame_path).name,
-                            "timestamp":    str(datetime.now()),
+                            "timestamp":    timestamp,
                             "anomaly_type": "fallen",
                             "danger_level": "critical",
                             "description":  "작업자 낙상 감지",
