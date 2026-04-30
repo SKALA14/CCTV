@@ -17,11 +17,11 @@ from redis_client import xreadgroup, xadd, xack, mark_processed
 
 logger = logging.getLogger(__name__)
 
-GROUP    = "emergency"
-CONSUMER = "emergency-worker"
-FALL_WINDOW_SEC   = 10   
-FALL_CONFIRM_COUNT = 3   
-_COLORS = {
+GROUP      = "emergency"
+CONSUMER   = "emergency-worker"
+MIN_FRAMES = 3   
+WINDOW_SEC = 5.0
+_COLORS    = {
     "fallen": (0, 0, 255),
     "fire":   (0, 128, 255),
     "smoke":  (128, 128, 128),
@@ -93,11 +93,11 @@ def run():
                     fallen_timestamps[camera_id].append(now)
 
                     # 윈도우 밖 제거
-                    cutoff = now - FALL_WINDOW_SEC
+                    cutoff = now - WINDOW_SEC
                     while fallen_timestamps[camera_id] and fallen_timestamps[camera_id][0] < cutoff:
                         fallen_timestamps[camera_id].popleft()
 
-                    if len(fallen_timestamps[camera_id]) >= FALL_CONFIRM_COUNT:
+                    if len(fallen_timestamps[camera_id]) >= MIN_FRAMES:
                         xadd(config.ALERTS_STREAM, {
                             "camera_id":    camera_id,
                             "frame":        Path(frame_path).name,
