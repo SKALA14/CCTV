@@ -14,7 +14,6 @@ class Settings(BaseSettings):
     EMERGENCY_GROUP: str = "emergency"
     GENERAL_GROUP: str = "general"
 
-    OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o"
     PROMPT_DIR: str = "./prompts"
 
@@ -22,7 +21,7 @@ class Settings(BaseSettings):
     GENERAL_MODEL_PATH: str = "yolov8n.pt"
     DEVICE: str = "cpu"
 
-    CAMERA_ID: str = "video0"
+    CAMERA_ID: str = "video99"
     FRAME_STORAGE_PATH: str = "./frames"
     ANNOTATE_FRAMES: bool = True  # True면 bbox·id를 프레임에 그려서 덮어씀
 
