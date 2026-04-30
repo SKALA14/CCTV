@@ -48,8 +48,6 @@ class VLMClient:
         self._client = OpenAI(api_key=api_key)
 
     def _predict(self, prompt: str, image_paths: list[str]) -> str:
-        if self._client is None:
-            raise RuntimeError("load()를 먼저 호출하세요.")
         if not image_paths:
             raise ValueError("image_paths가 비어 있습니다.")
 
