@@ -21,10 +21,6 @@ class Settings(BaseSettings):
     EMERGENCY_MODEL_PATH: str = "yolov8n.pt"
     GENERAL_MODEL_PATH: str = "yolov8n.pt"
     DEVICE: str = "cpu"
-    
-    VLM_BUFFER_SIZE: int = 5       # VLM에 넘길 최대 프레임 수
-    VLM_WINDOW_SEC: float = 5.0    # anomaly 트리거 후 VLM 호출까지 time window (초)
-
 
     CAMERA_ID: str = "video0"
     FRAME_STORAGE_PATH: str = "./frames"
