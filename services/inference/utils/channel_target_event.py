@@ -13,6 +13,7 @@ import logging
 from typing import Literal
 
 from config import config
+from redis_client import get_client
 
 logger = logging.getLogger(__name__)
 
@@ -53,12 +54,11 @@ def _parse_env_map(raw: str) -> dict[str, TargetEvent]:
 
 
 def resolve_target_event(camera_id: str) -> TargetEvent:
-    env_map = _parse_env_map(config.CAMERA_TARGET_EVENT_MAP)
-
-    if camera_id in env_map:
-        return env_map[camera_id]
-
+    raw = get_client().get("camera_target_event_map") or "{}"
+    redis_map = _parse_env_map(raw)
+    
+    if camera_id in redis_map:
+        return redis_map[camera_id]
     if camera_id in CAMERA_TARGET_EVENT_DEFAULTS:
         return CAMERA_TARGET_EVENT_DEFAULTS[camera_id]
-
     return DEFAULT_TARGET_EVENT
