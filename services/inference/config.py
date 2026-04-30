@@ -17,12 +17,14 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o"
     PROMPT_DIR: str = "./prompts"
-    CAMERA_TARGET_EVENT_MAP: str = "{}"  # JSON: {"cam_01":"intrusion","cam_02":"fire"}
 
     EMERGENCY_MODEL_PATH: str = "yolov8n.pt"
     GENERAL_MODEL_PATH: str = "yolov8n.pt"
     DEVICE: str = "cpu"
-    VLM_BUFFER_SIZE: int = 10  # VLM 호출 전 버퍼링할 프레임 수
+    
+    VLM_BUFFER_SIZE: int = 5       # VLM에 넘길 최대 프레임 수
+    VLM_WINDOW_SEC: float = 5.0    # anomaly 트리거 후 VLM 호출까지 time window (초)
+
 
     CAMERA_ID: str = "video0"
     FRAME_STORAGE_PATH: str = "./frames"
