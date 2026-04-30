@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO, format="%(processName)s %(levelname)s %(
 
 WORKERS = [
     ("emergency", emergency_run),
-    #("general",   general_run),
+    ("general",   general_run),
     ("cleaner",   cleaner_process),
 ]
 
