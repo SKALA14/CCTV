@@ -3,9 +3,9 @@
 # 입력: Redis Stream "frames" 메시지 — {frame_path, camera_id, timestamp}.
 # 출력: 긴급 상황 시 "alerts" 스트림에 XADD; 항상 XACK 후 mark_processed 호출.
 
-import json
 import logging
-from collections import defaultdict
+import time
+from collections import deque
 from datetime import datetime
 from pathlib import Path
 
@@ -19,9 +19,8 @@ logger = logging.getLogger(__name__)
 
 GROUP    = "emergency"
 CONSUMER = "emergency-worker"
-FALL_CONFIRM_FRAMES = 5
-
-# 라벨 색상: anomaly_type → BGR
+FALL_WINDOW_SEC   = 10   
+FALL_CONFIRM_COUNT = 3   
 _COLORS = {
     "fallen": (0, 0, 255),
     "fire":   (0, 128, 255),
@@ -52,19 +51,11 @@ def _annotate_and_save(frame_path: str, detections: list[dict]) -> None:
                     cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2)
 
     cv2.imwrite(frame_path, frame)
-    
-CONSUMER = "emergency-worker"
-FALL_CONFIRM_FRAMES = 5
 
 
 def run():
     model = EmergencyYOLO()
-
-    # track_id → 연속 넘어짐 프레임 수
-    fall_counter: dict[int, int] = defaultdict(int)
-    # 이미 알람을 보낸 track_id 집합 (중복 방지)
-    alerted_ids: set[int] = set()
-
+    fallen_timestamps: dict[str, deque] = {}  # {camera_id: deque of timestamps}
     logger.info("emergency pipeline started")
 
     while True:
@@ -80,12 +71,8 @@ def run():
 
             detections = model.predict(frame_path)
 
-            # 이번 프레임에서 넘어진 것으로 판정된 track_id 집합
-            fallen_ids_this_frame: set[int] = set()
-
             for det in detections:
                 anomaly_type = det.get("anomaly_type", "")
-                track_id     = det.get("track_id")
 
                 if anomaly_type in ("fire", "smoke"):
                     xadd(config.ALERTS_STREAM, {
@@ -93,30 +80,33 @@ def run():
                         "frame": Path(frame_path).name,
                         "timestamp": str(datetime.now()),
                         "anomaly_type": anomaly_type,
+                        "danger_level": "critical",
+                        "description": "화재 위험 감지",
                     })
                     continue
 
-                if anomaly_type == "fallen" and track_id is not None:
-                    fallen_ids_this_frame.add(track_id)
-                    fall_counter[track_id] += 1
+                elif anomaly_type == "fallen":
+                    if camera_id not in fallen_timestamps:
+                        fallen_timestamps[camera_id] = deque()
 
-                    if (
-                        fall_counter[track_id] >= FALL_CONFIRM_FRAMES
-                        and track_id not in alerted_ids
-                    ):
+                    now = time.time()
+                    fallen_timestamps[camera_id].append(now)
+
+                    # 윈도우 밖 제거
+                    cutoff = now - FALL_WINDOW_SEC
+                    while fallen_timestamps[camera_id] and fallen_timestamps[camera_id][0] < cutoff:
+                        fallen_timestamps[camera_id].popleft()
+
+                    if len(fallen_timestamps[camera_id]) >= FALL_CONFIRM_COUNT:
                         xadd(config.ALERTS_STREAM, {
-                            "camera_id": camera_id,
-                            "frame": Path(frame_path).name,
-                            "timestamp": str(datetime.now()),
-                            "anomaly_type": anomaly_type,
+                            "camera_id":    camera_id,
+                            "frame":        Path(frame_path).name,
+                            "timestamp":    str(datetime.now()),
+                            "anomaly_type": "fallen",
+                            "danger_level": "critical",
+                            "description":  "작업자 낙상 감지",
                         })
-                        alerted_ids.add(track_id)
-                        logger.info("fall alert: track_id=%s frame=%s", track_id, frame_path)
-
-            gone_ids = set(fall_counter) - fallen_ids_this_frame
-            for tid in gone_ids:
-                del fall_counter[tid]
-                alerted_ids.discard(tid) 
+                        fallen_timestamps[camera_id].clear()  # 알람 후 리셋
 
             if config.ANNOTATE_FRAMES and detections:
                 _annotate_and_save(frame_path, detections)
