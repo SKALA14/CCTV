@@ -76,12 +76,13 @@ def run() -> None:
     last_vlm_call: dict[str, float]                       = {}
     call_lock = threading.Lock()
 
-    job_queue: queue.Queue[_VLMJob | None] = queue.Queue(maxsize=8)
+    job_queue: queue.Queue[_VLMJob | None] = queue.Queue(maxsize=4)
     worker = threading.Thread(
-        target=_vlm_worker, args=(job_queue, vlm, last_vlm_call, call_lock), daemon=True,
+        target=_vlm_worker,
+        args=(job_queue, vlm, last_vlm_call, call_lock),
+        daemon=True,
     )
     worker.start()
-    logger.info("general pipeline started (async VLM worker)")
 
     try:
         while True:
