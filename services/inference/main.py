@@ -1,22 +1,20 @@
-# 세 개의 독립 프로세스를 띄워 서비스를 시작하는 진입점.
-# 정의: main() — multiprocessing.Process로 emergency·general·cleaner를 각각 실행.
+# 독립 프로세스를 띄워 서비스를 시작하는 진입점.
+# 정의: main() — multiprocessing.Process로 unified pipeline을 실행.
 # 입력: 없음 (각 프로세스가 Redis에서 직접 읽음).
 # 출력: 없음 (프로세스들이 종료될 때까지 블로킹).
 
 import multiprocessing
 import logging
 
+from pipelines.s0_unified import run as unified_run
+from pipelines.s9_cleaner import cleaner_process
 from redis_client import init_consumer_groups
-from pipelines.emergency import run as emergency_run
-from pipelines.general import run as general_run
-from cleaner import cleaner_process
 
 logging.basicConfig(level=logging.INFO, format="%(processName)s %(levelname)s %(message)s")
 
 WORKERS = [
-    ("emergency", emergency_run),
-    ("general",   general_run),
-    ("cleaner",   cleaner_process),
+    ("unified", unified_run),
+    ("cleaner", cleaner_process),
 ]
 
 
