@@ -1,0 +1,9 @@
+services:
+  ingestion:
+    volumes:
+      - ./../frames:/frames
+  inference:
+    volumes:
+      - ./../frames:/frames
+    environment:
+      ANNOTATE_FRAMES: "true"
