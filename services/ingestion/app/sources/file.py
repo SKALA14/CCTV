@@ -12,10 +12,10 @@ class FileSource(FrameSource):
     def __init__(self):
         self._cap = None
 
-    def open(self) -> None:
-        self._cap = cv2.VideoCapture(config.SOURCE_PATH)
+    def open(self, path: str) -> None:
+        self._cap = cv2.VideoCapture(path)
         if not self._cap.isOpened():
-            raise RuntimeError(f"영상 파일을 열 수 없습니다: {config.SOURCE_PATH}")
+            raise RuntimeError(f"영상 파일을 열 수 없습니다: {path}")
 
     def read_frame(self) -> np.ndarray | None:
         ok, frame = self._cap.read()

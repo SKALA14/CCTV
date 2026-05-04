@@ -1,5 +1,12 @@
-opencv-python-headless
-redis
-pydantic-settings
-numpy
-yt-dlp
+# ── core ──────────────────────────────────────────────
+opencv-python-headless==4.13.0.92
+numpy>=1.26,<3
+
+# ── redis ─────────────────────────────────────────────
+redis==7.1.1
+
+# ── config ────────────────────────────────────────────
+pydantic-settings==2.14.0
+
+# ── video source ──────────────────────────────────────
+yt-dlp>=2026.2.21

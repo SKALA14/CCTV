@@ -15,15 +15,15 @@ class RtspSource(FrameSource):
     def __init__(self):
         self._cap = None
 
-    def open(self) -> None:
+    def open(self, path: str) -> None:
         for i in range(10):
-            self._cap = cv2.VideoCapture(config.SOURCE_PATH)
+            self._cap = cv2.VideoCapture(path)
             if self._cap.isOpened():
-                logger.info("RTSP 연결 성공: %s", config.SOURCE_PATH)
+                logger.info("RTSP 연결 성공: %s", path)
                 return
             logger.warning("RTSP 연결 실패, 재시도 %d/10", i + 1)
             time.sleep(3)
-        raise RuntimeError(f"RTSP 스트림을 열 수 없습니다: {config.SOURCE_PATH}")
+        raise RuntimeError(f"RTSP 스트림을 열 수 없습니다: {path}")
 
     def read_frame(self) -> np.ndarray | None:
         ok, frame = self._cap.read()
