@@ -12,7 +12,7 @@ services:
       - "8554:8554"
       - "8888:8888"
 
-  ingestion:
+  ingestion_0:
     build:
       context: ../services/ingestion
     environment:
@@ -25,6 +25,48 @@ services:
       REDIS_URL: redis://redis:6379
     volumes:
       - ./../sample:/data:ro
+      - frames_vol:/frames
+    depends_on:
+      - redis
+    restart: always
+
+  ingestion_1:
+    build:
+      context: ../services/ingestion
+    environment:
+      CAMERA_ID: camera_3
+      SAMPLE_FPS: "2"
+      FRAME_STORAGE_PATH: /frames/
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - frames_vol:/frames
+    depends_on:
+      - redis
+    restart: always
+
+  ingestion_2:
+    build:
+      context: ../services/ingestion
+    environment:
+      CAMERA_ID: camera_3
+      SAMPLE_FPS: "2"
+      FRAME_STORAGE_PATH: /frames/
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - frames_vol:/frames
+    depends_on:
+      - redis
+    restart: always
+
+  ingestion_3:
+    build:
+      context: ../services/ingestion
+    environment:
+      CAMERA_ID: camera_3
+      SAMPLE_FPS: "2"
+      FRAME_STORAGE_PATH: /frames/
+      REDIS_URL: redis://redis:6379
+    volumes:
       - frames_vol:/frames
     depends_on:
       - redis
