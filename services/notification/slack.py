@@ -6,10 +6,9 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-HIGH_SEVERITIES = {"HIGH", "CRITICAL"}
+HIGH_SEVERITIES = {"high", "critical"}
 EMERGENCY_DEDUPE_WINDOW = timedelta(minutes=15)
 _emergency_last_sent_at: dict[tuple[str, str], datetime] = {}
-
 
 def _parse_timestamp(value: Any) -> datetime:
     if isinstance(value, datetime):
@@ -31,14 +30,14 @@ def should_notify_general(vlm_result: dict[str, Any]) -> bool:
     if not vlm_result.get("is_anomaly", False):
         return False
 
-    severity = str(vlm_result.get("severity", "")).upper()
+    severity = str(vlm_result.get("danger_level", "")).lower()
     if not severity:
         return True
     return severity in HIGH_SEVERITIES
 
 
 def build_general_payload(vlm_result: dict[str, Any]) -> dict[str, Any]:
-    severity = str(vlm_result.get("severity", "UNKNOWN")).upper()
+    severity = str(vlm_result.get("danger_level", "")).lower()
     camera_id = vlm_result.get("camera_id", "unknown")
     timestamp = vlm_result.get("timestamp", "")
     event_type = vlm_result.get("event_type", "general")
@@ -47,8 +46,7 @@ def build_general_payload(vlm_result: dict[str, Any]) -> dict[str, Any]:
     rule = vlm_result.get("rule", "")
     frame = vlm_result.get("frame", "")
 
-    emoji = "🚨" if severity in HIGH_SEVERITIES else "⚠️"
-    fallback_text = f"{emoji} [{severity}] {camera_id} | {timestamp} | {event_type} | {reason}"
+    fallback_text = f"[{severity}] {camera_id} | {timestamp} | {event_type} | {reason}"
 
     payload = {
         "text": fallback_text,
@@ -57,7 +55,7 @@ def build_general_payload(vlm_result: dict[str, Any]) -> dict[str, Any]:
                 "type": "header",
                 "text": {
                     "type": "plain_text",
-                    "text": f"{emoji} 이상 상황 감지 알림",
+                    "text": "이상 상황 감지 알림",
                 },
             },
             {
@@ -106,7 +104,7 @@ def build_emergency_payload(alert: dict[str, Any]) -> dict[str, Any]:
     max_conf = max((float(det.get("conf", 0)) for det in detections), default=0)
 
     fallback_text = (
-        f"🚨 [EMERGENCY] {camera_id} | {timestamp} | "
+        f"[EMERGENCY] {camera_id} | {timestamp} | "
         f"{anomaly_type} | {classes or 'detection'}"
     )
 
@@ -123,7 +121,7 @@ def build_emergency_payload(alert: dict[str, Any]) -> dict[str, Any]:
                 "type": "header",
                 "text": {
                     "type": "plain_text",
-                    "text": "🚨 긴급 상황 감지 알림",
+                    "text": "긴급 상황 감지 알림",
                 },
             },
             {
