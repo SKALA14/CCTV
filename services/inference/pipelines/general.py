@@ -86,7 +86,7 @@ def run() -> None:
 
     try:
         while True:
-            messages = xreadgroup(config.FRAMES_STREAM, GROUP, CONSUMER)
+            messages = xreadgroup(config.FRAMES_STREAM, GROUP, CONSUMER, count=10)
 
             for msg_id, fields in messages:
                 frame_path = fields.get("frame_path", "")
