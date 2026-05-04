@@ -6,7 +6,7 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-HIGH_SEVERITIES = {"high"}
+HIGH_SEVERITIES = {"high", "critical"}
 EMERGENCY_DEDUPE_WINDOW = timedelta(minutes=15)
 _emergency_last_sent_at: dict[tuple[str, str], datetime] = {}
 
