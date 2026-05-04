@@ -71,11 +71,8 @@ CCTV/
 │   │   │   ├── emergency.py         # 화재·낙상 즉시 알람
 │   │   │   └── general.py          # 침입·PPE 등 VLM 분석
 │   │   ├── prompts/
-│   │   │   ├── fall.j2
-│   │   │   ├── fire.j2
-│   │   │   ├── intrusion.j2
-│   │   │   ├── ppe.j2
-│   │   │   └── target_event_prompts.py
+│   │   │   ├── base.j2
+│   │   │   └── prompt.py
 │   │   ├── utils/
 │   │   │   ├── builder.py
 │   │   │   └── channel_target_event.py
