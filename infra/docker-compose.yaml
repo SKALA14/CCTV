@@ -28,6 +28,7 @@ services:
       - frames_vol:/frames
     depends_on:
       - redis
+      - inference
     restart: always
 
   inference:
