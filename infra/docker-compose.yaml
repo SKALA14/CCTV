@@ -16,15 +16,11 @@ services:
     build:
       context: ../services/ingestion
     environment:
-      SOURCE_TYPE: rtsp
-      SOURCE_PATH: rtsp://host.docker.internal:8554/webcam
+      CAMERA_ID: cam0
       SAMPLE_FPS: "2"
-      REALTIME_SIMULATION: "false"
-      CAMERA_ID: ${CAMERA_ID:-video0}
       FRAME_STORAGE_PATH: /frames/
       REDIS_URL: redis://redis:6379
     volumes:
-      - ./../sample:/data:ro
       - frames_vol:/frames
     depends_on:
       - redis
@@ -34,7 +30,7 @@ services:
     build:
       context: ../services/ingestion
     environment:
-      CAMERA_ID: camera_3
+      CAMERA_ID: cam1
       SAMPLE_FPS: "2"
       FRAME_STORAGE_PATH: /frames/
       REDIS_URL: redis://redis:6379
@@ -48,7 +44,7 @@ services:
     build:
       context: ../services/ingestion
     environment:
-      CAMERA_ID: camera_3
+      CAMERA_ID: cam2
       SAMPLE_FPS: "2"
       FRAME_STORAGE_PATH: /frames/
       REDIS_URL: redis://redis:6379
@@ -62,7 +58,7 @@ services:
     build:
       context: ../services/ingestion
     environment:
-      CAMERA_ID: camera_3
+      CAMERA_ID: cam3
       SAMPLE_FPS: "2"
       FRAME_STORAGE_PATH: /frames/
       REDIS_URL: redis://redis:6379
@@ -87,7 +83,7 @@ services:
       ALERTS_STREAM: alerts
       DEVICE: cpu
     volumes:
-      - frames_vol:/frames          # cleaner가 삭제하므로 ro 제거
+      - frames_vol:/frames
     depends_on:
       - redis
 
