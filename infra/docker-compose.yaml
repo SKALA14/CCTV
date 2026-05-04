@@ -6,14 +6,20 @@ services:
     volumes:
       - redis_data:/data
 
+  mediamtx:
+    image: bluenviron/mediamtx
+    ports:
+      - "8554:8554"
+      - "8888:8888"
+
   ingestion:
     build:
       context: ../services/ingestion
     environment:
-      SOURCE_TYPE: file
-      SOURCE_PATH: /data/falls.mp4
+      SOURCE_TYPE: rtsp
+      SOURCE_PATH: rtsp://host.docker.internal:8554/webcam
       SAMPLE_FPS: "2"
-      REALTIME_SIMULATION: "true"
+      REALTIME_SIMULATION: "false"
       CAMERA_ID: ${CAMERA_ID:-video0}
       FRAME_STORAGE_PATH: /frames/
       REDIS_URL: redis://redis:6379
@@ -22,6 +28,7 @@ services:
       - frames_vol:/frames
     depends_on:
       - redis
+    restart: always
 
   inference:
     build:
