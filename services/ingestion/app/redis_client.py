@@ -20,6 +20,7 @@ def get_client() -> redis.Redis:
             client = redis.from_url(config.REDIS_URL, decode_responses=True)
             client.ping()
             _redis_client = client
+            logger.info("Redis 연결 성공: %s", config.REDIS_URL)
             return _redis_client
         except redis.exceptions.ConnectionError:
             logger.warning("Redis 연결 실패 (%d/5), 3초 후 재시도", attempt)

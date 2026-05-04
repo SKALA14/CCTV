@@ -2,6 +2,7 @@
 # SOURCE_TYPE에 따라 소스를 선택하고 FpsSampler → FramePublisher 순서로 실행한다.
 
 import time
+import logging
 
 from .config import config
 from .redis_client import get_client
@@ -11,6 +12,12 @@ from .sources.youtube import YouTubeSource
 from .sampler import FpsSampler
 from .publisher import FramePublisher
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(name)s %(levelname)s %(message)s",
+)
+
 _SOURCES = {
     "file":    FileSource,
     "rtsp":    RtspSource,
@@ -19,10 +26,12 @@ _SOURCES = {
 
 def wait_for_source():
     client = get_client()
+    logger.info("소스 대기 중 (camera_id=%s)", config.CAMERA_ID)
     while True:
         url = client.get(f"camera:{config.CAMERA_ID}:source_url")
         type_ = client.get(f"camera:{config.CAMERA_ID}:source_type")
         if url and type_:
+            logger.info("소스 수신 (type=%s, url=%s)", type_, url)
             return url, type_
         time.sleep(2)
 
