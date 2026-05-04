@@ -28,8 +28,8 @@ export function useEvents() {
     if (DUMMY_MODE) {
       const q = (query || '').trim().toLowerCase()
       events.value = DUMMY_EVENTS.filter(ev => {
-        const matchChannel = !channelId || ev.channel_id === channelId
-        const matchText = !q || [ev.reason, ev.event_type, ev.channel_name]
+        const matchChannel = !channelId || ev.camera_id === channelId
+        const matchText = !q || [ev.description, ev.event_type, ev.channel_name]
           .some(s => s && s.toLowerCase().includes(q))
         return matchChannel && matchText
       })
