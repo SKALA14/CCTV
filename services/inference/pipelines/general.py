@@ -54,6 +54,7 @@ def run():
             "camera_id":   camera_id,
             "description": result["description"],
             "is_anomaly":  str(result["is_anomaly"]),
+            "danger_level": str(result.get("danger_level", "none")),
             "timestamp":   str(time.time()),
         })
         logger.info("event published: camera=%s anomaly=%s", camera_id, result["is_anomaly"])

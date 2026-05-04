@@ -6,10 +6,9 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-HIGH_SEVERITIES = {"HIGH", "CRITICAL"}
+HIGH_SEVERITIES = {"high"}
 EMERGENCY_DEDUPE_WINDOW = timedelta(minutes=15)
 _emergency_last_sent_at: dict[tuple[str, str], datetime] = {}
-
 
 def _parse_timestamp(value: Any) -> datetime:
     if isinstance(value, datetime):
@@ -31,14 +30,14 @@ def should_notify_general(vlm_result: dict[str, Any]) -> bool:
     if not vlm_result.get("is_anomaly", False):
         return False
 
-    severity = str(vlm_result.get("severity", "")).upper()
+    severity = str(vlm_result.get("danger_level", "")).lower()
     if not severity:
         return True
     return severity in HIGH_SEVERITIES
 
 
 def build_general_payload(vlm_result: dict[str, Any]) -> dict[str, Any]:
-    severity = str(vlm_result.get("severity", "UNKNOWN")).upper()
+    severity = str(vlm_result.get("danger_level", "")).lower()
     camera_id = vlm_result.get("camera_id", "unknown")
     timestamp = vlm_result.get("timestamp", "")
     event_type = vlm_result.get("event_type", "general")
