@@ -19,9 +19,9 @@
       <div class="flex items-center gap-2 mb-1">
         <span class="text-sm font-medium" style="color: var(--text-primary);">{{ event.channel_name }}</span>
         <span class="text-xs" style="color: var(--text-muted);">·</span>
-        <span class="text-xs" style="color: var(--text-muted);">{{ formatTime(event.created_at) }}</span>
+        <span class="text-xs" style="color: var(--text-muted);">{{ formatTime(event.timestamp) }}</span>
       </div>
-      <p class="text-sm line-clamp-2 leading-relaxed" style="color: var(--text-muted);">{{ event.reason }}</p>
+      <p class="text-sm line-clamp-2 leading-relaxed" style="color: var(--text-muted);">{{ event.description }}</p>
     </div>
 
     <!-- 배지 + 버튼 -->
