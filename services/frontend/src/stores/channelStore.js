@@ -6,7 +6,8 @@ export const useChannelStore = defineStore('channel', () => {
 
     function addChannel(channel) {
         if (channels.value.length >= 4) return
-        channels.value.push({ ...channel, id: Date.now(), status: 'ok' })
+        const streamId = channel.url.split('/').pop()
+        channels.value.push({ ...channel, id: streamId, status: 'ok' })
     }
 
     function removeChannel(id) {
