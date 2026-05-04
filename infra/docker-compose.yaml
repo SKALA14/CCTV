@@ -13,6 +13,7 @@ services:
       SOURCE_TYPE: file
       SOURCE_PATH: /data/falls.mp4
       SAMPLE_FPS: "2"
+      REALTIME_SIMULATION: "true"
       CAMERA_ID: ${CAMERA_ID:-video0}
       FRAME_STORAGE_PATH: /frames/
       REDIS_URL: redis://redis:6379
