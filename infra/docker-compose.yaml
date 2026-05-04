@@ -6,6 +6,17 @@ services:
     volumes:
       - redis_data:/data
 
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: cctv
+      POSTGRES_PASSWORD: cctv
+      POSTGRES_DB: cctv
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
   ingestion:
     build:
       context: ../services/ingestion
@@ -48,10 +59,13 @@ services:
       - "8000:8000"
     environment:
       REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql+asyncpg://cctv:cctv@postgres:5432/cctv
       EVENTS_STREAM: events
       ALERTS_STREAM: alerts
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
     depends_on:
       - redis
+      - postgres
 
   frontend:
     build:
@@ -64,3 +78,4 @@ services:
 volumes:
   redis_data:
   frames_vol:
+  postgres_data:
