@@ -27,7 +27,6 @@ _VALID_EVENT_TYPES = {"fall", "fire", "intrusion", "ppe", "normal"}
 
 
 def _encode_image(image_path: str) -> tuple[str, str]:
-    """이미지 파일 → (base64 문자열, media_type)."""
     path = Path(image_path)
     media_map = {
         ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
@@ -39,31 +38,16 @@ def _encode_image(image_path: str) -> tuple[str, str]:
 
 
 class VLMClient:
-    """OpenAI Vision API 래퍼. 단일 책임: analyze()."""
-
     def __init__(self, max_tokens: int = 512, temperature: float = 0.1):
-        """config.py의 OPENAI_MODEL을 기본 모델로 설정하고 클라이언트를 미초기화 상태로 생성."""
         self.model       = config.OPENAI_MODEL
         self.max_tokens  = max_tokens
         self.temperature = temperature
-        self._client: OpenAI | None = None
-
-    def load(self) -> "VLMClient":
-        """OpenAI 클라이언트 초기화. 체이닝 가능."""
-        api_key = config.OPENAI_API_KEY or os.getenv("OPENAI_API_KEY", "")
+        api_key = os.getenv("OPENAI_API_KEY", "")
         if not api_key:
             raise EnvironmentError("OPENAI_API_KEY 환경변수가 필요합니다.")
         self._client = OpenAI(api_key=api_key)
-        return self
-
-    def unload(self) -> None:
-        """OpenAI 클라이언트 참조 해제."""
-        self._client = None
 
     def _predict(self, prompt: str, image_paths: list[str]) -> str:
-        """이미지 목록 + 프롬프트 → OpenAI API 단일 호출 → 원문 텍스트 반환."""
-        if self._client is None:
-            raise RuntimeError("load()를 먼저 호출하세요.")
         if not image_paths:
             raise ValueError("image_paths가 비어 있습니다.")
 
@@ -117,17 +101,6 @@ class VLMClient:
             }
 
     def analyze(self, frame_paths: list[str], prompt: str) -> dict:
-        """
-        general_pipeline 진입점.
-
-        Args:
-            frame_paths : JPEG 프레임 경로 목록 (general.py buffer에서 추출)
-            prompt      : get_prompt_for_event()로 조립된 프롬프트 문자열
-
-        Returns:
-            {"description": str, "is_anomaly": bool,
-             "danger_level": str, "event_type": str, "confidence": float}
-        """
         if not frame_paths:
             return {
                 "description":  "",
@@ -140,20 +113,3 @@ class VLMClient:
         raw = self._predict(prompt, frame_paths)
         logger.debug("VLM raw: %s", raw[:200])
         return self._parse(raw)
-
-
-_instance: Optional[VLMClient] = None
-
-
-def _get_client() -> VLMClient:
-    """최초 호출 시에만 초기화하는 지연 싱글턴."""
-    global _instance
-    if _instance is None:
-        _instance = VLMClient()
-        _instance.load()
-    return _instance
-
-
-def analyze(frame_paths: list[str], prompt: str) -> dict:
-    """general.py의 vlm.analyze() 호출을 받는 모듈 레벨 진입점."""
-    return _get_client().analyze(frame_paths, prompt)

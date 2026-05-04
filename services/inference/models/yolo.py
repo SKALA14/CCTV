@@ -31,7 +31,7 @@ class FireYOLO:
         self.model = YOLO("models/fire.pt")
 
     def predict(self, frame, h: int, w: int) -> list[dict]:
-        results = self.model(frame, conf=0.15, imgsz=960, verbose=False)
+        results = self.model(frame, conf=0.15, imgsz=640, verbose=False)
         detections = []
 
         if results[0].boxes is None:
@@ -42,7 +42,6 @@ class FireYOLO:
             class_name = self.model.names[cls_id]
             if class_name in self.FIRE_CLASSES:
                 detections.append({
-                    "track_id": None,
                     "anomaly_type": class_name,
                     "confidence": round(float(box.conf[0].item()), 4),
                 })
@@ -104,7 +103,7 @@ class PoseYOLO:
         return score >= 2
 
     def predict(self, frame, h: int, w: int) -> list[dict]:
-        results = self.model.track(frame, conf=0.5, imgsz=960, persist=True, verbose=False)
+        results = self.model(frame, conf=0.5, imgsz=640, verbose=False)
         detections = []
 
         if results[0].boxes is None or results[0].keypoints is None:
@@ -119,15 +118,10 @@ class PoseYOLO:
             if self.model.names[cls_id] != "person":
                 continue
 
-            track_id = None
-            if boxes.id is not None:
-                track_id = int(boxes.id[idx].item())
-
             fallen = self._is_fallen(kpts[idx], confs[idx], box.xyxy[0])
 
             detections.append({
-                "track_id":    track_id,
-                "anomaly_type": "fallen" if fallen else "person",
+                "anomaly_type": "fallen" if fallen else "none",
                 "confidence":  round(float(box.conf[0].item()), 4),
                 "bbox":        clamp_bbox(box.xyxy[0].tolist(), h, w),
                 "keypoints":   results[0].keypoints.data[idx].tolist(),
@@ -164,36 +158,18 @@ class GeneralYOLO:
         # 우선 person만 탐지
         self.target_classes = {"person"}
 
-        print("✅ GeneralYOLO 로드 완료 (yolo26m.pt)")
-
-    def predict(self, image_path: str) -> list[dict]:
+    def predict(self, image_path: str) -> bool:
         frame = cv2.imread(image_path)
-
         if frame is None:
-            return []
+            return False
 
-        h, w = frame.shape[:2]
-        detections = []
+        results = self.model(frame, conf=0.25, imgsz=640, verbose=False)
+        if results[0].boxes is None:
+            return False
 
-        results = self.model(
-            frame,
-            conf=0.25,
-            imgsz=640,
-            verbose=False
-        )
+        for box in results[0].boxes:
+            cls_id = int(box.cls[0].item())
+            if self.model.names[cls_id] in self.target_classes:
+                return True
 
-        if results[0].boxes is not None:
-            for idx, box in enumerate(results[0].boxes):
-                cls_id = int(box.cls[0].item())
-                class_name = self.model.names[cls_id]
-
-                if class_name in self.target_classes:
-                    detections.append({
-                        "track_id": idx + 1,
-                        "class": class_name,
-                        "confidence": round(float(box.conf[0].item()), 4),
-                        "bbox": clamp_bbox(box.xyxy[0].tolist(), h, w),
-                        "keypoints": None
-                    })
-
-        return detections
+        return False
