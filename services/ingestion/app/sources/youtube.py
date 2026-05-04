@@ -25,11 +25,11 @@ class YouTubeSource(FrameSource):
     def __init__(self):
         self._cap = None
 
-    def open(self) -> None:
-        stream_url = _extract_stream_url(config.SOURCE_PATH)
+    def open(self, path: str) -> None:
+        stream_url = _extract_stream_url(path)
         self._cap = cv2.VideoCapture(stream_url)
         if not self._cap.isOpened():
-            raise RuntimeError(f"YouTube 스트림을 열 수 없습니다: {config.SOURCE_PATH}")
+            raise RuntimeError(f"YouTube 스트림을 열 수 없습니다: {path}")
 
     def read_frame(self) -> np.ndarray | None:
         ok, frame = self._cap.read()
