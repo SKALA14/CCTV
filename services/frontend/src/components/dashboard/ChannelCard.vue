@@ -8,7 +8,6 @@
 
     <!-- 영상 영역 -->
     <div class="video-area">
-      <span class="text-sm select-none" style="color: var(--text-subtle);">라이브 영상 ({{ channel.id }})</span>
       <video ref="videoEl" autoplay muted playsinline style="width:100%; height:100%; object-fit:cover;"></video>
     </div>
 
@@ -35,9 +34,10 @@ const videoEl = ref(null)
 let hls = null
 
 onMounted(() => {
-  const src = `/hls/${props.channel.id}/index.m3u8`
+  const src = `http://localhost:8888/${props.channel.id}/index.m3u8`
   if (Hls.isSupported()) {
     hls = new Hls()
+    hls.on(Hls.Events.ERROR, (_, data) => console.error('[hls]', props.channel.id, data.type, data.details))
     hls.loadSource(src)
     hls.attachMedia(videoEl.value)
   } else {

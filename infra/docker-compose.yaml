@@ -17,10 +17,10 @@ services:
       context: ../services/ingestion
     environment:
       SOURCE_TYPE: rtsp
-      SOURCE_PATH: rtsp://host.docker.internal:8554/webcam
+      SOURCE_PATH: rtsp://host.docker.internal:8554/cam1
       SAMPLE_FPS: "2"
       REALTIME_SIMULATION: "false"
-      CAMERA_ID: ${CAMERA_ID:-video0}
+      CAMERA_ID: ${CAMERA_ID:-cam1}
       FRAME_STORAGE_PATH: /frames/
       REDIS_URL: redis://redis:6379
     volumes:
@@ -36,7 +36,7 @@ services:
       context: ../services/inference
     environment:
       REDIS_URL: redis://redis:6379
-      CAMERA_ID: ${CAMERA_ID:-video0}
+      CAMERA_ID: ${CAMERA_ID:-cam1}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
       PROMPT_DIR: /service/prompts
@@ -62,13 +62,13 @@ services:
   #   depends_on:
   #     - redis
 
-  # frontend:
-  #   build:
-  #     context: ../services/frontend
-  #   ports:
-  #     - "80:80"
-  #   depends_on:
-  #     - backend
+  frontend:
+    build:
+      context: ../services/frontend
+    ports:
+      - "80:80"
+    # depends_on:
+    #   - backend
 
 volumes:
   redis_data:
