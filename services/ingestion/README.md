@@ -22,7 +22,9 @@ Redis Streams : frames
 ## 핵심 설계 포인트
 - `sources/base.py`의 `FrameSource` ABC로 소스를 추상화.
 - `SOURCE_TYPE`은 환경변수로 직접 지정하거나, 백엔드가 `SOURCE_PATH` URL 패턴을 보고 자동 판별해 Redis에 기록.
-- 컨테이너 시작 시 `SOURCE_PATH`가 없으면 Redis를 폴링하며 대기. 키가 생기는 순간 자동으로 스트리밍 시작.
+- 컨테이너 시작 시 `SOURCE_PATH`가 없으면 Redis를 2초 간격으로 폴링하며 대기. 키가 생기는 순간 자동으로 스트리밍 시작. 폴링 부하는 사실상 0.
+- 스트림 종료 또는 연결 끊김 시 컨테이너가 exit되고 `restart: always`로 자동 재시작. 재시작 후 다시 폴링 대기 상태로 진입.
+- Redis 클라이언트는 `client.py`에서 싱글턴으로 관리. `main.py`와 `publisher.py`가 공유.
 - `sampler.py`를 별도 모듈로 분리해 추후 씬 변화 기반 샘플링으로 교체 가능.
 - `docker-compose`에서 카메라 4대(`cam0` ~ `cam3`)를 고정 컨테이너로 운영. `CAMERA_ID`만 각각 다르게 주입.
 
