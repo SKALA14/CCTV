@@ -11,8 +11,7 @@ class Settings(BaseSettings):
     EVENTS_STREAM: str = "events"
     ALERTS_STREAM: str = "alerts"
 
-    EMERGENCY_GROUP: str = "emergency"
-    GENERAL_GROUP: str = "general"
+    UNIFIED_GROUP: str = "unified"
 
     OPENAI_MODEL: str = "gpt-4o"
     PROMPT_DIR: str = "./prompts"
@@ -22,6 +21,37 @@ class Settings(BaseSettings):
     CAMERA_ID: str = "video99"
     FRAME_STORAGE_PATH: str = "./frames"
     ANNOTATE_FRAMES: bool = False  # True면 bbox·id를 프레임에 그려서 덮어씀
+    ANNOTATION_COLORS: dict[str, tuple[int, int, int]] = {
+        "fallen": (0, 0, 255),
+        "fire": (0, 128, 255),
+        "smoke": (128, 128, 128),
+        "person": (0, 255, 0),
+    }
+
+    MODEL_QUEUE_SIZE: int = 30
+    RESULT_QUEUE_SIZE: int = 90
+    FRAME_RESULT_TIMEOUT_SEC: float = 2.0
+
+    FALL_MIN_FRAMES: int = 3
+    FALL_WINDOW_SEC: float = 5.0
+
+    GENERAL_MIN_FRAMES: int = 3
+    GENERAL_BUFFER_SIZE: int = 5
+    GENERAL_WINDOW_SEC: float = 10.0
+    GENERAL_MIN_CALL_INTERVAL: float = 30.0
+    VLM_QUEUE_SIZE: int = 4
+
+    FIRE_MODEL_PATH: str = "models/fire.pt"
+    POSE_MODEL_PATH: str = "models/yolo26m-pose.pt"
+    GENERAL_MODEL_PATH: str = "models/yolo26m.pt"
+
+    YOLO_IMGSZ: int = 640
+    FIRE_CONF: float = 0.15
+    POSE_CONF: float = 0.5
+    GENERAL_CONF: float = 0.25
+    POSE_KEYPOINT_CONF: float = 0.3
+    FALL_TORSO_ANGLE_THRESH: float = 55.0
+    FALL_BBOX_RATIO_THRESH: float = 1.3
 
     class Config:
         env_file = ".env"
