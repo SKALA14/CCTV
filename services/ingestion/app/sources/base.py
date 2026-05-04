@@ -7,7 +7,7 @@ import numpy as np
 class FrameSource(ABC):
 
     @abstractmethod
-    def open(self) -> None:
+    def open(self, path: str) -> None:
         pass
 
     @abstractmethod

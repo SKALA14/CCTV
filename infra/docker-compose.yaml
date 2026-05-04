@@ -12,19 +12,57 @@ services:
       - "8554:8554"
       - "8888:8888"
 
-  ingestion:
+  ingestion_0:
     build:
       context: ../services/ingestion
     environment:
-      SOURCE_TYPE: rtsp
-      SOURCE_PATH: rtsp://host.docker.internal:8554/webcam
+      CAMERA_ID: cam0
       SAMPLE_FPS: "2"
-      REALTIME_SIMULATION: "false"
-      CAMERA_ID: ${CAMERA_ID:-video0}
       FRAME_STORAGE_PATH: /frames/
       REDIS_URL: redis://redis:6379
     volumes:
-      - ./../sample:/data:ro
+      - frames_vol:/frames
+    depends_on:
+      - redis
+    restart: always
+
+  ingestion_1:
+    build:
+      context: ../services/ingestion
+    environment:
+      CAMERA_ID: cam1
+      SAMPLE_FPS: "2"
+      FRAME_STORAGE_PATH: /frames/
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - frames_vol:/frames
+    depends_on:
+      - redis
+    restart: always
+
+  ingestion_2:
+    build:
+      context: ../services/ingestion
+    environment:
+      CAMERA_ID: cam2
+      SAMPLE_FPS: "2"
+      FRAME_STORAGE_PATH: /frames/
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - frames_vol:/frames
+    depends_on:
+      - redis
+    restart: always
+
+  ingestion_3:
+    build:
+      context: ../services/ingestion
+    environment:
+      CAMERA_ID: cam3
+      SAMPLE_FPS: "2"
+      FRAME_STORAGE_PATH: /frames/
+      REDIS_URL: redis://redis:6379
+    volumes:
       - frames_vol:/frames
     depends_on:
       - redis
@@ -45,7 +83,7 @@ services:
       ALERTS_STREAM: alerts
       DEVICE: cpu
     volumes:
-      - frames_vol:/frames          # cleaner가 삭제하므로 ro 제거
+      - frames_vol:/frames
     depends_on:
       - redis
 
