@@ -14,17 +14,14 @@ class Settings(BaseSettings):
     EMERGENCY_GROUP: str = "emergency"
     GENERAL_GROUP: str = "general"
 
-    OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o"
     PROMPT_DIR: str = "./prompts"
 
-    EMERGENCY_MODEL_PATH: str = "yolov8n.pt"
-    GENERAL_MODEL_PATH: str = "yolov8n.pt"
     DEVICE: str = "cpu"
-    VLM_BUFFER_SIZE: int = 10  # VLM 호출 전 버퍼링할 프레임 수
 
-    CAMERA_ID: str = "video0"
+    CAMERA_ID: str = "video99"
     FRAME_STORAGE_PATH: str = "./frames"
+    ANNOTATE_FRAMES: bool = True  # True면 bbox·id를 프레임에 그려서 덮어씀
 
     class Config:
         env_file = ".env"

@@ -42,7 +42,7 @@ Redis Streams : events
 ## 디렉토리 구조
 
 ```
-cctv-ai/
+CCTV/
 │
 ├── services/
 │   ├── ingestion/                   # 영상 수집 · 프레임 샘플링 서비스
@@ -53,20 +53,32 @@ cctv-ai/
 │   │   │   ├── publisher.py
 │   │   │   └── sources/
 │   │   │       ├── base.py          # FrameSource ABC
-│   │   │       └── file.py          # 로컬 파일 소스 (MVP)
+│   │   │       ├── file.py          # 로컬 파일 소스
+│   │   │       └── youtube.py       # YouTube 소스
 │   │   ├── Dockerfile
 │   │   ├── requirements.txt
 │   │   └── README.md
 │   │
-│   ├── inference/                   # VLM 추론 파이프라인 서비스
-│   │   ├── app/
-│   │   │   ├── main.py
-│   │   │   ├── config.py
-│   │   │   ├── consumer.py
+│   ├── inference/                   # YOLO + VLM 추론 파이프라인 서비스
+│   │   ├── main.py
+│   │   ├── config.py
+│   │   ├── redis_client.py
+│   │   ├── cleaner.py
+│   │   ├── models/
 │   │   │   ├── vlm.py
-│   │   │   └── publisher.py
+│   │   │   └── yolo.py              # FireYOLO · PoseYOLO · EmergencyYOLO · GeneralYOLO
+│   │   ├── pipelines/
+│   │   │   ├── emergency.py         # 화재·낙상 즉시 알람
+│   │   │   └── general.py          # 침입·PPE 등 VLM 분석
 │   │   ├── prompts/
-│   │   │   └── scene_description.j2
+│   │   │   ├── fall.j2
+│   │   │   ├── fire.j2
+│   │   │   ├── intrusion.j2
+│   │   │   ├── ppe.j2
+│   │   │   └── target_event_prompts.py
+│   │   ├── utils/
+│   │   │   ├── builder.py
+│   │   │   └── channel_target_event.py
 │   │   ├── Dockerfile
 │   │   ├── requirements.txt
 │   │   └── README.md
@@ -86,19 +98,31 @@ cctv-ai/
 │   │   ├── requirements.txt
 │   │   └── README.md
 │   │
-│   └── frontend/                    # React 대시보드
-│       ├── src/
-│       │   ├── api/
-│       │   ├── components/
-│       │   └── hooks/
-│       ├── Dockerfile
-│       └── package.json
+│   ├── frontend/                    # Vue 대시보드
+│   │   ├── src/
+│   │   │   ├── api/
+│   │   │   ├── components/
+│   │   │   │   ├── dashboard/
+│   │   │   │   ├── layout/
+│   │   │   │   └── search/
+│   │   │   ├── composables/
+│   │   │   ├── constants/
+│   │   │   ├── router/
+│   │   │   ├── stores/
+│   │   │   ├── views/
+│   │   │   └── App.vue
+│   │   ├── Dockerfile
+│   │   ├── nginx.conf
+│   │   └── package.json
+│   │
+│   └── notification/                # 알림 발송
+│       └── slack.py
 │
 ├── infra/
-│   └── docker/
-│       ├── docker-compose.yml       # 전체 스택 기동 (ingestion·inference·backend·frontend·redis·postgres·mediamtx)
-│       └── .env.example
+│   └── docker-compose.yaml          # 전체 스택 기동
 │
+├── frames/                          # 샘플링된 프레임 저장 볼륨
+├── sample/                          # 테스트용 영상 파일
 └── README.md
 ```
 

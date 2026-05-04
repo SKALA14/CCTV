@@ -3,7 +3,10 @@ opencv-python-headless
 redis
 pydantic-settings
 numpy
-opencv-python
+<<<<<<< HEAD
+=======
+cv2
+>>>>>>> 8e49691eacbeecec6dd43ed2645b5efeabd6f3a4
 yt-dlp
 =======
 opencv-python-headless~=4.10.0

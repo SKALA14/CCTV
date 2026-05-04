@@ -90,7 +90,7 @@ const form = reactive({
   name:        props.initial?.name        || '',
   url:         props.initial?.url         || '',
   description: props.initial?.description || '',
-  options:     props.initial?.options     || ['쓰러짐 / 추락', '화재 / 연기'],
+  options:     props.initial?.options     || ['넘어짐 / 쓰러짐'],
 })
 
 function toggleOption(opt) {
