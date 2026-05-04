@@ -1,5 +1,14 @@
 services:
-  ingestion:
+  ingestion_0:
+    volumes:
+      - ./../frames:/frames
+  ingestion_1:
+    volumes:
+      - ./../frames:/frames
+  ingestion_2:
+    volumes:
+      - ./../frames:/frames
+  ingestion_3:
     volumes:
       - ./../frames:/frames
   inference:
