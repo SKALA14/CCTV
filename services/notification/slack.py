@@ -46,8 +46,7 @@ def build_general_payload(vlm_result: dict[str, Any]) -> dict[str, Any]:
     rule = vlm_result.get("rule", "")
     frame = vlm_result.get("frame", "")
 
-    emoji = "🚨" if severity in HIGH_SEVERITIES else "⚠️"
-    fallback_text = f"{emoji} [{severity}] {camera_id} | {timestamp} | {event_type} | {reason}"
+    fallback_text = f"[{severity}] {camera_id} | {timestamp} | {event_type} | {reason}"
 
     payload = {
         "text": fallback_text,
@@ -56,7 +55,7 @@ def build_general_payload(vlm_result: dict[str, Any]) -> dict[str, Any]:
                 "type": "header",
                 "text": {
                     "type": "plain_text",
-                    "text": f"{emoji} 이상 상황 감지 알림",
+                    "text": "이상 상황 감지 알림",
                 },
             },
             {
@@ -105,7 +104,7 @@ def build_emergency_payload(alert: dict[str, Any]) -> dict[str, Any]:
     max_conf = max((float(det.get("conf", 0)) for det in detections), default=0)
 
     fallback_text = (
-        f"🚨 [EMERGENCY] {camera_id} | {timestamp} | "
+        f"[EMERGENCY] {camera_id} | {timestamp} | "
         f"{anomaly_type} | {classes or 'detection'}"
     )
 
@@ -122,7 +121,7 @@ def build_emergency_payload(alert: dict[str, Any]) -> dict[str, Any]:
                 "type": "header",
                 "text": {
                     "type": "plain_text",
-                    "text": "🚨 긴급 상황 감지 알림",
+                    "text": "긴급 상황 감지 알림",
                 },
             },
             {
