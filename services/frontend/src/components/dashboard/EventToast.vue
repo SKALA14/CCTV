@@ -1,7 +1,7 @@
 <template>
   <transition name="banner">
     <div v-if="latest" class="banner-toast">
-      🔴 &nbsp;이벤트 감지 — {{ latest.channel_name }} / {{ latest.event_type }} / {{ formatTime(latest.created_at) }}
+      🔴 &nbsp;이벤트 감지 — {{ latest.channel_name }} / {{ latest.event_type }} / {{ formatTime(latest.timestamp) }}
     </div>
   </transition>
 </template>

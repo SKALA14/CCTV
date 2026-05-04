@@ -40,7 +40,7 @@
               <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M8 5v14l11-7z"/>
               </svg>
-              <span class="text-sm">{{ event.channel_name }} — {{ formatDateTime(event.created_at) }}</span>
+              <span class="text-sm">{{ event.channel_name }} — {{ formatDateTime(event.timestamp) }}</span>
             </div>
           </div>
 
@@ -107,12 +107,12 @@
               <div class="w-12 h-9 rounded flex-shrink-0 flex items-center justify-center text-xs overflow-hidden"
                 style="background: var(--track-bg); color: var(--text-subtle);">
                 <img v-if="rel.thumbnail_url" :src="rel.thumbnail_url" class="w-full h-full object-cover" alt="" />
-                <span v-else>{{ rel.channel_id || '' }}</span>
+                <span v-else>{{ rel.camera_id || '' }}</span>
               </div>
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium truncate" style="color: var(--text-primary);">{{ rel.channel_name }}</p>
                 <p class="text-xs truncate" style="color: var(--text-subtle);">
-                  {{ formatDateTime(rel.created_at) }} · {{ rel.event_type }}
+                  {{ formatDateTime(rel.timestamp) }} · {{ rel.event_type }}
                 </p>
               </div>
               <span class="danger-badge flex-shrink-0" :class="rel.danger_level">{{ rel.danger_level }}</span>
@@ -133,7 +133,7 @@
             </div>
             <div class="flex justify-between">
               <dt class="text-xs" style="color: var(--text-subtle);">발생 시각</dt>
-              <dd class="text-xs text-right" style="color: var(--text-primary);">{{ formatDateTime(event.created_at) }}</dd>
+              <dd class="text-xs text-right" style="color: var(--text-primary);">{{ formatDateTime(event.timestamp) }}</dd>
             </div>
             <div class="flex justify-between">
               <dt class="text-xs" style="color: var(--text-subtle);">이벤트 유형</dt>
@@ -159,7 +159,7 @@
         <!-- VLM 판단 결과 -->
         <div class="rounded-xl p-4" style="background: var(--bg-card); border: 1px solid var(--border);">
           <h3 class="font-semibold text-sm mb-3" style="color: var(--text-primary);">VLM 판단 결과</h3>
-          <p class="text-sm leading-relaxed mb-4" style="color: var(--text-muted);">{{ event.reason }}</p>
+          <p class="text-sm leading-relaxed mb-4" style="color: var(--text-muted);">{{ event.description }}</p>
           <div v-if="event.vlm_confidence != null">
             <div class="flex justify-between text-xs mb-1.5" style="color: var(--text-subtle);">
               <span>신뢰도</span>
