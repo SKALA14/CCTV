@@ -1,7 +1,7 @@
 # Redis 연결과 Streams 유틸 함수를 정의한다.
 # 정의: get_client·ensure_group·xreadgroup·xadd·xack·mark_processed.
 # 입력: config.REDIS_URL (연결), stream/group/consumer 문자열 (각 함수 인자).
-# 출력: 메시지 리스트(xreadgroup), msg_id(xadd), ACK 카운트(xack), 삭제 대상 여부 bool(mark_processed).
+# 출력: 메시지 리스트(xreadgroup), msg_id(xadd), ACK 카운트(xack), 삭제 등록 여부(mark_processed).
 
 import redis as _redis
 from config import config
@@ -25,8 +25,7 @@ def _ensure_group(stream: str, group: str) -> None:
 
 def init_consumer_groups() -> None:
     """서비스 시작 시 필요한 모든 스트림·그룹을 한 번에 선언한다."""
-    _ensure_group(config.FRAMES_STREAM, "emergency")
-    _ensure_group(config.FRAMES_STREAM, "general")
+    _ensure_group(config.FRAMES_STREAM, config.UNIFIED_GROUP)
 
 
 def xreadgroup(
@@ -53,17 +52,9 @@ def xack(stream: str, group: str, *msg_ids: str) -> int:
     return get_client().xack(stream, group, *msg_ids)
 
 
-def mark_processed(frame_path: str, total: int = 2) -> bool:
-    r = get_client()
-    key = f"ack_count:{frame_path}"
-    
-    pipe = r.pipeline()
-    pipe.incr(key)
-    pipe.expire(key, 3600)
-    count, _ = pipe.execute()
-    
-    if count >= total:
-        r.delete(key)
-        r.rpush("delete_queue", frame_path)
-        return True
-    return False
+def mark_processed(frame_path: str) -> bool:
+    if not frame_path:
+        return False
+
+    get_client().rpush("delete_queue", frame_path)
+    return True
