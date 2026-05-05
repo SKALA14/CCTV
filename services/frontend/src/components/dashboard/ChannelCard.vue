@@ -14,7 +14,7 @@
     <!-- 호버 액션 -->
     <div class="hover-actions">
       <button class="hover-btn" @click.stop="$emit('edit', channel)">수정</button>
-      <button class="hover-btn" @click.stop="$emit('remove', channel.id)">삭제</button>
+      <button class="hover-btn" @click.stop="$emit('remove', channel.slot)">삭제</button>
     </div>
 
     <!-- 채널명 하단 띠 -->
