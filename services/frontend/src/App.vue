@@ -96,12 +96,12 @@ import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import AppNav from './components/layout/AppNav.vue'
 import EventToast from './components/dashboard/EventToast.vue'
-import { useWebSocket } from './composables/useWebSocket.js'
+// import { useWebSocket } from './composables/useWebSocket.js'
 import { useChannelStore } from './stores/channelStore.js'
 import { MAX_CHANNELS } from './constants/events.js'
 import { useTheme } from './composables/useTheme.js'
 
-useWebSocket()
+// useWebSocket()
 
 const { isDark, toggle } = useTheme()
 
