@@ -7,9 +7,12 @@
       class="w-[480px] rounded-2xl p-6 shadow-2xl"
       style="background: var(--bg-card); border: 1px solid var(--border);"
     >
-      <h3 class="font-semibold text-base mb-5" style="color: var(--text-primary);">
-        {{ isEdit ? '채널 수정' : '채널 추가' }}
+      <h3 class="font-semibold text-base mb-1" style="color: var(--text-primary);">
+        {{ isEdit ? '채널 수정' : `슬롯 ${props.slot}에 채널 등록` }}
       </h3>
+      <p class="text-xs mb-5" style="color: var(--text-muted);">
+        camera_id: cam{{ props.slot }}
+      </p>
 
       <div class="space-y-4">
         <div>
@@ -18,20 +21,42 @@
             v-model="form.name"
             type="text"
             placeholder="예: 정문 CCTV"
-            class="w-full h-10 px-3 rounded-lg text-sm focus:outline-none focus:border-blue-500 transition-colors"
-            style="background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-primary);"
+            class="w-full h-10 px-3 rounded-lg text-sm focus:outline-none transition-colors"
+            :style="`background: var(--input-bg); border: 1px solid ${errors.name ? '#ef4444' : 'var(--input-border)'}; color: var(--text-primary);`"
           />
+          <p v-if="errors.name" class="text-xs mt-1 text-red-400">{{ errors.name }}</p>
         </div>
 
         <div>
-          <label class="block text-xs mb-1.5" style="color: var(--text-muted);">영상 URL *</label>
+          <label class="block text-xs mb-2" style="color: var(--text-muted);">영상 소스</label>
+          <div class="flex gap-2 mb-3">
+            <button
+              class="px-3 py-1.5 rounded-lg text-sm transition-colors"
+              :class="form.sourceType === 'url' ? 'bg-blue-600 text-white' : ''"
+              :style="form.sourceType !== 'url' ? 'border: 1px solid var(--input-border); color: var(--text-muted);' : ''"
+              @click="form.sourceType = 'url'"
+            >URL 입력</button>
+            <button
+              class="px-3 py-1.5 rounded-lg text-sm transition-colors"
+              :class="form.sourceType === 'webcam' ? 'bg-blue-600 text-white' : ''"
+              :style="form.sourceType !== 'webcam' ? 'border: 1px solid var(--input-border); color: var(--text-muted);' : ''"
+              @click="form.sourceType = 'webcam'"
+            >웹캠</button>
+          </div>
           <input
+            v-if="form.sourceType === 'url'"
             v-model="form.url"
             type="text"
-            placeholder="rtsp://192.168.1.1:554/stream"
-            class="w-full h-10 px-3 rounded-lg text-sm font-mono focus:outline-none focus:border-blue-500 transition-colors"
-            style="background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-primary);"
+            placeholder="rtsp://192.168.1.1:554/stream 또는 http://..."
+            class="w-full h-10 px-3 rounded-lg text-sm font-mono focus:outline-none transition-colors"
+            :style="`background: var(--input-bg); border: 1px solid ${errors.url ? '#ef4444' : 'var(--input-border)'}; color: var(--text-primary);`"
           />
+          <p v-if="errors.url" class="text-xs mt-1 text-red-400">{{ errors.url }}</p>
+          <p
+            v-if="form.sourceType === 'webcam'"
+            class="text-xs px-3 py-2 rounded-lg"
+            style="background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-muted);"
+          >브라우저 웹캠을 사용합니다 (저장 후 권한 요청)</p>
         </div>
 
         <div>
@@ -39,7 +64,7 @@
           <textarea
             v-model="form.description"
             placeholder="채널 위치, 용도 등 메모"
-            rows="3"
+            rows="2"
             class="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none focus:border-blue-500 transition-colors resize-none"
             style="background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-primary);"
           ></textarea>
@@ -81,17 +106,49 @@
 import { reactive } from 'vue'
 import { GENERAL_OPTIONS } from '../../constants/events.js'
 
-const props = defineProps({ initial: Object })
+const props = defineProps({
+  slot: { type: Number, default: 0 },
+  initial: Object,
+  existingNames: { type: Array, default: () => [] },
+})
 const emit = defineEmits(['close', 'submit'])
 
-const isEdit = !!props.initial?.id
+const isEdit = !!props.initial?.name
 
 const form = reactive({
   name:        props.initial?.name        || '',
-  url:         props.initial?.url         || '',
+  sourceType:  props.initial?.url === 'webcam' ? 'webcam' : 'url',
+  url:         props.initial?.url && props.initial.url !== 'webcam' ? props.initial.url : '',
   description: props.initial?.description || '',
-  options:     props.initial?.options     || ['넘어짐 / 쓰러짐'],
+  options:     props.initial?.options     || [],
 })
+
+const errors = reactive({ name: '', url: '' })
+
+function validate() {
+  errors.name = ''
+  errors.url  = ''
+
+  const trimmed = form.name.trim()
+  if (!trimmed) {
+    errors.name = '채널명을 입력해주세요.'
+    return false
+  }
+  const duplicate = props.existingNames
+    .map(n => n.trim().toLowerCase())
+    .includes(trimmed.toLowerCase())
+  if (duplicate) {
+    errors.name = '이미 사용 중인 채널명입니다.'
+    return false
+  }
+
+  if (form.sourceType === 'url' && !form.url.trim()) {
+    errors.url = 'URL을 입력해주세요.'
+    return false
+  }
+
+  return true
+}
 
 function toggleOption(opt) {
   const idx = form.options.indexOf(opt)
@@ -99,7 +156,15 @@ function toggleOption(opt) {
 }
 
 function submit() {
-  if (!form.name || !form.url) return
-  emit('submit', { ...form, id: props.initial?.id })
+  if (!validate()) return
+
+  const url = form.sourceType === 'webcam' ? 'webcam' : form.url.trim()
+  emit('submit', {
+    slot: props.slot,
+    name: form.name.trim(),
+    url,
+    description: form.description,
+    options: form.options,
+  })
 }
 </script>
