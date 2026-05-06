@@ -6,15 +6,18 @@ services:
     volumes:
       - redis_data:/data
 
-  mediamtx:
-    image: bluenviron/mediamtx
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: cctv
+      POSTGRES_PASSWORD: cctv
+      POSTGRES_DB: cctv
     ports:
-      - "8554:8554"
-      - "8888:8888"
+      - "5432:5432"
     volumes:
-      - ./mediamtx.yml:/mediamtx.yml
+      - postgres_data:/var/lib/postgresql/data
 
-  ingestion_0:
+  ingestion:
     build:
       context: ../services/ingestion
     environment:
@@ -68,7 +71,6 @@ services:
       - frames_vol:/frames
     depends_on:
       - redis
-      - inference
     restart: always
 
   inference:
@@ -76,7 +78,7 @@ services:
       context: ../services/inference
     environment:
       REDIS_URL: redis://redis:6379
-      CAMERA_ID: ${CAMERA_ID:-cam1}
+      CAMERA_ID: ${CAMERA_ID:-video0}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
       PROMPT_DIR: /service/prompts
@@ -90,26 +92,30 @@ services:
     depends_on:
       - redis
 
-  # backend:
-  #   build:
-  #     context: ../services/backend
-  #   ports:
-  #     - "8000:8000"
-  #   environment:
-  #     REDIS_URL: redis://redis:6379
-  #     EVENTS_STREAM: events
-  #     ALERTS_STREAM: alerts
-  #   depends_on:
-  #     - redis
+  backend:
+    build:
+      context: ../services/backend
+    ports:
+      - "8000:8000"
+    environment:
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql+asyncpg://cctv:cctv@postgres:5432/cctv
+      EVENTS_STREAM: events
+      ALERTS_STREAM: alerts
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    depends_on:
+      - redis
+      - postgres
 
   frontend:
     build:
       context: ../services/frontend
     ports:
       - "80:80"
-    # depends_on:
-    #   - backend
+    depends_on:
+      - backend
 
 volumes:
   redis_data:
   frames_vol:
+  postgres_data:
