@@ -1,0 +1,8 @@
+hlsSegmentDuration: 2s
+hlsSegmentCount: 7
+
+paths:
+  cam0: {}
+  cam1: {}
+  cam2: {}
+  cam3: {}
