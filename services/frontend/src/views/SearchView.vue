@@ -16,7 +16,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import SearchBar from '../components/search/SearchBar.vue'
 import ChannelFilter from '../components/search/ChannelFilter.vue'
 import ResultList from '../components/search/ResultList.vue'
@@ -25,7 +25,8 @@ import { useChannels } from '../composables/useChannels.js'
 import { useEventStore } from '../stores/eventStore.js'
 
 const { events, loading, error, load, search } = useEvents()
-const { channels } = useChannels()
+const { slots } = useChannels()
+const channels = computed(() => slots.value.filter(Boolean))
 const eventStore = useEventStore()
 
 onMounted(() => { load() })

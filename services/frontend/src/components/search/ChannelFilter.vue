@@ -8,11 +8,11 @@
     >전체 채널</span>
     <span
       v-for="ch in channels"
-      :key="ch.id"
+      :key="ch.camera_id"
       class="px-3 py-1 rounded-full text-sm cursor-pointer transition-colors select-none"
-      :class="modelValue === ch.id ? 'bg-blue-600 border-blue-600 text-white' : ''"
-      :style="modelValue !== ch.id ? 'border: 1px solid var(--border); color: var(--text-muted);' : 'border: 1px solid transparent;'"
-      @click="emit('update:modelValue', ch.id)"
+      :class="modelValue === ch.camera_id ? 'bg-blue-600 border-blue-600 text-white' : ''"
+      :style="modelValue !== ch.camera_id ? 'border: 1px solid var(--border); color: var(--text-muted);' : 'border: 1px solid transparent;'"
+      @click="emit('update:modelValue', ch.camera_id)"
     >{{ ch.name }}</span>
   </div>
 </template>
