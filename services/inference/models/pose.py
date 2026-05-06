@@ -55,7 +55,7 @@ class PoseYOLO:
 
         return score >= 2
 
-    def predict(self, frame, h: int, w: int) -> list[dict]:
+    def predict(self, frame, h: int, w: int, camera_id: str) -> list[dict]:
         results = self.model(frame, conf=config.POSE_CONF, imgsz=config.YOLO_IMGSZ, verbose=False)
         detections = []
 

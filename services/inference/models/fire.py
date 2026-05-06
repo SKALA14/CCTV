@@ -9,7 +9,7 @@ class FireYOLO:
     def __init__(self):
         self.model = YOLO(config.FIRE_MODEL_PATH)
 
-    def predict(self, frame, h: int, w: int) -> list[dict]:
+    def predict(self, frame, h: int, w: int, camera_id: str) -> list[dict]:
         results = self.model(frame, conf=config.FIRE_CONF, imgsz=config.YOLO_IMGSZ, verbose=False)
         detections = []
 
