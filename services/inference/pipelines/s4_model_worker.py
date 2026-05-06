@@ -9,7 +9,7 @@
 출력
 - result_queue에 ModelResult를 push한다.
 - ModelResult 스키마: {msg_id, model_name, detections, error}
-- detections는 모델별 predict(frame, h, w)가 반환한 route 기반 detection 목록이다.
+- detections는 모델별 predict(frame, h, w, camera_id)가 반환한 route 기반 detection 목록이다.
 '''
 
 import logging
@@ -45,7 +45,7 @@ def model_worker(
                 detections = []
             else:
                 h, w = frame.shape[:2]
-                detections = model.predict(frame, h, w)
+                detections = model.predict(frame, h, w, job.camera_id)
             result = ModelResult(job.msg_id, model_name, detections)
         except Exception as exc:
             logger.exception("%s model worker error: msg_id=%s", model_name, job.msg_id)
