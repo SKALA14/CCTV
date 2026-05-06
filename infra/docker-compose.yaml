@@ -11,12 +11,13 @@ services:
     ports:
       - "8554:8554"
       - "8888:8888"
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml
 
   ingestion_0:
     build:
       context: ../services/ingestion
     environment:
-<<<<<<< HEAD
       CAMERA_ID: cam0
       SAMPLE_FPS: "2"
       FRAME_STORAGE_PATH: /frames/
@@ -61,13 +62,6 @@ services:
     environment:
       CAMERA_ID: cam3
       SAMPLE_FPS: "2"
-=======
-      SOURCE_TYPE: rtsp
-      SOURCE_PATH: rtsp://host.docker.internal:8554/cam1
-      SAMPLE_FPS: "2"
-      REALTIME_SIMULATION: "false"
-      CAMERA_ID: ${CAMERA_ID:-cam1}
->>>>>>> front/rts
       FRAME_STORAGE_PATH: /frames/
       REDIS_URL: redis://redis:6379
     volumes:
