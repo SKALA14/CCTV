@@ -8,7 +8,7 @@
     />
     <AddChannelModal
       v-if="showModal"
-      :slot="activeSlot"
+      :slot-index="activeSlot"
       :initial="editingChannel"
       :existing-names="existingNames"
       @close="closeModal"
@@ -73,7 +73,7 @@ function handleSubmit(data) {
     updateChannel(data.slot, data)
   } else {
     addChannel(data.slot, data)
-    postChannel({ slot: data.slot, camera_id: `cam${data.slot}`, ...data })
+    postChannel({ slot: data.slot, camera_id: `cam${data.slot}`, ...data }).catch(console.error)
   }
   closeModal()
 }
