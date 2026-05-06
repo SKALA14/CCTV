@@ -45,8 +45,6 @@ class GeneralYOLO:
                     "route": "general",
                     "anomaly_type": "candidate",
                     "confidence": round(float(box.conf[0].item()), 4),
-                    "flow_score": flow_result.score,
-                    "flow_threshold": config.GENERAL_OPTICAL_FLOW_THRESHOLD,
                     "source_model": "general_yolo",
                 })
 

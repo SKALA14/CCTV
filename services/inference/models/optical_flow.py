@@ -13,7 +13,6 @@
 - OpticalFlowResult
 - is_spike: 현재 프레임이 직전 프레임 대비 움직임 기준값을 넘었는지 여부.
 - score: optical flow magnitude의 percentile score.
-- reason: warmup, below_threshold, spike 등 디버깅용 판정 사유.
 
 주의
 - 원본 프레임 전체를 저장하지 않고 resized grayscale 1장만 보관해 메모리 사용을 제한한다.
@@ -30,7 +29,6 @@ import numpy as np
 class OpticalFlowResult:
     is_spike: bool
     score: float
-    reason: str
 
 
 class OpticalFlowGate:
@@ -61,10 +59,10 @@ class OpticalFlowGate:
         self.prev_seen_at[camera_id] = now
 
         if prev_gray is None:
-            return OpticalFlowResult(False, 0.0, "warmup")
+            return OpticalFlowResult(False, 0.0)
 
         if prev_gray.shape != gray.shape:
-            return OpticalFlowResult(False, 0.0, "shape_changed")
+            return OpticalFlowResult(False, 0.0)
 
         flow = cv2.calcOpticalFlowFarneback(
             prev_gray,
@@ -82,8 +80,8 @@ class OpticalFlowGate:
         score = float(np.percentile(magnitude, self.percentile))
 
         if score >= self.threshold:
-            return OpticalFlowResult(True, round(score, 4), "spike")
-        return OpticalFlowResult(False, round(score, 4), "below_threshold")
+            return OpticalFlowResult(True, round(score, 4))
+        return OpticalFlowResult(False, round(score, 4))
 
     def _to_resized_gray(self, frame: np.ndarray) -> np.ndarray:
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
