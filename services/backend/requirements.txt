@@ -6,3 +6,4 @@ redis
 pydantic-settings
 pgvector
 openai
+httpx

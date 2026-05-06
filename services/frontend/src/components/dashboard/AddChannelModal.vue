@@ -43,20 +43,27 @@
               @click="form.sourceType = 'webcam'"
             >웹캠</button>
           </div>
-          <input
-            v-if="form.sourceType === 'url'"
-            v-model="form.url"
-            type="text"
-            placeholder="rtsp://192.168.x.x:554/stream 또는 http://..."
-            class="w-full h-10 px-3 rounded-lg text-sm font-mono focus:outline-none transition-colors"
-            :style="`background: var(--input-bg); border: 1px solid ${errors.url ? '#ef4444' : 'var(--input-border)'}; color: var(--text-primary);`"
-          />
-          <p v-if="errors.url" class="text-xs mt-1 text-red-400">{{ errors.url }}</p>
-          <p
-            v-if="form.sourceType === 'url'"
-            class="text-xs mt-1"
-            style="color: var(--text-muted);"
-          >mp4·m3u8은 브라우저 직접 재생 / rtsp://는 ingestion 파이프라인 경유</p>
+          <div v-if="form.sourceType === 'url'" class="space-y-2">
+            <input
+              v-model="form.rtspUrl"
+              type="text"
+              placeholder="rtsp://192.168.x.x:554/stream 또는 http://..."
+              class="w-full h-10 px-3 rounded-lg text-sm font-mono focus:outline-none transition-colors"
+              :style="`background: var(--input-bg); border: 1px solid ${errors.rtspUrl ? '#ef4444' : 'var(--input-border)'}; color: var(--text-primary);`"
+            />
+            <p v-if="errors.rtspUrl" class="text-xs mt-1 text-red-400">{{ errors.rtspUrl }}</p>
+            <input
+              v-model="form.channelName"
+              type="text"
+              placeholder="mediamtx 스트림 경로 (예: cam0)"
+              class="w-full h-10 px-3 rounded-lg text-sm font-mono focus:outline-none transition-colors"
+              :style="`background: var(--input-bg); border: 1px solid ${errors.channelName ? '#ef4444' : 'var(--input-border)'}; color: var(--text-primary);`"
+            />
+            <p v-if="errors.channelName" class="text-xs mt-1 text-red-400">{{ errors.channelName }}</p>
+            <p class="text-xs" style="color: var(--text-muted);">
+              rtsp://는 mediamtx WebRTC 경유 재생
+            </p>
+          </div>
           <p
             v-if="form.sourceType === 'webcam'"
             class="text-xs px-3 py-2 rounded-lg"
@@ -123,16 +130,18 @@ const isEdit = !!props.initial?.name
 const form = reactive({
   name:        props.initial?.name        || '',
   sourceType:  props.initial?.url === 'webcam' ? 'webcam' : 'url',
-  url:         props.initial?.url && props.initial.url !== 'webcam' ? props.initial.url : '',
+  rtspUrl:     props.initial?.rtspUrl     || '',
+  channelName: props.initial?.channelName || `cam${props.slotIndex}`,
   description: props.initial?.description || '',
   options:     props.initial?.options     || [],
 })
 
-const errors = reactive({ name: '', url: '' })
+const errors = reactive({ name: '', rtspUrl: '', channelName: '' })
 
 function validate() {
-  errors.name = ''
-  errors.url  = ''
+  errors.name        = ''
+  errors.rtspUrl     = ''
+  errors.channelName = ''
 
   const trimmed = form.name.trim()
   if (!trimmed) {
@@ -147,11 +156,16 @@ function validate() {
     return false
   }
 
-  if (form.sourceType === 'url' && !form.url.trim()) {
-    errors.url = 'URL을 입력해주세요.'
-    return false
+  if (form.sourceType === 'url') {
+    if (!form.rtspUrl.trim()) {
+      errors.rtspUrl = 'URL을 입력해주세요.'
+      return false
+    }
+    if (!form.channelName.trim()) {
+      errors.channelName = '스트림 경로를 입력해주세요.'
+      return false
+    }
   }
-  // pipeline은 URL 자동 생성이므로 검증 불필요
 
   return true
 }
@@ -164,14 +178,16 @@ function toggleOption(opt) {
 function submit() {
   if (!validate()) return
 
-  const url = form.sourceType === 'webcam' ? 'webcam' : form.url.trim()
+  const isWebcam = form.sourceType === 'webcam'
 
   emit('submit', {
-    slot: props.slotIndex,
-    name: form.name.trim(),
-    url,
+    slot:        props.slotIndex,
+    name:        form.name.trim(),
+    url:         isWebcam ? 'webcam' : form.rtspUrl.trim(),
+    rtspUrl:     isWebcam ? null : form.rtspUrl.trim(),
+    channelName: isWebcam ? null : form.channelName.trim(),
     description: form.description,
-    options: form.options,
+    options:     form.options,
   })
 }
 </script>

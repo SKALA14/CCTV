@@ -1,12 +1,17 @@
 import api from './index.js'
 import { DUMMY_MODE } from '../constants/mode.js'
 
-export async function postChannel({ slot, camera_id, name, url, options }) {
+export async function postChannel({ slot, name, channelName, rtspUrl, description, options }) {
     if (DUMMY_MODE) return
-    await api.post('/channels', { slot, camera_id, name, url, options })
+    await api.post('/channels', { slot, name, channelName, rtspUrl, description, options })
 }
 
-export async function deleteChannel(camera_id) {
+export async function putChannel(channelName, patch) {
     if (DUMMY_MODE) return
-    await api.delete(`/channels/${camera_id}`)
+    await api.put(`/channels/${channelName}`, patch)
+}
+
+export async function deleteChannel(channelName) {
+    if (DUMMY_MODE) return
+    await api.delete(`/channels/${channelName}`)
 }

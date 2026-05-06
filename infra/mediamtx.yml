@@ -1,8 +1,11 @@
-hlsSegmentDuration: 2s
-hlsSegmentCount: 7
-
-paths:
-  cam0: {}
-  cam1: {}
-  cam2: {}
-  cam3: {}
+webrtcAddress: :8889
+api: yes
+apiAddress: :9997
+authInternalUsers:
+  - user: any
+    pass: ""
+    permissions:
+      - action: api
+      - action: read
+      - action: publish
+      - action: playback

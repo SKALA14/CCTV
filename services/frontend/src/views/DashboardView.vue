@@ -22,7 +22,7 @@ import { ref, computed, inject, watch } from 'vue'
 import ChannelGrid from '../components/dashboard/ChannelGrid.vue'
 import AddChannelModal from '../components/dashboard/AddChannelModal.vue'
 import { useChannels } from '../composables/useChannels.js'
-import { postChannel, deleteChannel } from '../api/channels.js'
+import { postChannel, putChannel, deleteChannel } from '../api/channels.js'
 
 const { slots, addChannel, updateChannel, removeChannel } = useChannels()
 
@@ -71,9 +71,10 @@ function closeModal() {
 function handleSubmit(data) {
   if (editingChannel.value) {
     updateChannel(data.slot, data)
+    putChannel(data.channelName, data).catch(console.error)
   } else {
     addChannel(data.slot, data)
-    postChannel({ slot: data.slot, camera_id: `cam${data.slot}`, ...data }).catch(console.error)
+    postChannel(data).catch(console.error)
   }
   closeModal()
 }
@@ -82,7 +83,7 @@ function handleRemove(slot) {
   if (confirm('채널을 삭제하시겠습니까?')) {
     const ch = slots.value[slot]
     removeChannel(slot)
-    if (ch) deleteChannel(ch.camera_id)
+    if (ch) deleteChannel(ch.channelName)
   }
 }
 </script>
