@@ -4,9 +4,8 @@ import { ref } from 'vue'
 export const useChannelStore = defineStore('channel', () => {
     const slots = ref([null, null, null, null])
 
-    function addChannel(channel) {
-        if (channels.value.length >= 4) return
-        channels.value.push({ ...channel, id: Date.now(), status: 'ok' })
+    function addChannel(slot, data) {
+        slots.value[slot] = { slot, camera_id: `cam${slot}`, ...data, status: 'ok' }
     }
 
     function removeChannel(slot) {

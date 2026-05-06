@@ -108,8 +108,8 @@ const { isDark, toggle } = useTheme()
 const route = useRoute()
 const isDashboard = computed(() => route.path === '/')
 
-const { channels } = storeToRefs(useChannelStore())
-const isMaxChannels = computed(() => channels.value.length >= MAX_CHANNELS)
+const { slots } = storeToRefs(useChannelStore())
+const isMaxChannels = computed(() => slots.value.every(s => s !== null))
 
 const addModalSignal = ref(false)
 provide('addModalSignal', addModalSignal)
