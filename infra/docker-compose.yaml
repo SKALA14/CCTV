@@ -17,7 +17,17 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  ingestion:
+  mediamtx:
+    image: bluenviron/mediamtx
+    ports:
+      - "8554:8554"
+      - "8888:8888"
+      - "8889:8889"   # WebRTC
+      - "9997:9997"   # 관리 API
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml
+
+  ingestion_0:
     build:
       context: ../services/ingestion
     environment:
@@ -114,6 +124,7 @@ services:
       - "80:80"
     depends_on:
       - backend
+      - mediamtx
 
 volumes:
   redis_data:

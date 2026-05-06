@@ -9,11 +9,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from app.config import config
 from app.db.session import engine, Base
 from app.worker import run_worker
-from app.api import events, ws
+from app.api import events, ws, channels
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
     logger.info("DB 테이블 생성 완료")
 
@@ -49,3 +51,4 @@ app.add_middleware(
 
 app.include_router(events.router)
 app.include_router(ws.router)
+app.include_router(channels.router)
