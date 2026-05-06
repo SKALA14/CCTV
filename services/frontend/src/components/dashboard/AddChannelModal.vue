@@ -8,10 +8,10 @@
       style="background: var(--bg-card); border: 1px solid var(--border);"
     >
       <h3 class="font-semibold text-base mb-1" style="color: var(--text-primary);">
-        {{ isEdit ? '채널 수정' : `슬롯 ${props.slot}에 채널 등록` }}
+        {{ isEdit ? '채널 수정' : `슬롯 ${props.slotIndex}에 채널 등록` }}
       </h3>
       <p class="text-xs mb-5" style="color: var(--text-muted);">
-        camera_id: cam{{ props.slot }}
+        camera_id: cam{{ props.slotIndex }}
       </p>
 
       <div class="space-y-4">
@@ -28,14 +28,14 @@
         </div>
 
         <div>
-          <label class="block text-xs mb-2" style="color: var(--text-muted);">영상 소스</label>
+          <label class="block text-xs mb-2" style="color: var(--text-muted);">소스 타입</label>
           <div class="flex gap-2 mb-3">
             <button
               class="px-3 py-1.5 rounded-lg text-sm transition-colors"
               :class="form.sourceType === 'url' ? 'bg-blue-600 text-white' : ''"
               :style="form.sourceType !== 'url' ? 'border: 1px solid var(--input-border); color: var(--text-muted);' : ''"
               @click="form.sourceType = 'url'"
-            >URL 입력</button>
+            >소스 URL</button>
             <button
               class="px-3 py-1.5 rounded-lg text-sm transition-colors"
               :class="form.sourceType === 'webcam' ? 'bg-blue-600 text-white' : ''"
@@ -47,11 +47,16 @@
             v-if="form.sourceType === 'url'"
             v-model="form.url"
             type="text"
-            placeholder="rtsp://192.168.1.1:554/stream 또는 http://..."
+            placeholder="rtsp://192.168.x.x:554/stream 또는 http://..."
             class="w-full h-10 px-3 rounded-lg text-sm font-mono focus:outline-none transition-colors"
             :style="`background: var(--input-bg); border: 1px solid ${errors.url ? '#ef4444' : 'var(--input-border)'}; color: var(--text-primary);`"
           />
           <p v-if="errors.url" class="text-xs mt-1 text-red-400">{{ errors.url }}</p>
+          <p
+            v-if="form.sourceType === 'url'"
+            class="text-xs mt-1"
+            style="color: var(--text-muted);"
+          >mp4·m3u8은 브라우저 직접 재생 / rtsp://는 ingestion 파이프라인 경유</p>
           <p
             v-if="form.sourceType === 'webcam'"
             class="text-xs px-3 py-2 rounded-lg"
@@ -107,7 +112,7 @@ import { reactive } from 'vue'
 import { GENERAL_OPTIONS } from '../../constants/events.js'
 
 const props = defineProps({
-  slot: { type: Number, default: 0 },
+  slotIndex: { type: Number, default: 0 },
   initial: Object,
   existingNames: { type: Array, default: () => [] },
 })
@@ -146,6 +151,7 @@ function validate() {
     errors.url = 'URL을 입력해주세요.'
     return false
   }
+  // pipeline은 URL 자동 생성이므로 검증 불필요
 
   return true
 }
@@ -159,8 +165,9 @@ function submit() {
   if (!validate()) return
 
   const url = form.sourceType === 'webcam' ? 'webcam' : form.url.trim()
+
   emit('submit', {
-    slot: props.slot,
+    slot: props.slotIndex,
     name: form.name.trim(),
     url,
     description: form.description,

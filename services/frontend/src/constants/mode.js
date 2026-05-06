@@ -1,1 +1,1 @@
-export const DUMMY_MODE = import.meta.env.VITE_USE_DUMMY === 'true'
+export const DUMMY_MODE = import.meta.env.VITE_USE_DUMMY !== 'false'
