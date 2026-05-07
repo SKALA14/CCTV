@@ -11,7 +11,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.websocket("/ws/events")
+@router.websocket("/ws")
 async def ws_events(websocket: WebSocket):
     await websocket.accept()
     r = aioredis.from_url(config.REDIS_URL, decode_responses=True)
