@@ -54,7 +54,7 @@ async def _mediamtx_add(channel_name: str, rtsp_url: str) -> None:
 async def _mediamtx_delete(channel_name: str) -> None:
     async with httpx.AsyncClient() as client:
         res = await client.delete(
-            f"{MEDIAMTX_API}/v3/config/paths/delete/{channel_name}",
+            f"{MEDIAMTX_API}/v3/config/paths/remove/{channel_name}",
         )
     if res.status_code not in (200, 204, 404):
         raise HTTPException(status_code=502, detail=f"mediamtx 삭제 실패: {res.text}")
