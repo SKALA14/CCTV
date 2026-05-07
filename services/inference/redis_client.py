@@ -18,7 +18,7 @@ def get_client() -> _redis.Redis: #
 
 def _ensure_group(stream: str, group: str) -> None:
     try:
-        get_client().xgroup_create(stream, group, id="0", mkstream=True)
+        get_client().xgroup_create(stream, group, id="$", mkstream=True)
     except _redis.exceptions.ResponseError:
         pass  # 이미 존재하는 그룹
 
