@@ -37,6 +37,7 @@ def wait_for_source():
 
 
 def main():
+    client = get_client()
     if not config.SOURCE_PATH or not config.SOURCE_TYPE:
         source_path, source_type = wait_for_source()
     else:
@@ -52,7 +53,12 @@ def main():
     sampler = FpsSampler(source)
     publisher = FramePublisher()
 
-    for frame in sampler.frames():
+    check_interval = max(1, int(config.SAMPLE_FPS) * 5)  # 5초마다 확인
+    for i, frame in enumerate(sampler.frames()):
+        if i % check_interval == 0:
+            if not client.exists(f"camera:{config.CAMERA_ID}:source_url"):
+                logger.info("소스 키 삭제됨, ingestion 종료 (camera_id=%s)", config.CAMERA_ID)
+                break
         path = publisher.publish(frame)
         print(f"저장: {path}")
 
