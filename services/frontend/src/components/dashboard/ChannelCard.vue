@@ -44,13 +44,15 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useWebRTC } from '../../composables/useWebRTC.js'
+import { useChannelStore } from '../../stores/channelStore.js'
 import { MEDIAMTX_URL } from '../../constants/mediamtx.js'
 
 const props = defineProps({ channel: Object })
 defineEmits(['edit', 'remove'])
 
-const isAlert    = computed(() => props.channel.status === 'alert')
-const webcamError = ref(false)
+const channelStore = useChannelStore()
+const isAlert      = computed(() => props.channel.status === 'alert')
+const webcamError  = ref(false)
 
 let mediaStream = null
 
@@ -88,6 +90,14 @@ onMounted(() => {
 onUnmounted(() => {
   stopWebcam()
   disconnect()
+})
+
+watch(status, (newStatus) => {
+  if (newStatus === 'error') {
+    channelStore.setChannelStatus(props.channel.slot, 'error')
+  } else if (newStatus === 'connected') {
+    channelStore.setChannelStatus(props.channel.slot, 'ok')
+  }
 })
 
 watch(() => props.channel.url, (newUrl) => {
