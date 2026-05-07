@@ -18,11 +18,13 @@ _store: dict[str, dict[str, Any]] = {}
 _redis = aioredis.from_url(config.REDIS_URL, decode_responses=True)
 
 
+
 class ChannelCreate(BaseModel):
     slot:        int
     name:        str
     channelName: str
     rtspUrl:     str
+    sourceType:  str
     description: str = ""
     options:     list[str] = []
 
@@ -70,11 +72,12 @@ async def create_channel(body: ChannelCreate) -> dict:
     if body.channelName in _store:
         raise HTTPException(status_code=409, detail="이미 등록된 channelName입니다.")
 
-    await _mediamtx_add(body.channelName, body.rtspUrl)
+    if body.sourceType == "rtsp":
+        await _mediamtx_add(body.channelName, body.rtspUrl)
 
     cam_id = f"cam{body.slot}"
     await _redis.set(f"camera:{cam_id}:source_url", body.rtspUrl)
-    await _redis.set(f"camera:{cam_id}:source_type", "rtsp")
+    await _redis.set(f"camera:{cam_id}:source_type", body.sourceType)
     logger.info("ingestion source set: cam_id=%s url=%s", cam_id, body.rtspUrl)
 
     channel = body.model_dump()
