@@ -11,9 +11,10 @@ from ..config import config
 
 def _extract_stream_url(youtube_url: str) -> str:
     ydl_opts = {
-        "format": "bestvideo[ext=mp4]/best[ext=mp4]/best",
-        "quiet": True,
-        "no_warnings": True,
+        "format": "bestvideo[vcodec^=avc1][ext=mp4]/bestvideo[ext=mp4][vcodec!=av01]/best[ext=mp4][vcodec!=av01]/best[vcodec!=av01]",
+        "quiet": False,
+        "no_warnings": False,
+        "socket_timeout": 15,
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(youtube_url, download=False)

@@ -22,6 +22,8 @@ import threading
 from collections import deque
 from typing import Callable
 
+import cv2
+
 from config import config
 from models.fire import FireYOLO
 from models.general import GeneralYOLO
@@ -100,11 +102,14 @@ def run() -> None:
                     ack_frame(GROUP, msg_id, frame_path)
                     continue
 
+                frame = cv2.imread(frame_path)
+
                 job = FrameJob(
                     msg_id=msg_id,
                     camera_id=fields.get("camera_id", config.CAMERA_ID),
                     frame_path=frame_path,
                     timestamp=fields.get("timestamp", ""),
+                    frame=frame,
                 )
                 dispatch_frame(GROUP, job, MODEL_NAMES, model_queues, pending)
 
