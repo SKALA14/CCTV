@@ -117,6 +117,7 @@
 <script setup>
 import { reactive } from 'vue'
 import { GENERAL_OPTIONS } from '../../constants/events.js'
+import { detectSourceType } from '../../utils/detectSourceType.js'
 
 const props = defineProps({
   slotIndex: { type: Number, default: 0 },
@@ -179,13 +180,15 @@ function submit() {
   if (!validate()) return
 
   const isWebcam = form.sourceType === 'webcam'
+  const trimmedUrl = form.rtspUrl.trim()
 
   emit('submit', {
     slot:        props.slotIndex,
     name:        form.name.trim(),
-    url:         isWebcam ? 'webcam' : form.rtspUrl.trim(),
-    rtspUrl:     isWebcam ? null : form.rtspUrl.trim(),
+    url:         isWebcam ? 'webcam' : trimmedUrl,
+    rtspUrl:     isWebcam ? null : trimmedUrl,
     channelName: isWebcam ? null : form.channelName.trim(),
+    sourceType:  isWebcam ? 'webcam' : detectSourceType(trimmedUrl),
     description: form.description,
     options:     form.options,
   })
