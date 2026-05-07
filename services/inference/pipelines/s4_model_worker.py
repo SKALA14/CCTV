@@ -16,8 +16,6 @@ import logging
 import queue
 from typing import Callable
 
-import cv2
-
 from pipelines.s1_types import FrameJob, ModelResult
 
 logger = logging.getLogger(__name__)
@@ -40,7 +38,7 @@ def model_worker(
             break
 
         try:
-            frame = cv2.imread(job.frame_path)
+            frame = job.frame
             if frame is None:
                 detections = []
             else:

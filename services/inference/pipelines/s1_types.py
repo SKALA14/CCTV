@@ -12,15 +12,19 @@ unified pipeline에서 공유하는 작업/결과 상태 타입을 정의한다.
 '''
 
 from dataclasses import dataclass, field
+from typing import Optional
+
+import numpy as np
 
 
-@dataclass(frozen=True)
+@dataclass
 class FrameJob:
     # msg_id는 Redis ACK와 모델별 결과 취합에 모두 사용하는 프레임 작업 ID다.
     msg_id: str
     camera_id: str
     frame_path: str
     timestamp: str
+    frame: Optional[np.ndarray] = field(default=None, compare=False, repr=False)
 
 
 @dataclass(frozen=True)
