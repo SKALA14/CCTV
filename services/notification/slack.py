@@ -95,34 +95,27 @@ def build_general_payload(vlm_result: dict[str, Any]) -> dict[str, Any]:
 
 
 def build_emergency_payload(alert: dict[str, Any]) -> dict[str, Any]:
-    camera_id = alert.get("camera_id", "unknown")
-    timestamp = alert.get("timestamp", "")
+    camera_id    = alert.get("camera_id", "unknown")
+    timestamp    = alert.get("timestamp", "")
     anomaly_type = alert.get("anomaly_type", "emergency")
-    frame = alert.get("frame", "")
-    detections = alert.get("detections", [])
-    classes = ", ".join(sorted({str(det.get("class", "unknown")) for det in detections}))
-    max_conf = max((float(det.get("conf", 0)) for det in detections), default=0)
+    danger_level = alert.get("danger_level", "critical")
+    description  = alert.get("description", "")
+    frame        = alert.get("frame", "")
+    source_model = alert.get("source_model", "")
+    confidence   = alert.get("confidence", "")
+    try:
+        conf_display = f"{float(confidence):.2f}"
+    except (TypeError, ValueError):
+        conf_display = "-"
 
-    fallback_text = (
-        f"[EMERGENCY] {camera_id} | {timestamp} | "
-        f"{anomaly_type} | {classes or 'detection'}"
-    )
-
-    detection_lines = [
-        f"- {det.get('class', 'unknown')} ({float(det.get('conf', 0)):.2f})"
-        for det in detections[:10]
-    ]
-    detection_text = "\n".join(detection_lines) if detection_lines else "탐지 결과 없음"
+    fallback_text = f"[EMERGENCY] {camera_id} | {timestamp} | {anomaly_type}"
 
     return {
         "text": fallback_text,
         "blocks": [
             {
                 "type": "header",
-                "text": {
-                    "type": "plain_text",
-                    "text": "긴급 상황 감지 알림",
-                },
+                "text": {"type": "plain_text", "text": "긴급 상황 감지 알림"},
             },
             {
                 "type": "section",
@@ -130,17 +123,18 @@ def build_emergency_payload(alert: dict[str, Any]) -> dict[str, Any]:
                     {"type": "mrkdwn", "text": f"*카메라 ID:*\n{camera_id}"},
                     {"type": "mrkdwn", "text": f"*발생 시각:*\n{timestamp}"},
                     {"type": "mrkdwn", "text": f"*이상 유형:*\n{anomaly_type}"},
-                    {"type": "mrkdwn", "text": f"*탐지 수:*\n{len(detections)}"},
-                    {"type": "mrkdwn", "text": f"*최고 신뢰도:*\n{max_conf:.2f}"},
+                    {"type": "mrkdwn", "text": f"*위험도:*\n{danger_level}"},
+                    {"type": "mrkdwn", "text": f"*신뢰도:*\n{conf_display}"},
                     {"type": "mrkdwn", "text": f"*프레임:*\n{frame}"},
                 ],
             },
             {
                 "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"*YOLO 탐지 결과:*\n{detection_text}",
-                },
+                "text": {"type": "mrkdwn", "text": f"*탐지 모델:*\n{source_model}"},
+            },
+            {
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": f"*설명:*\n{description}"},
             },
             {"type": "divider"},
         ],
