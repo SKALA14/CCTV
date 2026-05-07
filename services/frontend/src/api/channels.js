@@ -1,9 +1,9 @@
 import api from './index.js'
 import { DUMMY_MODE } from '../constants/mode.js'
 
-export async function postChannel({ slot, name, channelName, rtspUrl, description, options }) {
+export async function postChannel({ slot, name, channelName, rtspUrl, sourceType, description, options }) {
     if (DUMMY_MODE) return
-    await api.post('/channels', { slot, name, channelName, rtspUrl, description, options })
+    await api.post('/channels', { slot, name, channelName, rtspUrl, sourceType, description, options })
 }
 
 export async function putChannel(channelName, patch) {
