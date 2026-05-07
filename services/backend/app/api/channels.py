@@ -2,7 +2,7 @@ import logging
 from typing import Any
 
 import httpx
-import redis
+import redis.asyncio as aioredis
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/channels", tags=["channels"])
 MEDIAMTX_API = "http://mediamtx:9997"
 
 _store: dict[str, dict[str, Any]] = {}
-_redis = redis.from_url(config.REDIS_URL, decode_responses=True)
+_redis = aioredis.from_url(config.REDIS_URL, decode_responses=True)
 
 
 class ChannelCreate(BaseModel):
@@ -73,8 +73,8 @@ async def create_channel(body: ChannelCreate) -> dict:
     await _mediamtx_add(body.channelName, body.rtspUrl)
 
     cam_id = f"cam{body.slot}"
-    _redis.set(f"camera:{cam_id}:source_url", body.rtspUrl)
-    _redis.set(f"camera:{cam_id}:source_type", "rtsp")
+    await _redis.set(f"camera:{cam_id}:source_url", body.rtspUrl)
+    await _redis.set(f"camera:{cam_id}:source_type", "rtsp")
     logger.info("ingestion source set: cam_id=%s url=%s", cam_id, body.rtspUrl)
 
     channel = body.model_dump()
@@ -111,6 +111,6 @@ async def delete_channel(channel_name: str) -> None:
     slot = _store[channel_name].get("slot")
     if slot is not None:
         cam_id = f"cam{slot}"
-        _redis.delete(f"camera:{cam_id}:source_url", f"camera:{cam_id}:source_type")
+        await _redis.delete(f"camera:{cam_id}:source_url", f"camera:{cam_id}:source_type")
 
     _store.pop(channel_name)
