@@ -6,7 +6,15 @@
     </div>
 
     <div class="video-area">
+      <iframe
+        v-if="channel.sourceType === 'youtube' && youtubeEmbedUrl"
+        :src="youtubeEmbedUrl"
+        allow="autoplay; encrypted-media"
+        allowfullscreen
+        style="width:100%; height:100%; border:none; border-radius:inherit;"
+      />
       <video
+        v-else
         ref="videoRef"
         autoplay
         muted
@@ -56,6 +64,24 @@ const webcamError  = ref(false)
 
 let mediaStream = null
 
+function extractYoutubeId(url) {
+  const patterns = [
+    /[?&]v=([^&#]+)/,
+    /youtu\.be\/([^?&#]+)/,
+  ]
+  for (const pattern of patterns) {
+    const m = url.match(pattern)
+    if (m) return m[1]
+  }
+  return null
+}
+
+const youtubeEmbedUrl = computed(() => {
+  if (props.channel.sourceType !== 'youtube') return null
+  const id = extractYoutubeId(props.channel.url)
+  return id ? `https://www.youtube.com/embed/${id}?autoplay=1&mute=1` : null
+})
+
 function whepUrl(channelName) {
   return `${MEDIAMTX_URL}/${channelName}/whep`
 }
@@ -80,10 +106,13 @@ function stopWebcam() {
 }
 
 onMounted(() => {
-  if (props.channel.url === 'webcam') {
+  const { url, sourceType } = props.channel
+  if (url === 'webcam') {
     startWebcam()
-  } else {
+  } else if (sourceType === 'rtsp') {
     connect()
+  } else if (sourceType === 'file') {
+    videoRef.value.src = url
   }
 })
 
@@ -106,8 +135,10 @@ watch(() => props.channel.url, (newUrl) => {
 
   if (newUrl === 'webcam') {
     startWebcam()
-  } else {
+  } else if (props.channel.sourceType === 'rtsp') {
     connect()
+  } else if (props.channel.sourceType === 'file') {
+    videoRef.value.src = newUrl
   }
 })
 </script>
