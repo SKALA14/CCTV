@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 
 def cleaner_process() -> None:
     r = get_client()
+    flushed = r.delete("delete_queue")
+    if flushed:
+        logger.info("flushed stale delete_queue (%d entries)", flushed)
     while True:
         result = r.blpop("delete_queue", timeout=5)
         if not result:
