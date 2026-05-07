@@ -21,7 +21,7 @@ CONSUMER_NAME  = "notification-worker"
 def _ensure_groups(r: redis.Redis) -> None:
     for stream in (ALERTS_STREAM, EVENTS_STREAM):
         try:
-            r.xgroup_create(stream, CONSUMER_GROUP, id="0", mkstream=True)
+            r.xgroup_create(stream, CONSUMER_GROUP, id="$", mkstream=True)
         except redis.ResponseError:
             pass  # 이미 존재
 
