@@ -103,6 +103,7 @@ def run() -> None:
                     continue
 
                 frame = cv2.imread(frame_path)
+                logger.info("xread %s", frame_path)
 
                 job = FrameJob(
                     msg_id=msg_id,
