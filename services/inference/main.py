@@ -10,7 +10,7 @@ from pipelines.s0_unified import run as unified_run
 from pipelines.s9_cleaner import cleaner_process
 from redis_client import init_consumer_groups
 
-logging.basicConfig(level=logging.INFO, format="%(processName)s %(levelname)s %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(processName)s [%(levelname)s] %(message)s")
 
 WORKERS = [
     ("unified", unified_run),

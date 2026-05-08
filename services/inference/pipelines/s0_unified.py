@@ -90,6 +90,7 @@ def run() -> None:
         name="vlm-worker",
     )
     vlm_thread.start()
+    logging.basicConfig(level=logging.INFO, format="%(processName)s [%(levelname)s] %(message)s")
     logger.info("unified pipeline started")
 
     try:
@@ -102,17 +103,19 @@ def run() -> None:
                     ack_frame(GROUP, msg_id, frame_path)
                     continue
 
+                camera_id = fields.get("camera_id", config.CAMERA_ID)
                 frame = cv2.imread(frame_path)
-                logger.info("xread %s", frame_path)
+                logger.info("[1/4] 프레임 수신: msg_id=%s camera=%s", msg_id, camera_id)
 
                 job = FrameJob(
                     msg_id=msg_id,
-                    camera_id=fields.get("camera_id", config.CAMERA_ID),
+                    camera_id=camera_id,
                     frame_path=frame_path,
                     timestamp=fields.get("timestamp", ""),
                     frame=frame,
                 )
                 dispatch_frame(GROUP, job, MODEL_NAMES, model_queues, pending)
+                logger.info("[2/4] 모델 큐 분배 완료: msg_id=%s → fire/pose/general", msg_id)
 
             drain_results(result_queue, pending, fallen_timestamps)
             finalize_ready_frames(GROUP, pending, buffers, window_starts)
