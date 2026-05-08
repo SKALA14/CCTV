@@ -50,7 +50,8 @@ def main():
     source = cls()
     source.open(source_path)
 
-    sampler = FpsSampler(source)
+    realtime = source_type in ("youtube", "file")
+    sampler = FpsSampler(source, realtime=realtime)
     publisher = FramePublisher()
 
     check_interval = max(1, int(config.SAMPLE_FPS) * 5)  # 5초마다 확인

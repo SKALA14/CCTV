@@ -9,8 +9,9 @@ from .config import config
 
 class FpsSampler:
 
-    def __init__(self, source: FrameSource):
+    def __init__(self, source: FrameSource, realtime: bool = False):
         self.source = source
+        self.realtime = realtime or config.REALTIME_SIMULATION
 
     def frames(self):
         """샘플링된 프레임을 실시간 간격으로 yield. 소스가 끝나면 종료."""
@@ -26,7 +27,7 @@ class FpsSampler:
 
             if frame_idx % interval == 0:
                 yield frame
-                if config.REALTIME_SIMULATION:
+                if self.realtime:
                     time.sleep(sleep_sec)
 
             frame_idx += 1
