@@ -30,7 +30,7 @@ class Settings(BaseSettings):
 
     MODEL_QUEUE_SIZE: int = 30
     RESULT_QUEUE_SIZE: int = 90
-    FRAME_RESULT_TIMEOUT_SEC: float = 2.0
+    FRAME_RESULT_TIMEOUT_SEC: float = 5.0
 
     FALL_MIN_FRAMES: int = 3
     FALL_WINDOW_SEC: float = 5.0

@@ -12,13 +12,18 @@ Redis Stream 처리 완료(XACK)와 프레임 삭제 후보 등록을 담당한�
 - mark_processed(frame_path)로 delete_queue에 프레임 삭제 작업을 등록한다.
 '''
 
+import logging
+
 from config import config
 from redis_client import mark_processed, xack
+
+logger = logging.getLogger(__name__)
 
 
 def ack_frame(group: str, msg_id: str, frame_path: str) -> None:
     xack(config.FRAMES_STREAM, group, msg_id)
     mark_processed(frame_path)
+    logger.info("xack %s", frame_path)
 
 
 def ack_all(group: str, frames: list[tuple[str, str, str]]) -> None:
