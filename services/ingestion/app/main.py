@@ -15,7 +15,7 @@ from .publisher import FramePublisher
 logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s %(name)s %(levelname)s %(message)s",
+    format="%(name)s [%(levelname)s] %(message)s",
 )
 
 _SOURCES = {
@@ -60,8 +60,7 @@ def main():
             if not client.exists(f"camera:{config.CAMERA_ID}:source_url"):
                 logger.info("소스 키 삭제됨, ingestion 종료 (camera_id=%s)", config.CAMERA_ID)
                 break
-        path = publisher.publish(frame)
-        print(f"저장: {path}")
+        publisher.publish(frame)
 
     source.close()
 

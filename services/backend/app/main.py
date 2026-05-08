@@ -5,9 +5,10 @@
 
 import asyncio
 import logging
+import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
@@ -48,6 +49,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.time()
+    logger.info("→ %s %s", request.method, request.url.path)
+    response = await call_next(request)
+    elapsed = (time.time() - start) * 1000
+    logger.info("← %s %s %d (%.1fms)", request.method, request.url.path, response.status_code, elapsed)
+    return response
+
 
 app.include_router(events.router)
 app.include_router(ws.router)
