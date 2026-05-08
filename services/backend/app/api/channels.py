@@ -75,8 +75,13 @@ async def create_channel(body: ChannelCreate) -> dict:
     if body.sourceType == "rtsp":
         await _mediamtx_add(body.channelName, body.rtspUrl)
 
+    source_url = body.rtspUrl
+    if body.sourceType == "file":
+        filename = body.rtspUrl.lstrip("/").removeprefix("sample/")
+        source_url = f"/sample/{filename}"
+
     cam_id = f"cam{body.slot}"
-    await _redis.set(f"camera:{cam_id}:source_url", body.rtspUrl)
+    await _redis.set(f"camera:{cam_id}:source_url", source_url)
     await _redis.set(f"camera:{cam_id}:source_type", body.sourceType)
     logger.info("ingestion source set: cam_id=%s url=%s", cam_id, body.rtspUrl)
 
