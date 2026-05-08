@@ -112,7 +112,7 @@ onMounted(() => {
   } else if (sourceType === 'rtsp') {
     connect()
   } else if (sourceType === 'file') {
-    videoRef.value.src = url
+    videoRef.value.src = `/sample/${url.replace(/^\/?(sample\/)?/, '')}`
   }
 })
 
@@ -138,7 +138,7 @@ watch(() => props.channel.url, (newUrl) => {
   } else if (props.channel.sourceType === 'rtsp') {
     connect()
   } else if (props.channel.sourceType === 'file') {
-    videoRef.value.src = newUrl
+    videoRef.value.src = `/sample/${newUrl.replace(/^\/?(sample\/)?/, '')}`
   }
 })
 </script>
