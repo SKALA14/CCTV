@@ -29,6 +29,7 @@ services:
   ingestion_0:
     build:
       context: ../services/ingestion
+    image: cctv-ingestion
     environment:
       CAMERA_ID: cam0
       SAMPLE_FPS: "2"
@@ -44,6 +45,7 @@ services:
   ingestion_1:
     build:
       context: ../services/ingestion
+    image: cctv-ingestion
     environment:
       CAMERA_ID: cam1
       SAMPLE_FPS: "2"
@@ -58,6 +60,7 @@ services:
   ingestion_2:
     build:
       context: ../services/ingestion
+    image: cctv-ingestion
     environment:
       CAMERA_ID: cam2
       SAMPLE_FPS: "2"
@@ -72,6 +75,7 @@ services:
   ingestion_3:
     build:
       context: ../services/ingestion
+    image: cctv-ingestion
     environment:
       CAMERA_ID: cam3
       SAMPLE_FPS: "2"
