@@ -14,6 +14,7 @@ route=emergency 탐지 결과를 즉시 alerts 스트림으로 발행하고 낙�
   {camera_id, frame, timestamp, route, anomaly_type, danger_level, description, confidence, source_model}
 '''
 
+import logging
 import time
 from collections import deque
 from pathlib import Path
@@ -22,8 +23,13 @@ from config import config
 from pipelines.s1_types import PendingFrame
 from redis_client import xadd
 
+logger = logging.getLogger(__name__)
+
 
 def publish_emergency(camera_id: str, frame_path: str, timestamp: str, det: dict) -> None:
+    anomaly_type = det.get("anomaly_type", "unknown")
+    logger.warning("[emergency] alerts 발행: camera=%s type=%s confidence=%s",
+                   camera_id, anomaly_type, det.get("confidence", ""))
     xadd(config.ALERTS_STREAM, {
         "camera_id": camera_id,
         "frame": Path(frame_path).name,
@@ -53,7 +59,11 @@ def handle_fallen(
     while fallen_timestamps[camera_id] and fallen_timestamps[camera_id][0] < cutoff:
         fallen_timestamps[camera_id].popleft()
 
-    if len(fallen_timestamps[camera_id]) >= config.FALL_MIN_FRAMES:
+    count = len(fallen_timestamps[camera_id])
+    logger.info("[emergency] 낙상 누적: camera=%s count=%d/%d",
+                camera_id, count, config.FALL_MIN_FRAMES)
+    if count >= config.FALL_MIN_FRAMES:
+        logger.warning("[emergency] 낙상 임계치 도달 → alerts 발행: camera=%s count=%d", camera_id, count)
         publish_emergency(camera_id, frame_path, timestamp, det)
         fallen_timestamps[camera_id].clear()
 

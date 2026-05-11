@@ -39,11 +39,19 @@ def model_worker(
 
         try:
             frame = job.frame
+            logger.info("[3/4] %s 추론 시작: msg_id=%s", model_name, job.msg_id)
             if frame is None:
                 detections = []
             else:
                 h, w = frame.shape[:2]
                 detections = model.predict(frame, h, w)
+            logger.info("[3/4] %s 추론 완료: msg_id=%s 감지=%d건", model_name, job.msg_id, len(detections))
+            if detections:
+                for det in detections:
+                    logger.warning("[%s] 이상 감지: camera=%s type=%s confidence=%s",
+                                   model_name, job.camera_id,
+                                   det.get("anomaly_type", "unknown"),
+                                   det.get("confidence", ""))
             result = ModelResult(job.msg_id, model_name, detections)
         except Exception as exc:
             logger.exception("%s model worker error: msg_id=%s", model_name, job.msg_id)
