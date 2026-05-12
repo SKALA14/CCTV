@@ -5,8 +5,12 @@ import httpx
 import redis.asyncio as aioredis
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import delete as sa_delete
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.config import config
+from app.db.session import AsyncSessionLocal
+from app.db.models import CctvChannel
 
 logger = logging.getLogger(__name__)
 
@@ -18,12 +22,11 @@ _store: dict[str, dict[str, Any]] = {}
 _redis = aioredis.from_url(config.REDIS_URL, decode_responses=True)
 
 
-
 class ChannelCreate(BaseModel):
     slot:        int
     name:        str
     channelName: str
-    rtspUrl:     str
+    rtspUrl:     str | None = None
     sourceType:  str
     description: str = ""
     options:     list[str] = []
@@ -53,6 +56,18 @@ async def _mediamtx_add(channel_name: str, rtsp_url: str) -> None:
         raise HTTPException(status_code=502, detail=f"mediamtx 등록 실패: {res.text}")
 
 
+async def _mediamtx_add_empty(channel_name: str) -> None:
+    """source 없이 path만 등록 — 브라우저 WHIP push 허용용"""
+    async with httpx.AsyncClient() as client:
+        res = await client.post(
+            f"{MEDIAMTX_API}/v3/config/paths/add/{channel_name}",
+            json={},
+        )
+        logger.info("mediamtx add empty path %s → %d", channel_name, res.status_code)
+        if res.status_code == 400 and "already exists" in res.text:
+            return  # 이미 존재하면 OK
+
+
 async def _mediamtx_delete(channel_name: str) -> None:
     async with httpx.AsyncClient() as client:
         res = await client.delete(
@@ -72,21 +87,54 @@ async def create_channel(body: ChannelCreate) -> dict:
     if body.channelName in _store:
         raise HTTPException(status_code=409, detail="이미 등록된 channelName입니다.")
 
-    if body.sourceType == "rtsp":
-        await _mediamtx_add(body.channelName, body.rtspUrl)
-
-    source_url = body.rtspUrl
-    if body.sourceType == "file":
-        filename = body.rtspUrl.lstrip("/").removeprefix("sample/")
-        source_url = f"/sample/{filename}"
-
     cam_id = f"cam{body.slot}"
-    await _redis.set(f"camera:{cam_id}:source_url", source_url)
-    await _redis.set(f"camera:{cam_id}:source_type", body.sourceType)
-    logger.info("ingestion source set: cam_id=%s url=%s", cam_id, body.rtspUrl)
 
-    channel = body.model_dump()
+    if body.sourceType == "rtsp":
+        if not body.rtspUrl:
+            raise HTTPException(status_code=400, detail="RTSP 소스는 rtspUrl이 필수입니다.")
+        await _mediamtx_add(body.channelName, body.rtspUrl)
+        # ingestion은 mediamtx 재스트림으로 연결 (카메라 이중 접속 방지)
+        ingestion_url  = f"rtsp://mediamtx:8554/{body.channelName}"
+        ingestion_type = "rtsp"
+
+    elif body.sourceType == "webcam":
+        # MediaMTX에 path 사전 등록 (source 없음) → 브라우저 WHIP push 허용
+        await _mediamtx_add_empty(body.channelName)
+        ingestion_url  = f"rtsp://mediamtx:8554/{body.channelName}"
+        ingestion_type = "rtsp"
+
+    elif body.sourceType == "file":
+        filename = (body.rtspUrl or "").lstrip("/").removeprefix("sample/")
+        ingestion_url  = f"/sample/{filename}"
+        ingestion_type = "file"
+
+    else:
+        ingestion_url  = body.rtspUrl or ""
+        ingestion_type = body.sourceType
+
+    await _redis.set(f"camera:{cam_id}:source_url", ingestion_url)
+    await _redis.set(f"camera:{cam_id}:source_type", ingestion_type)
+
+    async with AsyncSessionLocal() as session:
+        async with session.begin():
+            stmt = pg_insert(CctvChannel).values(
+                camera_id=cam_id,
+                camera_name=body.channelName,
+                source_type=ingestion_type,
+                source_url=ingestion_url,
+            ).on_conflict_do_update(
+                index_elements=["camera_id"],
+                set_={
+                    "camera_name": body.channelName,
+                    "source_type": ingestion_type,
+                    "source_url": ingestion_url,
+                },
+            )
+            await session.execute(stmt)
+
+    channel = {**body.model_dump(), "ingestion_url": ingestion_url}
     _store[body.channelName] = channel
+    logger.info("채널 등록: cam_id=%s ingestion_url=%s", cam_id, ingestion_url)
     return channel
 
 
@@ -97,7 +145,7 @@ async def update_channel(channel_name: str, body: ChannelUpdate) -> dict:
 
     channel = _store[channel_name]
 
-    if body.rtspUrl and body.rtspUrl != channel["rtspUrl"]:
+    if body.rtspUrl and body.rtspUrl != channel.get("rtspUrl"):
         await _mediamtx_delete(channel_name)
         await _mediamtx_add(channel_name, body.rtspUrl)
 
@@ -120,5 +168,10 @@ async def delete_channel(channel_name: str) -> None:
     if slot is not None:
         cam_id = f"cam{slot}"
         await _redis.delete(f"camera:{cam_id}:source_url", f"camera:{cam_id}:source_type")
+        async with AsyncSessionLocal() as session:
+            async with session.begin():
+                await session.execute(
+                    sa_delete(CctvChannel).where(CctvChannel.camera_id == cam_id)
+                )
 
     _store.pop(channel_name)
