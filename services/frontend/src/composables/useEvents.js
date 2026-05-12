@@ -16,9 +16,10 @@ export function useEvents() {
     loading.value = true
     error.value = null
     try {
-      events.value = await fetchEvents(params)
+      const res = await fetchEvents(params)
+      events.value = Array.isArray(res) ? res : (res.events ?? [])
     } catch (e) {
-      error.value = e.message
+      error.value = e.response?.data?.detail ?? e.message
     } finally {
       loading.value = false
     }
@@ -38,9 +39,10 @@ export function useEvents() {
     loading.value = true
     error.value = null
     try {
-      events.value = await searchEvents(query, channelId)
+      const res = await searchEvents(query, channelId)
+      events.value = Array.isArray(res) ? res : (res.events ?? [])
     } catch (e) {
-      error.value = e.message
+      error.value = e.response?.data?.detail ?? e.message
     } finally {
       loading.value = false
     }
