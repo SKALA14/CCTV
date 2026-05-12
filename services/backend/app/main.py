@@ -8,14 +8,17 @@ import logging
 import time
 from contextlib import asynccontextmanager
 
+import redis.asyncio as aioredis
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text
+from sqlalchemy import text, select
 
 from app.config import config
-from app.db.session import engine, Base
+from app.db.session import engine, Base, AsyncSessionLocal
+from app.db.models import CctvChannel
 from app.worker import run_worker
 from app.api import events, ws, channels
+from app.api.channels import _store
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +34,25 @@ async def lifespan(app: FastAPI):
             WITH (m = 16, ef_construction = 64)
         """))
     logger.info("DB 테이블 생성 완료")
+
+    async with AsyncSessionLocal() as session:
+        rows = await session.execute(select(CctvChannel))
+        _r = aioredis.from_url(config.REDIS_URL, decode_responses=True)
+        for ch in rows.scalars().all():
+            slot = int(ch.camera_id.replace("cam", ""))
+            _store[ch.camera_name] = {
+                "slot": slot,
+                "name": ch.camera_name,
+                "channelName": ch.camera_name,
+                "rtspUrl": ch.source_url,
+                "sourceType": ch.source_type,
+                "description": "",
+                "options": [],
+            }
+            await _r.set(f"camera:{ch.camera_id}:source_url", ch.source_url)
+            await _r.set(f"camera:{ch.camera_id}:source_type", ch.source_type)
+        await _r.aclose()
+    logger.info("채널 복구 완료: %d개", len(_store))
 
     worker_task = asyncio.create_task(run_worker())
     logger.info("백그라운드 워커 시작")
