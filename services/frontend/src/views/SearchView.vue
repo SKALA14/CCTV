@@ -43,7 +43,10 @@ async function handleSearch(query) {
 watch(selectedChannelId, async () => {
   if (lastQuery.value) {
     await search(lastQuery.value, selectedChannelId.value)
-    eventStore.setSearchResults(events.value)
+  } else {
+    const params = selectedChannelId.value ? { channel_id: selectedChannelId.value } : {}
+    await load(params)
   }
+  eventStore.setSearchResults(events.value)
 })
 </script>
