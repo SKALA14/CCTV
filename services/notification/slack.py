@@ -142,13 +142,13 @@ def build_emergency_payload(alert: dict[str, Any]) -> dict[str, Any]:
 
 
 def should_notify_emergency(alert: dict[str, Any]) -> bool:
-    camera_id = str(alert.get("camera_id", "unknown"))
+    camera_id    = str(alert.get("camera_id", "unknown"))
     anomaly_type = str(alert.get("anomaly_type", "emergency"))
-    timestamp = _parse_timestamp(alert.get("timestamp"))
-    dedupe_key = (camera_id, anomaly_type)
+    dedupe_key   = (camera_id, anomaly_type)
 
     last_sent_at = _emergency_last_sent_at.get(dedupe_key)
-    if last_sent_at and timestamp - last_sent_at < EMERGENCY_DEDUPE_WINDOW:
+    now = datetime.now()
+    if last_sent_at and now - last_sent_at < EMERGENCY_DEDUPE_WINDOW:
         logger.info(
             "duplicate emergency alert skipped: camera_id=%s anomaly_type=%s last_sent_at=%s",
             camera_id,
@@ -177,11 +177,9 @@ def send_emergency_alert(alert: dict[str, Any], webhook_url: str) -> None:
         return
 
     _post_to_slack(webhook_url, build_emergency_payload(alert))
-    camera_id = str(alert.get("camera_id", "unknown"))
+    camera_id    = str(alert.get("camera_id", "unknown"))
     anomaly_type = str(alert.get("anomaly_type", "emergency"))
-    _emergency_last_sent_at[(camera_id, anomaly_type)] = _parse_timestamp(
-        alert.get("timestamp")
-    )
+    _emergency_last_sent_at[(camera_id, anomaly_type)] = datetime.now()
 
 
 def send_general_alert(vlm_result: dict[str, Any], webhook_url: str) -> None:
