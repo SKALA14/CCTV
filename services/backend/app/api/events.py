@@ -3,7 +3,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from openai import AsyncOpenAI
-from sqlalchemy import select, func
+from sqlalchemy import select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -14,7 +14,7 @@ router = APIRouter()
 _openai = AsyncOpenAI()
 
 
-def _to_schema(event: EventLog, channel_name: str | None = None) -> EventLogRead:
+def _to_schema(event: EventLog, channel_name: str | None = None, similarity: float | None = None) -> EventLogRead:
     return EventLogRead(
         id=event.event_id,
         channel_id=event.camera_id,
@@ -23,14 +23,17 @@ def _to_schema(event: EventLog, channel_name: str | None = None) -> EventLogRead
         event_type=event.event_type,
         danger_level=event.danger_level,
         reason=event.description,
-        confidence=None,
+        confidence=event.confidence,
         vlm_confidence=None,
         pose_event=None,
-        thumbnail_url=None,
-        clip_url=None,
+        source_model=event.source_model,
+        frame_path=event.frame_path,
+        thumbnail_url=event.thumbnail_url,
+        clip_url=event.clip_url,
         source_path=event.source_path,
         occurred_at=event.occurred_at,
         created_at=event.created_at,
+        similarity=similarity,
     )
 
 
@@ -88,19 +91,41 @@ async def search_events(
     )
     query_vector = response.data[0].embedding
 
-    query = select(EventLog).where(EventLog.embedding.isnot(None))
+    where_clause = "WHERE embedding IS NOT NULL"
+    params: dict = {"vec": str(query_vector), "limit": limit}
     if channel_id:
-        query = query.where(EventLog.camera_id == channel_id)
+        where_clause += " AND camera_id = :channel_id"
+        params["channel_id"] = channel_id
+
+    rows = await db.execute(
+        text(f"""
+            SELECT event_id,
+                   (embedding <=> CAST(:vec AS vector)) AS distance
+            FROM event_logs
+            {where_clause}
+            ORDER BY distance
+            LIMIT :limit
+        """),
+        params,
+    )
+    id_dist = {str(r.event_id): r.distance for r in rows}
+
+    if not id_dist:
+        return EventListResponse(events=[], total=0, skip=0, limit=limit)
 
     result = await db.execute(
-        query.order_by(EventLog.embedding.cosine_distance(query_vector)).limit(limit)
+        select(EventLog).where(EventLog.event_id.in_([uuid.UUID(k) for k in id_dist]))
     )
-    events = result.scalars().all()
+    events_map = {str(e.event_id): e for e in result.scalars().all()}
+    ordered = [events_map[k] for k in id_dist if k in events_map]
 
-    channel_names = await _fetch_channel_names(db, [e.camera_id for e in events])
+    channel_names = await _fetch_channel_names(db, [e.camera_id for e in ordered])
     return EventListResponse(
-        events=[_to_schema(e, channel_names.get(e.camera_id)) for e in events],
-        total=len(events),
+        events=[
+            _to_schema(e, channel_names.get(e.camera_id), similarity=round(1 - id_dist[str(e.event_id)], 4))
+            for e in ordered
+        ],
+        total=len(ordered),
         skip=0,
         limit=limit,
     )

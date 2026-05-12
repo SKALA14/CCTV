@@ -7,3 +7,4 @@ pydantic-settings
 pgvector
 openai
 httpx
+opencv-python-headless
