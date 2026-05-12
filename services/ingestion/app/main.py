@@ -64,6 +64,11 @@ def main():
 
     source.close()
 
+    if source_type == "file":
+        client.delete(f"camera:{config.CAMERA_ID}:source_url")
+        client.delete(f"camera:{config.CAMERA_ID}:source_type")
+        logger.info("파일 재생 완료, 소스 키 삭제 (camera_id=%s)", config.CAMERA_ID)
+
 
 if __name__ == "__main__":
     main()
