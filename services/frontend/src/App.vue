@@ -91,7 +91,7 @@
 </template>
 
 <script setup>
-import { ref, computed, provide } from 'vue'
+import { ref, computed, provide, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import AppNav from './components/layout/AppNav.vue'
@@ -100,6 +100,7 @@ import EventToast from './components/dashboard/EventToast.vue'
 import { useChannelStore } from './stores/channelStore.js'
 import { MAX_CHANNELS } from './constants/events.js'
 import { useTheme } from './composables/useTheme.js'
+import { getChannels } from './api/channels.js'
 
 // useWebSocket()
 
@@ -108,8 +109,22 @@ const { isDark, toggle } = useTheme()
 const route = useRoute()
 const isDashboard = computed(() => route.path === '/')
 
-const { slots } = storeToRefs(useChannelStore())
+const channelStore = useChannelStore()
+const { slots } = storeToRefs(channelStore)
 const isMaxChannels = computed(() => slots.value.every(s => s !== null))
+
+onMounted(async () => {
+  try {
+    const res = await getChannels()
+    res.data.forEach(ch => {
+      if (channelStore.slots[ch.slot] === null) {
+        channelStore.addChannel(ch.slot, ch)
+      }
+    })
+  } catch (e) {
+    console.warn('채널 복구 실패:', e.message)
+  }
+})
 
 const addModalSignal = ref(false)
 provide('addModalSignal', addModalSignal)
