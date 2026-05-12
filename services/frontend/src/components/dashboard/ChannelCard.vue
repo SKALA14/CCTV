@@ -52,6 +52,7 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useWebRTC } from '../../composables/useWebRTC.js'
+import { useWebRTCPublish } from '../../composables/useWebRTCPublish.js'
 import { useChannelStore } from '../../stores/channelStore.js'
 import { MEDIAMTX_URL } from '../../constants/mediamtx.js'
 
@@ -60,9 +61,7 @@ defineEmits(['edit', 'remove'])
 
 const channelStore = useChannelStore()
 const isAlert      = computed(() => props.channel.status === 'alert')
-const webcamError  = ref(false)
-
-let mediaStream = null
+const webcamError  = ref(false)  // getUserMedia 실패 시에만 true
 
 function extractYoutubeId(url) {
   const patterns = [
@@ -90,25 +89,19 @@ const { videoRef, status, error, connect, disconnect } = useWebRTC(
   whepUrl(props.channel.channelName)
 )
 
-async function startWebcam() {
-  try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-    videoRef.value.srcObject = mediaStream
-  } catch {
-    webcamError.value = true
-  }
-}
+const { status: pubStatus, startPublish, stopPublish } = useWebRTCPublish()
 
-function stopWebcam() {
-  mediaStream?.getTracks().forEach(t => t.stop())
-  mediaStream = null
-  webcamError.value = false
+function isWebcam(ch) {
+  return ch.sourceType === 'webcam' || ch.url === 'webcam'
 }
 
 onMounted(() => {
   const { url, sourceType } = props.channel
-  if (url === 'webcam') {
-    startWebcam()
+  if (isWebcam(props.channel)) {
+    const whipUrl = `/webrtc/${props.channel.channelName}/whip`
+    startPublish(whipUrl, videoRef.value).catch(() => {
+      // WHIP 실패해도 로컬 프리뷰는 유지
+    })
   } else if (sourceType === 'rtsp') {
     connect()
   } else if (sourceType === 'file') {
@@ -117,7 +110,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  stopWebcam()
+  stopPublish()
   disconnect()
 })
 
@@ -130,11 +123,12 @@ watch(status, (newStatus) => {
 })
 
 watch(() => props.channel.url, (newUrl) => {
+  stopPublish()
   disconnect()
-  stopWebcam()
 
-  if (newUrl === 'webcam') {
-    startWebcam()
+  if (isWebcam(props.channel)) {
+    const whipUrl = `/webrtc/${props.channel.channelName}/whip`
+    startPublish(whipUrl, videoRef.value)
   } else if (props.channel.sourceType === 'rtsp') {
     connect()
   } else if (props.channel.sourceType === 'file') {
