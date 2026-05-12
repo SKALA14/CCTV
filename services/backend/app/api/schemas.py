@@ -15,11 +15,14 @@ class EventLogRead(BaseModel):
     confidence:    float | None
     vlm_confidence: float | None
     pose_event:    str | None
+    source_model:  str | None
+    frame_path:    str | None
     thumbnail_url: str | None
     clip_url:      str | None
     source_path:   str | None
     occurred_at:   datetime
     created_at:    datetime
+    similarity:    float | None = None
 
 
 class EventListResponse(BaseModel):
