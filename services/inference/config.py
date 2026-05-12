@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     DEVICE: str = "cpu"
 
     CAMERA_ID: str = "video99"
-    FRAME_STORAGE_PATH: str = "./frames"
+    FRAME_STORAGE_PATH: str = "/frames"
     ANNOTATE_FRAMES: bool = False  # True면 bbox·id를 프레임에 그려서 덮어씀
     ANNOTATION_COLORS: dict[str, tuple[int, int, int]] = {
         "fallen": (0, 0, 255),

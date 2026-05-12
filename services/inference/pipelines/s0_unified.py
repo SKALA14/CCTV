@@ -98,7 +98,7 @@ def run() -> None:
             messages = xreadgroup(config.FRAMES_STREAM, GROUP, CONSUMER, count=10, block_ms=100)
 
             for msg_id, fields in messages:
-                frame_path = fields.get("frame_path", "")
+                frame_path = fields.get("frame_path", "").replace("/frames", config.FRAME_STORAGE_PATH, 1)
                 if not frame_path:
                     ack_frame(GROUP, msg_id, frame_path)
                     continue
