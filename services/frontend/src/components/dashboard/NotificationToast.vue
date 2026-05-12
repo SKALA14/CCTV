@@ -65,12 +65,12 @@ import { useChannels } from '../../composables/useChannels.js'
 
 const store = useEventStore()
 const { notifications } = storeToRefs(store)
-const { channels } = useChannels()
+const { slots } = useChannels()
 
 function resolveChannelName(notif) {
   const cameraId = String(notif.channel_id || notif.camera_id || '')
-  const ch = channels.value.find(c => (
-    String(c.camera_id || '') === cameraId || String(c.id || '') === cameraId
+  const ch = slots.value.find(c => (
+    String(c.camera_id || c.channelName || '') === cameraId
   ))
   return ch?.name || notif.channel_name || cameraId || '알 수 없음'
 }
