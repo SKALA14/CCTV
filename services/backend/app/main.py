@@ -25,6 +25,11 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
+        await conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_event_logs_embedding_hnsw
+            ON event_logs USING hnsw (embedding vector_cosine_ops)
+            WITH (m = 16, ef_construction = 64)
+        """))
     logger.info("DB 테이블 생성 완료")
 
     worker_task = asyncio.create_task(run_worker())
