@@ -4,6 +4,18 @@ import { TOAST_DURATION } from '../constants/events.js'
 
 export const NOTIF_DURATION = 8000
 
+// TODO: 임시 쿨다운 로직 — 추후 별도 파일로 분리 예정
+const NOTIF_COOLDOWN_MS = 5 * 60 * 1000 // 5분
+const _cooldownMap = new Map() // key: `${camera_id}:${event_type}`
+
+function _isCoolingDown(event) {
+    const key = `${event.channel_id || event.camera_id}:${event.event_type}`
+    const last = _cooldownMap.get(key) || 0
+    if (Date.now() - last < NOTIF_COOLDOWN_MS) return true
+    _cooldownMap.set(key, Date.now())
+    return false
+}
+
 export const useEventStore = defineStore('event', () => {
     const liveEvents        = ref([])
     const toastQueue        = ref([])
@@ -17,9 +29,10 @@ export const useEventStore = defineStore('event', () => {
         toastQueue.value.push(event)
         setTimeout(() => { toastQueue.value.shift() }, TOAST_DURATION)
 
-        // 우하단 알림 (신규) — 정상 이벤트는 제외
+        // 우하단 알림 (신규) — 정상 이벤트 및 쿨다운 중인 이벤트 제외
         const level = event.danger_level
         if (!level || level === 'none' || event.event_type === 'normal') return
+        if (_isCoolingDown(event)) return
 
         const id = `${Date.now()}-${Math.random()}`
         notifications.value.unshift({ ...event, _notifId: id })
