@@ -22,8 +22,8 @@ from config import config
 
 logger = logging.getLogger(__name__)
 
-_VALID_LEVELS      = {"high", "medium", "low", "none"}
-_VALID_EVENT_TYPES = {"fall", "fire", "intrusion", "ppe", "normal"}
+_VALID_LEVELS      = {"critical", "none"}
+_VALID_EVENT_TYPES = {"intrusion", "ppe", "specific", "normal"}
 
 
 def _encode_image(image_path: str) -> tuple[str, str]:
@@ -73,14 +73,35 @@ class VLMClient:
 
     def _parse(self, raw_text: str) -> dict:
         """VLM 응답 JSON → 결과 dict. 파싱 실패 시 보수적 폴백."""
+        _fallback = {
+            "description":  raw_text[:300],
+            "is_anomaly":   True,
+            "danger_level": "critical",
+            "event_type":   "normal",
+            "confidence":   0.3,
+        }
+
+        # case 3: { } 자체가 없음
+        if raw_text.find("{") == -1:
+            logger.warning("VLM 응답에 JSON 없음 (중괄호 미발견): %.200s", raw_text)
+            return _fallback
+
+        # case 1 & 2: JSON 파싱 실패
         try:
             start = raw_text.find("{")
             end   = raw_text.rfind("}") + 1
             data  = json.loads(raw_text[start:end])
+        except json.JSONDecodeError as e:
+            if raw_text.count("{") > raw_text.count("}"):
+                logger.warning("VLM 응답 JSON 잘림 (max_tokens 초과 의심): %.200s", raw_text)
+            else:
+                logger.warning("VLM 응답이 유효한 JSON 아님: %s | %.200s", e, raw_text)
+            return _fallback
 
+        # case 4: 타입 변환 실패
+        try:
             level = data.get("danger_level", "none")
             etype = data.get("event_type", "normal")
-
             return {
                 "description":  str(data.get("reason", "")),
                 "is_anomaly":   bool(data.get("is_danger", False)),
@@ -88,17 +109,9 @@ class VLMClient:
                 "event_type":   etype if etype in _VALID_EVENT_TYPES else "normal",
                 "confidence":   float(max(0.0, min(1.0, data.get("confidence", 0.5)))),
             }
-
-        except Exception:
-            # 파싱 완전 실패 → 알림 누락 방지를 위해 is_anomaly=True 보수적 처리
-            logger.warning("VLM 응답 파싱 실패, 보수적 폴백 적용")
-            return {
-                "description":  raw_text[:300],
-                "is_anomaly":   True,
-                "danger_level": "medium",
-                "event_type":   "normal",
-                "confidence":   0.3,
-            }
+        except (ValueError, TypeError) as e:
+            logger.warning("VLM 응답 값 변환 실패: %s | data: %s", e, data)
+            return _fallback
 
     def analyze(self, frame_paths: list[str], prompt: str) -> dict:
         if not frame_paths:

@@ -79,15 +79,15 @@
 
     <!-- 우측 메인 영역 -->
     <div class="flex flex-col flex-1 min-w-0">
-      <!-- 이벤트 배너 토스트 -->
-      <EventToast />
-
       <!-- 라우터 뷰 -->
       <main class="flex-1 overflow-auto">
         <router-view />
       </main>
     </div>
   </div>
+
+  <!-- 우하단 알림 토스트 (어느 페이지에서나 표시) -->
+  <NotificationToast />
 </template>
 
 <script setup>
@@ -95,14 +95,14 @@ import { ref, computed, provide, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import AppNav from './components/layout/AppNav.vue'
-import EventToast from './components/dashboard/EventToast.vue'
-// import { useWebSocket } from './composables/useWebSocket.js'
+import NotificationToast from './components/dashboard/NotificationToast.vue'
+import { useWebSocket } from './composables/useWebSocket.js'
 import { useChannelStore } from './stores/channelStore.js'
 import { MAX_CHANNELS } from './constants/events.js'
 import { useTheme } from './composables/useTheme.js'
 import { getChannels } from './api/channels.js'
 
-// useWebSocket()
+useWebSocket()
 
 const { isDark, toggle } = useTheme()
 
