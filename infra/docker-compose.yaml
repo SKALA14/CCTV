@@ -117,6 +117,9 @@ services:
       EVENTS_STREAM: events
       ALERTS_STREAM: alerts
       OPENAI_API_KEY: ${OPENAI_API_KEY}
+      FRAME_STORAGE_PATH: /frames
+    volumes:
+      - ../frames:/frames
     depends_on:
       - redis
       - postgres
@@ -140,6 +143,7 @@ services:
       - "80:80"
     volumes:
       - ../sample:/sample
+      - ../frames:/frames
     depends_on:
       - backend
       - mediamtx
