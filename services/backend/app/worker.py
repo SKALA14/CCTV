@@ -11,6 +11,7 @@ alerts(emergency), events(general) 두 스트림을 asyncio.gather로 동시에 
 import asyncio
 import logging
 import os
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -34,6 +35,10 @@ logger = logging.getLogger(__name__)
 
 CONSUMER_GROUP = "backend"
 CONSUMER_NAME  = "backend-worker"
+
+# (camera_id, event_type) → 마지막 저장 시각 (monotonic)
+_dedup_last_saved: dict[tuple[str, str], float] = {}
+DEDUP_COOLDOWN_SEC = 30.0
 
 _redis_client: aioredis.Redis | None = None
 
@@ -176,6 +181,14 @@ async def _process_message(
 ) -> None:
     camera_id    = fields.get("camera_id", "unknown")
     event_type   = fields.get("anomaly_type", "normal")
+
+    dedup_key = (camera_id, event_type)
+    now_mono  = time.monotonic()
+    if now_mono - _dedup_last_saved.get(dedup_key, 0) < DEDUP_COOLDOWN_SEC:
+        logger.info("dedup skip: camera=%s event_type=%s", camera_id, event_type)
+        return
+    _dedup_last_saved[dedup_key] = now_mono
+
     danger_level = fields.get("danger_level", "none")
     description  = fields.get("description", "")
     frame_path   = fields.get("frame")
