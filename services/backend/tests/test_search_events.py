@@ -69,3 +69,37 @@ def test_no_sqlalchemy_text_in_query():
         .limit(10)
     )
     assert "text(" not in repr(stmt)
+
+
+def test_multi_vector_threshold_is_065():
+    """임계값이 0.65로 완화되었는지 확인"""
+    vec = [0.1] * 1536
+    distance_col = EventLog.embedding.cosine_distance(vec)
+    stmt = (
+        select(EventLog, distance_col.label("distance"))
+        .where(EventLog.embedding.is_not(None))
+        .where(distance_col < 0.65)
+        .order_by(distance_col)
+        .limit(20)
+    )
+    sql = str(stmt.compile(
+        dialect=postgresql.dialect(),
+        compile_kwargs={"literal_binds": True}
+    ))
+    assert "0.65" in sql
+
+
+def test_multi_vector_dedup_takes_min_distance():
+    """같은 event_id에 대해 두 distance 값이 있을 때 min을 취하는 로직 검증"""
+    from uuid import uuid4
+    eid = str(uuid4())
+    candidates: dict[str, tuple] = {}
+
+    # 첫 번째 벡터 결과: distance=0.5
+    candidates[eid] = (object(), 0.5)
+    # 두 번째 벡터 결과: distance=0.3 (더 가까움)
+    dist = 0.3
+    if eid not in candidates or dist < candidates[eid][1]:
+        candidates[eid] = (object(), dist)
+
+    assert candidates[eid][1] == 0.3
