@@ -26,7 +26,8 @@ class EventLogRead(BaseModel):
 
 
 class EventListResponse(BaseModel):
-    events: list[EventLogRead]
-    total:  int
-    skip:   int
-    limit:  int
+    events:         list[EventLogRead]
+    total:          int
+    skip:           int
+    limit:          int
+    applied_filter: str | None = None
