@@ -82,19 +82,22 @@ async def list_events(
 
 @router.get("/events/search", response_model=EventListResponse)
 async def search_events(
-    q:          str = Query(..., min_length=1),
-    channel_id: Optional[str] = Query(None),
-    limit:      int = Query(10, ge=1, le=50),
-    start_date: Optional[datetime] = Query(None),
-    end_date:   Optional[datetime] = Query(None),
+    q:               str  = Query(..., min_length=1),
+    channel_id:      Optional[str]      = Query(None),
+    limit:           int  = Query(10, ge=1, le=50),
+    start_date:      Optional[datetime] = Query(None),
+    end_date:        Optional[datetime] = Query(None),
+    skip_time_parse: bool = Query(False),
     db: AsyncSession = Depends(get_db),
 ):
-    cleaned_query, parsed_start, parsed_end, label = parse_time_expression(q)
-
-    if start_date or end_date:
-        active_start, active_end, applied_filter = start_date, end_date, None
+    if skip_time_parse:
+        cleaned_query, active_start, active_end, applied_filter = q, None, None, None
     else:
-        active_start, active_end, applied_filter = parsed_start, parsed_end, label
+        cleaned_query, parsed_start, parsed_end, label = parse_time_expression(q)
+        if start_date or end_date:
+            active_start, active_end, applied_filter = start_date, end_date, None
+        else:
+            active_start, active_end, applied_filter = parsed_start, parsed_end, label
 
     embed_response = await _openai.embeddings.create(
         model="text-embedding-3-small",
@@ -102,10 +105,12 @@ async def search_events(
     )
     query_vector: list[float] = embed_response.data[0].embedding
 
-    distance_col = EventLog.embedding.cosine_distance(query_vector).label("distance")
+    distance_expr = EventLog.embedding.cosine_distance(query_vector)
+    distance_col  = distance_expr.label("distance")
     stmt = (
         select(EventLog, distance_col)
         .where(EventLog.embedding.is_not(None))
+        .where(distance_expr < 0.6)
         .order_by(distance_col)
         .limit(limit)
     )
