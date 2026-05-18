@@ -7,7 +7,7 @@
         style="color: var(--text-muted);"
         @mouseover="e => e.currentTarget.style.color = 'var(--text-primary)'"
         @mouseleave="e => e.currentTarget.style.color = 'var(--text-muted)'"
-        @click="router.back()"
+        @click="router.push('/search')"
       >← 검색 결과로 돌아가기</button>
       <span style="color: var(--border);">|</span>
       <span class="font-semibold" style="color: var(--text-primary);">클립 상세</span>
