@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.config import config
 from app.db.session import AsyncSessionLocal
-from app.db.models import CctvChannel
+from app.db.models import CctvChannel, EventLog
 
 logger = logging.getLogger(__name__)
 
@@ -170,6 +170,9 @@ async def delete_channel(channel_name: str) -> None:
         await _redis.delete(f"camera:{cam_id}:source_url", f"camera:{cam_id}:source_type")
         async with AsyncSessionLocal() as session:
             async with session.begin():
+                await session.execute(
+                    sa_delete(EventLog).where(EventLog.camera_id == cam_id)
+                )
                 await session.execute(
                     sa_delete(CctvChannel).where(CctvChannel.camera_id == cam_id)
                 )
