@@ -22,6 +22,7 @@ from openai import AsyncOpenAI
 from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 
+from app.api.embed_describer import describe_for_embedding as _describe_embed
 from app.config import config
 from app.db.session import AsyncSessionLocal
 from app.db.models import CctvChannel, EventLog
@@ -195,11 +196,11 @@ async def _process_message(
     confidence   = fields.get("confidence")
     source_model = fields.get("source_model")
     occurred_at  = await _parse_occurred_at(fields.get("timestamp", ""))
-    embed_text   = " ".join(filter(None, [
-        fields.get("anomaly_type") or fields.get("event_type", ""),
-        fields.get("danger_level", ""),
-        description,
-    ])).strip()
+    embed_text   = await _describe_embed(
+        event_type=fields.get("anomaly_type") or fields.get("event_type", ""),
+        danger_level=fields.get("danger_level", ""),
+        description=description,
+    )
     embedding    = await _generate_embedding(openai_client, embed_text)
 
     event_id = uuid.uuid4()
