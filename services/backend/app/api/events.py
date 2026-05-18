@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -11,6 +12,7 @@ from app.db.session import get_db
 from app.db.models import EventLog, CctvChannel
 from app.api.schemas import EventLogRead, EventListResponse
 from app.api.time_parser import parse_time_expression
+from app.api.query_expander import expand_query
 
 router = APIRouter()
 _openai = AsyncOpenAI()
@@ -99,29 +101,37 @@ async def search_events(
         else:
             active_start, active_end, applied_filter = parsed_start, parsed_end, label
 
-    embed_response = await _openai.embeddings.create(
-        model="text-embedding-3-small",
-        input=cleaned_query or q,
-    )
-    query_vector: list[float] = embed_response.data[0].embedding
+    base_query = cleaned_query or q
+    variants = await expand_query(base_query)
+    embed_responses = await asyncio.gather(*[
+        _openai.embeddings.create(model="text-embedding-3-small", input=v)
+        for v in variants
+    ])
+    query_vectors: list[list[float]] = [r.data[0].embedding for r in embed_responses]
 
-    distance_expr = EventLog.embedding.cosine_distance(query_vector)
-    distance_col  = distance_expr.label("distance")
-    stmt = (
-        select(EventLog, distance_col)
-        .where(EventLog.embedding.is_not(None))
-        .where(distance_expr < 0.6)
-        .order_by(distance_col)
-        .limit(limit)
-    )
-    if channel_id:
-        stmt = stmt.where(EventLog.camera_id == channel_id)
-    if active_start:
-        stmt = stmt.where(EventLog.occurred_at >= active_start)
-    if active_end:
-        stmt = stmt.where(EventLog.occurred_at <= active_end)
+    all_candidates: dict[str, tuple] = {}
+    for qv in query_vectors:
+        dist_expr = EventLog.embedding.cosine_distance(qv)
+        stmt = (
+            select(EventLog, dist_expr.label("distance"))
+            .where(EventLog.embedding.is_not(None))
+            .where(dist_expr < 0.65)
+            .order_by(dist_expr)
+            .limit(limit * 2)
+        )
+        if channel_id:
+            stmt = stmt.where(EventLog.camera_id == channel_id)
+        if active_start:
+            stmt = stmt.where(EventLog.occurred_at >= active_start)
+        if active_end:
+            stmt = stmt.where(EventLog.occurred_at <= active_end)
 
-    rows = (await db.execute(stmt)).all()
+        for event, dist in (await db.execute(stmt)).all():
+            eid = str(event.event_id)
+            if eid not in all_candidates or dist < all_candidates[eid][1]:
+                all_candidates[eid] = (event, dist)
+
+    rows = sorted(all_candidates.values(), key=lambda x: x[1])[:limit]
 
     if not rows:
         return EventListResponse(
