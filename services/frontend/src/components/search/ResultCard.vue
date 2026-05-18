@@ -26,7 +26,14 @@
 
     <!-- 배지 + 버튼 -->
     <div class="flex flex-col items-end justify-between flex-shrink-0 gap-2">
-      <span class="danger-badge" :class="event.danger_level">{{ event.danger_level }}</span>
+      <div class="flex items-center gap-1.5">
+        <span
+          v-if="event.similarity != null"
+          class="text-xs tabular-nums"
+          style="color: var(--text-muted);"
+        >{{ Math.round(event.similarity * 100) }}% 일치</span>
+        <span class="danger-badge" :class="event.danger_level">{{ event.danger_level }}</span>
+      </div>
       <button
         class="px-3 py-1.5 rounded-lg text-xs transition-colors whitespace-nowrap"
         style="border: 1px solid var(--border); color: var(--text-muted);"
