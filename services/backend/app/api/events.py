@@ -128,7 +128,7 @@ async def search_events(
 
     return EventListResponse(
         events=[
-            _to_schema(event, channel_names.get(event.camera_id), similarity=round(1 - distance, 4))
+            _to_schema(event, channel_names.get(event.camera_id), similarity=max(round(1 - distance, 4), 0.0))
             for event, distance in rows
         ],
         total=len(rows),
