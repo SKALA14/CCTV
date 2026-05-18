@@ -6,5 +6,12 @@ export const fetchEvents = (params = {}) =>
 export const fetchEventById = (id) =>
     api.get(`/events/${id}`).then(r => r.data)
 
-export const searchEvents = (query, channelId = null) =>
-    api.get('/events/search', { params: { q: query, channel_id: channelId } }).then(r => r.data)
+export const searchEvents = (query, channelId = null, startDate = null, endDate = null) =>
+    api.get('/events/search', {
+        params: {
+            q: query,
+            channel_id: channelId,
+            start_date: startDate,
+            end_date: endDate,
+        },
+    }).then(r => r.data)
