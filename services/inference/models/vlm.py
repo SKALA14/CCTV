@@ -71,6 +71,8 @@ class VLMClient:
         )
         return response.choices[0].message.content.strip()
 
+    _REFUSAL_PHRASES = ("i'm sorry", "i cannot", "i can't", "i am sorry", "cannot assist", "can't assist")
+
     def _parse(self, raw_text: str) -> dict:
         """VLM 응답 JSON → 결과 dict. 파싱 실패 시 보수적 폴백."""
         _fallback = {
@@ -83,6 +85,10 @@ class VLMClient:
 
         # case 3: { } 자체가 없음
         if raw_text.find("{") == -1:
+            lower = raw_text.lower()
+            if any(phrase in lower for phrase in self._REFUSAL_PHRASES):
+                logger.warning("VLM 콘텐츠 정책 거부 — 이벤트 발행 건너뜀: %.100s", raw_text)
+                return {"skipped": True, "event_type": "normal", "description": "", "danger_level": "none", "confidence": 0.0, "is_anomaly": False}
             logger.warning("VLM 응답에 JSON 없음 (중괄호 미발견): %.200s", raw_text)
             return _fallback
 
