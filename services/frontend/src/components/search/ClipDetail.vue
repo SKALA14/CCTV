@@ -269,7 +269,7 @@ function onMetadata() { duration.value = videoEl.value?.duration ?? 0 }
 function togglePlay() {
   if (!videoEl.value) return
   if (isPlaying.value) { videoEl.value.pause(); isPlaying.value = false }
-  else { videoEl.value.play(); isPlaying.value = true }
+  else { isPlaying.value = true; videoEl.value.play().catch(() => { isPlaying.value = false }) }
 }
 
 function skipBy(sec) {

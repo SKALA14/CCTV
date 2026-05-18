@@ -51,7 +51,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import SearchBar     from '../components/search/SearchBar.vue'
 import ChannelFilter from '../components/search/ChannelFilter.vue'
 import ResultList    from '../components/search/ResultList.vue'
@@ -67,6 +67,8 @@ const eventStore  = useEventStore()
 const selectedChannelId   = ref(null)
 const lastQuery           = ref('')
 const selectedQuickFilter = ref(null)
+
+onMounted(() => { load() })
 
 const QUICK_FILTERS = [
   { key: 'today',      label: '오늘' },
@@ -102,9 +104,9 @@ function getQuickFilterDates(key) {
   return { startDate: null, endDate: null }
 }
 
-async function handleSearch(query, startDate = null, endDate = null) {
+async function handleSearch(query, startDate = null, endDate = null, skipTimeParse = false) {
   lastQuery.value = query
-  await search(query, selectedChannelId.value, startDate, endDate)
+  await search(query, selectedChannelId.value, startDate, endDate, skipTimeParse)
   eventStore.setSearchResults(events.value)
 }
 
@@ -122,7 +124,7 @@ async function handleQuickFilter(key) {
 }
 
 async function clearAppliedFilter() {
-  await handleSearch(lastQuery.value)
+  await handleSearch(lastQuery.value, null, null, true)
 }
 
 watch(selectedChannelId, async () => {
@@ -134,7 +136,6 @@ watch(selectedChannelId, async () => {
   } else {
     const params = selectedChannelId.value ? { channel_id: selectedChannelId.value } : {}
     await load(params)
-    eventStore.setSearchResults(events.value)
   }
 })
 </script>
