@@ -51,6 +51,10 @@ def vlm_worker(
             timestamp = frames[0][2]
             result = vlm.analyze(frame_paths, get_prompt(cam_id))
 
+            if result.get("skipped"):
+                logger.info("VLM 거부 응답 — 이벤트 발행 생략: camera=%s", cam_id)
+                continue
+
             if result.get("event_type", "normal") != "normal":
                 with call_lock:
                     last_vlm_call[cam_id] = 0.0
