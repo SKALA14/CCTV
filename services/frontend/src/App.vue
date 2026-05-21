@@ -80,8 +80,11 @@
     <!-- 우측 메인 영역 -->
     <div class="flex flex-col flex-1 min-w-0">
       <!-- 라우터 뷰 -->
-      <main class="flex-1 overflow-auto">
-        <router-view />
+      <main class="flex-1 overflow-auto" style="position: relative;">
+        <div :style="isDashboard ? 'height: 100%' : 'visibility: hidden; position: absolute; inset: 0; pointer-events: none'">
+          <DashboardView />
+        </div>
+        <router-view v-if="!isDashboard" />
       </main>
     </div>
   </div>
@@ -95,6 +98,7 @@ import { ref, computed, provide, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import AppNav from './components/layout/AppNav.vue'
+import DashboardView from './views/DashboardView.vue'
 import NotificationToast from './components/dashboard/NotificationToast.vue'
 import { useWebSocket } from './composables/useWebSocket.js'
 import { useChannelStore } from './stores/channelStore.js'
