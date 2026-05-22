@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     EMERGENCY_GROUP: str = "emergency"
     DYNAMIC_GROUP: str = "dynamic"
 
+    ALERTS_MAXLEN: int = 1000   # DB 저장 후 사실상 불필요. 컨슈머 지연 대비 버퍼
+    EVENTS_MAXLEN: int = 500
+
     # OpenAI
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o"
@@ -23,8 +26,9 @@ class Settings(BaseSettings):
     # 경로
     FRAME_STORAGE_PATH: str = "/frames"
     PROMPT_DIR: str = "./prompts"
-    DYNAMIC_PROMPT_FILE: str = "dynamic_prompt.txt"
-    STATIC_PROMPT_FILE: str = "static_prompt.txt"
+    CHECKLIST_DIR: str = "/prompts"
+    DYNAMIC_PROMPT_FILE: str = "dynamic_prompt.j2"
+    STATIC_PROMPT_FILE: str = "static_prompt.j2"
 
     # YOLO 공통
     DEVICE: str = "cpu"
@@ -32,7 +36,7 @@ class Settings(BaseSettings):
 
     # Fire
     FIRE_MODEL_PATH: str = "models/fire.pt"
-    FIRE_CONF: float = 0.15
+    FIRE_CONF: float = 0.3
 
     # Pose
     POSE_MODEL_PATH: str = "models/yolo26m-pose.pt"
@@ -44,7 +48,9 @@ class Settings(BaseSettings):
     # Emergency
     FRAME_RESULT_TIMEOUT_SEC: float = 5.0
     FALL_MIN_FRAMES: int = 3
+
     FALL_WINDOW_SEC: float = 5.0
+    FIRE_DEDUP_SEC: float = 2.0  # fire/smoke 발행 후 같은 (camera, type) 발행 억제 시간
     MODEL_QUEUE_SIZE: int = 30
     RESULT_QUEUE_SIZE: int = 90
 

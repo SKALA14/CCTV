@@ -50,7 +50,9 @@ def xreadgroup(
     return messages
 
 
-def xadd(stream: str, fields: dict) -> str:
+def xadd(stream: str, fields: dict, maxlen: int | None = None) -> str:
+    if maxlen:
+        return get_client().xadd(stream, fields, maxlen=maxlen, approximate=True)
     return get_client().xadd(stream, fields)
 
 
