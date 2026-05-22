@@ -1,3 +1,8 @@
+# services/inference/models/pose.py
+"""낙상 판정 Pose YOLO 추론."""
+
+from __future__ import annotations
+
 import math
 
 from ultralytics import YOLO
@@ -12,17 +17,12 @@ class PoseYOLO:
     _L_SHOULDER, _R_SHOULDER = 5, 6
     _L_HIP, _R_HIP = 11, 12
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.model = YOLO(config.POSE_MODEL_PATH)
 
     @staticmethod
     def _is_fallen(pts, cf, bbox) -> bool:
-        """
-        점수 기준 (2점 이상 → 낙상):
-          +2  토르소 각도: 어깨-엉덩이 벡터가 수직에서 55도 이상 기울어진 경우
-          +2  코 위치: nose y > 엉덩이 중점 y (머리가 엉덩이보다 아래)
-          +1  bbox 비율: width / height > 1.3
-        """
+        """점수제 낙상 판정. 2점 이상이면 낙상."""
         L_SH, R_SH = PoseYOLO._L_SHOULDER, PoseYOLO._R_SHOULDER
         L_HIP, R_HIP = PoseYOLO._L_HIP, PoseYOLO._R_HIP
         NOSE = PoseYOLO._NOSE
@@ -56,8 +56,9 @@ class PoseYOLO:
         return score >= 2
 
     def predict(self, frame, h: int, w: int) -> list[dict]:
+        """프레임에서 사람을 찾고 낙상이면 detection 추가."""
         results = self.model(frame, conf=config.POSE_CONF, imgsz=config.YOLO_IMGSZ, verbose=False)
-        detections = []
+        detections: list[dict] = []
 
         if results[0].boxes is None or results[0].keypoints is None:
             return detections
@@ -82,7 +83,6 @@ class PoseYOLO:
                 "description": "작업자 낙상 감지",
                 "confidence": round(float(box.conf[0].item()), 4),
                 "bbox": clamp_bbox(box.xyxy[0].tolist(), h, w),
-                "keypoints": results[0].keypoints.data[idx].tolist(),
                 "source_model": "pose_yolo",
             })
 

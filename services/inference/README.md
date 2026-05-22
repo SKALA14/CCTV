@@ -1,55 +1,140 @@
+# Inference Service
+
+CCTV 프레임을 YOLO + VLM으로 분석해 이상 이벤트를 Redis에 발행하는 서비스.
+
+---
+
+## 프로세스 구조
+
 ```
 main.py
-  │
-  ├── init_consumer_groups()       # redis_client.py
-  │
-  ├── Process(unified_pipeline)    # pipelines/s0_unified.py
-  │     ├── s1_types.py            # 공통 작업/결과 타입
-  │     ├── s2_ack.py              # XACK 및 프레임 처리 완료 표시
-  │     ├── s3_annotation.py       # bbox 표시 저장
-  │     ├── s4_model_worker.py     # 모델별 worker 실행
-  │     ├── s5_emergency.py        # emergency 알림 발행
-  │     ├── s6_general.py          # general 후보/VLM 윈도우 관리
-  │     ├── s7_vlm_worker.py       # VLM 호출 및 events 발행
-  │     ├── s8_aggregator.py       # msg_id 기준 결과 취합
-  │     └── s9_cleaner.py          # 처리 완료 프레임 파일 삭제
-  │
-  └── models/
-        ├── fire.py                # fire/smoke YOLO
-        ├── pose.py                # fallen pose YOLO
-        └── general.py             # VLM 후보 YOLO
+  ├── unified  (Process)   # s0_unified.py — 프레임 수신·분배·취합 메인 루프
+  └── cleaner  (Process)   # s9_cleaner.py — 처리 완료 프레임 파일 삭제
 ```
 
-## 현재 변경 사항
+unified 프로세스 내부에서 스레드로 동작하는 워커:
 
-- `emergency.py`, `general.py`로 나뉘던 파이프라인을 `pipelines/unified.py`로 통합
-- 상황별 YOLO 모델은 `models/fire.py`, `models/pose.py`, `models/general.py`로 분리
-- 각 모델 worker는 시작 시 모델을 1회 로드한 뒤, 모델별 queue에서 FrameJob을 계속 처리
-- 각 모델 결과에 `route` 필드를 포함하고, `route=emergency`는 즉시 `alerts`, `route=general`은 VLM 후보 버퍼로 분기
-- aggregator는 Redis `msg_id` 기준으로 모델별 결과를 취합하고, 모든 모델 결과 도착 또는 timeout 후 ACK
-- pipeline 내부 책임을 `s0_unified`부터 `s9_cleaner`까지 처리 순서가 보이도록 파일명에 순번을 붙여 분리
-- cleaner는 ACK 이후 delete_queue에 등록된 프레임 파일을 삭제해 디스크 누적을 방지
+```
+unified (Process)
+  ├── fire-worker    (Thread)  # FireYOLO  → result_queue
+  ├── pose-worker    (Thread)  # PoseYOLO  → result_queue
+  ├── general-worker (Thread)  # GeneralYOLO → result_queue
+  └── vlm-worker     (Thread)  # VLMClient → events stream
+```
 
-## 실행 방법
+---
 
-`services/inference` 디렉토리에서 아래 명령으로 실행
+## 프레임 처리 흐름
+
+```
+Redis frames stream
+        │
+        │ xreadgroup (block=100ms, count=10)
+        ▼
+[s0_unified] FrameJob 생성
+        │
+        │ fan-out (put_nowait)
+        ├──────────────────────────────────────────┐
+        ▼                                          ▼
+  fire-worker                              pose-worker   general-worker
+  (FireYOLO.predict)                       (PoseYOLO)    (GeneralYOLO)
+        │                                          │
+        └──────────── result_queue ────────────────┘
+                            │
+                    [s8_aggregator] drain_results
+                            │ msg_id 기준 결과 누적
+                            │
+                    [s8_aggregator] finalize_ready_frames
+                      (모든 모델 완료 or timeout)
+                            │
+              ┌─────────────┴──────────────┐
+              │ route=emergency             │ route=general
+              ▼                            ▼
+       [s5_emergency]               [s6_general] 버퍼에 적재
+        fire/smoke → alerts stream          │
+        fallen → 누적 후 alerts stream      │ GENERAL_WINDOW_SEC 경과 후
+                                           ▼
+                                    [s7_vlm_worker]
+                                     VLM 분석
+                                           │
+                                    normal → 발행 생략
+                                    이상   → events stream
+                                           │
+                                    ACK + delete_queue push
+                                           │
+                                    [s9_cleaner]
+                                     JPEG 파일 삭제
+```
+
+---
+
+## 핵심 타입 (s1_types.py)
+
+| 타입 | 역할 |
+|------|------|
+| `FrameJob` | Redis msg_id·frame·카메라 정보를 담는 작업 단위. 모델 큐에 fan-out됨 |
+| `ModelResult` | 모델 worker가 result_queue로 반환하는 결과. `detections` 리스트 포함 |
+| `PendingFrame` | msg_id별 진행 상태 추적. expected/received 모델 집합으로 완료 판단 |
+
+detection 스키마:
+```python
+{
+    "route":        "emergency" | "general",
+    "anomaly_type": str,   # fire / smoke / fallen / ...
+    "danger_level": str,
+    "description":  str,
+    "confidence":   float,
+    "source_model": str,
+}
+```
+
+---
+
+## 라우팅 분기
+
+### emergency (즉시 발행)
+- `fire`, `smoke`: 감지 즉시 `alerts` stream에 XADD
+- `fallen`: camera별 시간 윈도우(`FALL_WINDOW_SEC`) 내 `FALL_MIN_FRAMES` 이상 누적 시 발행
+
+### general (VLM 검증 후 발행)
+1. GeneralYOLO가 일반 이상 후보를 탐지하면 camera별 버퍼에 적재
+2. `GENERAL_WINDOW_SEC` 경과 후 `GENERAL_MIN_FRAMES` 미달이면 오탐으로 판정, ACK만 수행
+3. 조건 충족 시 최대 `GENERAL_BUFFER_SIZE`장을 VLM에 전달
+4. VLM이 `normal`로 판정하면 발행 생략, 이상으로 판정하면 `events` stream에 XADD
+
+---
+
+## 주요 설정값 (config.py)
+
+| 설정 | 기본값 | 설명 |
+|------|--------|------|
+| `FRAME_RESULT_TIMEOUT_SEC` | 5.0s | 모든 모델 결과 대기 최대 시간 |
+| `FALL_MIN_FRAMES` | 3 | 낙상 판정 최소 누적 프레임 수 |
+| `FALL_WINDOW_SEC` | 5.0s | 낙상 누적 시간 윈도우 |
+| `GENERAL_WINDOW_SEC` | 10.0s | general 후보 수집 윈도우 |
+| `GENERAL_MIN_FRAMES` | 3 | VLM 호출 최소 프레임 수 |
+| `GENERAL_BUFFER_SIZE` | 5 | VLM에 전달하는 최대 프레임 수 |
+| `GENERAL_MIN_CALL_INTERVAL` | 30.0s | camera별 VLM 호출 최소 간격 (쿨다운) |
+| `MODEL_QUEUE_SIZE` | 30 | 모델별 입력 큐 최대 크기 |
+| `RESULT_QUEUE_SIZE` | 90 | 결과 큐 최대 크기 |
+
+---
+
+## Redis 인터페이스
+
+| 방향 | 키 / 스트림 | 내용 |
+|------|------------|------|
+| 입력 | `frames` stream | `{frame_path, camera_id, timestamp}` |
+| 출력 | `alerts` stream | emergency 이벤트 |
+| 출력 | `events` stream | general 이벤트 (VLM 검증 후) |
+| 내부 | `delete_queue` list | 삭제할 JPEG 경로. cleaner가 소비 |
+
+---
+
+## 실행
 
 ```bash
 python main.py
 ```
 
-## 추후 변경 필요 사항
-
-- VLM 입력 구조와 YOLO detection 출력 구조 통일
-- downstream 모듈에서 바로 사용할 수 있도록 payload 스키마 확정
-
-## 주의 사항
-
-- 모델 파일 경로(`models/fire.pt`, `models/yolo26m-pose.pt`, `models/yolo26m.pt`)가 현재 작업 위치 기준으로 맞아야 함
-- `route=emergency` 결과는 VLM을 기다리지 않고 즉시 알림으로 발행됨
-- 모델별 처리 속도가 달라도 `msg_id` 기준으로 결과를 합치며, timeout이 지난 프레임은 도착한 결과만 반영하고 처리 종료함
-- general 후보 프레임은 VLM 처리 또는 스킵 결정 후 ACK되므로, cleaner 삭제도 그 이후에 수행됨
-
-## 문서 반영 원칙
-
-- inference 디렉토리 내 구현/실행 방식이 바뀌면 이 README도 함께 업데이트
+모델 파일(`models/fire.pt`, `models/yolo26m-pose.pt`, `models/yolo26m.pt`)이 실행 디렉토리 기준으로 존재해야 합니다.

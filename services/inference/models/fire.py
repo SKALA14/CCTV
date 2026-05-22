@@ -1,3 +1,8 @@
+# services/inference/models/fire.py
+"""Fire/Smoke YOLO 추론."""
+
+from __future__ import annotations
+
 from ultralytics import YOLO
 
 from config import config
@@ -6,12 +11,13 @@ from config import config
 class FireYOLO:
     FIRE_CLASSES = {"fire", "smoke"}
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.model = YOLO(config.FIRE_MODEL_PATH)
 
     def predict(self, frame, h: int, w: int) -> list[dict]:
+        """프레임에서 fire/smoke를 감지해 detection 리스트 반환."""
         results = self.model(frame, conf=config.FIRE_CONF, imgsz=config.YOLO_IMGSZ, verbose=False)
-        detections = []
+        detections: list[dict] = []
 
         if results[0].boxes is None:
             return detections
