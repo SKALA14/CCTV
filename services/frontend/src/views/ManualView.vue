@@ -29,6 +29,45 @@
     <!-- 에러 -->
     <p v-if="uploadError" class="text-sm mb-4" style="color: var(--red);">{{ uploadError }}</p>
 
+    <!-- PDF 분석 중 로딩 (sessionId 없는 초기 상태) -->
+    <div
+      v-if="checklist.loading && !checklist.sessionId"
+      class="rounded-xl p-6 mb-6 flex flex-col items-center gap-3"
+      style="background: var(--bg-card); border: 1px solid var(--border);"
+    >
+      <div class="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      <p class="text-sm" style="color: var(--text-muted);">PDF에서 안전 체크리스트를 분석하는 중입니다 (30~60초 소요)...</p>
+    </div>
+
+    <!-- PDF 분석 실패 (sessionId 없이 에러만 있는 경우) -->
+    <div
+      v-if="checklist.error && !checklist.sessionId"
+      class="rounded-xl p-4 mb-6"
+      style="background: var(--bg-card); border: 1px solid var(--border);"
+    >
+      <p class="text-sm" style="color: var(--red);">{{ checklist.error }}</p>
+    </div>
+
+    <!-- 체크리스트 리뷰 (PDF 분석 후 표시) -->
+    <div
+      v-if="checklist.sessionId"
+      class="rounded-xl p-4 mb-6"
+      style="background: var(--bg-card); border: 1px solid var(--border);"
+    >
+      <ChecklistReview
+        :session-id="checklist.sessionId"
+        :static="checklist.static"
+        :dynamic="checklist.dynamic"
+        :loading="checklist.loading"
+        :error="checklist.error"
+        @refine="onRefine"
+        @confirm="onConfirm"
+      />
+      <p v-if="checklist.saved" class="text-xs mt-3 text-center" style="color: var(--green, #16a34a);">
+        체크리스트가 저장되었습니다.
+      </p>
+    </div>
+
     <!-- 파일 목록 -->
     <div v-if="store.loading" class="flex justify-center py-8">
       <div class="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
@@ -52,12 +91,6 @@
           <p class="text-xs" style="color: var(--text-subtle);">{{ formatSize(file.size) }} · {{ formatDate(file.uploaded_at) }}</p>
         </div>
         <button
-          v-if="file.type === 'application/pdf'"
-          class="text-xs rounded px-2 py-1 transition-colors mr-1"
-          style="color: var(--text-muted); border: 1px solid var(--border);"
-          @click="openFile(file)"
-        >열기</button>
-        <button
           class="text-xs rounded px-2 py-1 transition-colors"
           style="color: var(--red); border: 1px solid var(--border);"
           @click="store.remove(file.id)"
@@ -68,13 +101,24 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useManualStore } from '../stores/manualStore.js'
+import { analyzeManual, refineManual, confirmManual } from '../api/manuals.js'
+import ChecklistReview from '../components/manual/ChecklistReview.vue'
 
 const store = useManualStore()
 const fileInput = ref(null)
 const isDragging = ref(false)
 const uploadError = ref('')
+
+const checklist = reactive({
+  sessionId: '',
+  static: [],
+  dynamic: [],
+  loading: false,
+  error: '',
+  saved: false,
+})
 
 const ALLOWED_TYPES = new Set([
   'application/pdf',
@@ -99,7 +143,27 @@ async function handleFile(file) {
   uploadError.value = ''
   const err = validate(file)
   if (err) { uploadError.value = err; return }
+
   await store.upload(file)
+
+  if (file.name.toLowerCase().endsWith('.pdf')) {
+    checklist.sessionId = ''
+    checklist.static = []
+    checklist.dynamic = []
+    checklist.saved = false
+    checklist.error = ''
+    checklist.loading = true
+    try {
+      const result = await analyzeManual(file)
+      checklist.sessionId = result.session_id
+      checklist.static = result.static
+      checklist.dynamic = result.dynamic
+    } catch {
+      checklist.error = '체크리스트 분석에 실패했습니다. 다시 시도해주세요.'
+    } finally {
+      checklist.loading = false
+    }
+  }
 }
 
 function onFileChange(e) {
@@ -114,8 +178,31 @@ function onDrop(e) {
   if (file) handleFile(file)
 }
 
-function openFile(file) {
-  window.open(URL.createObjectURL(file), '_blank')
+async function onRefine({ feedback }) {
+  checklist.loading = true
+  checklist.error = ''
+  try {
+    const result = await refineManual(checklist.sessionId, feedback)
+    checklist.static = result.static
+    checklist.dynamic = result.dynamic
+  } catch {
+    checklist.error = '재생성에 실패했습니다. 이전 결과를 유지합니다.'
+  } finally {
+    checklist.loading = false
+  }
+}
+
+async function onConfirm({ sessionId, static: staticItems, dynamic: dynamicItems }) {
+  checklist.loading = true
+  checklist.error = ''
+  try {
+    await confirmManual(sessionId, staticItems, dynamicItems)
+    checklist.saved = true
+  } catch {
+    checklist.error = '저장에 실패했습니다. 다시 시도해주세요.'
+  } finally {
+    checklist.loading = false
+  }
 }
 
 function ext(name) { return name.split('.').pop() }

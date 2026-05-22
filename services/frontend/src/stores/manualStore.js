@@ -8,8 +8,13 @@ export const useManualStore = defineStore('manual', () => {
 
   async function load() {
     loading.value = true
-    files.value = await fetchManuals()
-    loading.value = false
+    try {
+      files.value = await fetchManuals()
+    } catch {
+      files.value = []
+    } finally {
+      loading.value = false
+    }
   }
 
   async function upload(file) {

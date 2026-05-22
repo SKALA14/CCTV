@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>CCTV System Architecture</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #f8fafc;
+  color: #1e293b;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  padding: 28px 36px 36px;
+  min-width: 1400px;
+}
+
+/* ── TITLE ── */
+.title-block { text-align:center; margin-bottom:24px; }
+.title-block h1 { font-size:17px; font-weight:800; color:#0f172a; letter-spacing:.5px; }
+.title-block p  { font-size:11px; color:#64748b; margin-top:4px; }
+
+/* ── ZONE ── */
+.zone {
+  border-radius:12px;
+  padding:12px 10px 14px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.zone-header {
+  font-size:9px; font-weight:800; letter-spacing:2px;
+  text-transform:uppercase; text-align:center; padding-bottom:6px;
+}
+
+.z-client  { background:#eff6ff; border:1.5px solid #bfdbfe; }
+.z-client  .zone-header { color:#1d4ed8; }
+.z-gateway { background:#f8fafc; border:1.5px solid #cbd5e1; }
+.z-gateway .zone-header { color:#475569; }
+.z-app     { background:#f5f3ff; border:1.5px solid #c4b5fd; }
+.z-app     .zone-header { color:#6d28d9; }
+.z-storage { background:#fffbeb; border:1.5px solid #fde68a; }
+.z-storage .zone-header { color:#92400e; }
+
+/* ── CARD ── */
+.card {
+  border-radius:8px; padding:9px 11px;
+  font-size:11px; background:#fff;
+  display:flex; flex-direction:column; gap:3px;
+}
+.card-title { font-size:11px; font-weight:700; margin-bottom:3px; }
+.card-item  { font-size:10px; color:#64748b; padding-left:9px; position:relative; }
+.card-item::before { content:'–'; position:absolute; left:0; color:#94a3b8; }
+
+.c-blue   { border:1px solid #bfdbfe; border-left:3px solid #3b82f6; }
+.c-blue   .card-title { color:#1d4ed8; }
+.c-slate  { border:1px solid #e2e8f0; border-left:3px solid #64748b; }
+.c-slate  .card-title { color:#334155; }
+.c-indigo { border:1px solid #e0e7ff; border-left:3px solid #6366f1; }
+.c-indigo .card-title { color:#4338ca; }
+.c-violet { border:1px solid #ede9fe; border-left:3px solid #7c3aed; }
+.c-violet .card-title { color:#6d28d9; }
+.c-red    { border:1px solid #fee2e2; border-left:3px solid #ef4444; }
+.c-red    .card-title { color:#b91c1c; }
+.c-amber  { border:1px solid #fef3c7; border-left:3px solid #f59e0b; }
+.c-amber  .card-title { color:#92400e; }
+.c-green  { border:1px solid #dcfce7; border-left:3px solid #22c55e; }
+.c-green  .card-title { color:#15803d; }
+.c-teal   { border:1px solid #ccfbf1; border-left:3px solid #14b8a6; }
+.c-teal   .card-title { color:#0f766e; }
+.c-pink   { border:1px solid #fce7f3; border-left:3px solid #ec4899; }
+.c-pink   .card-title { color:#be185d; }
+
+/* ── TAG ── */
+.tag { display:inline-block; font-size:8px; font-weight:700; padding:1px 4px; border-radius:3px; margin-left:4px; vertical-align:middle; }
+.tag-new { background:#dcfce7; color:#166534; }
+.tag-fix { background:#fee2e2; color:#991b1b; }
+
+/* ── SUBZONE ── */
+.subzone {
+  border-radius:8px; padding:9px 10px 11px;
+  display:flex; flex-direction:column; gap:6px;
+}
+.sz-ingestion { background:#ecfdf5; border:1px dashed #6ee7b7; }
+.sz-ingestion .sz-label { color:#065f46; }
+.sz-backend   { background:#eef2ff; border:1px dashed #a5b4fc; }
+.sz-backend   .sz-label { color:#4338ca; }
+.sz-inference { background:#fdf4ff; border:1px dashed #d8b4fe; }
+.sz-inference .sz-label { color:#7e22ce; }
+.sz-notif     { background:#fff1f2; border:1px dashed #fda4af; }
+.sz-notif     .sz-label { color:#be123c; }
+.sz-label { font-size:9px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase; margin-bottom:2px; }
+
+/* ── MAIN CANVAS ── */
+.canvas {
+  display:grid;
+  grid-template-columns: 150px 22px 118px 22px 1fr 22px 158px;
+  align-items:start;
+  gap:0;
+}
+
+/* ── ROW util ── */
+.row { display:flex; gap:6px; align-items:stretch; }
+
+/* ── HORIZONTAL ARROW ── */
+.harrow {
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  align-self:stretch; gap:2px; padding:0 2px;
+}
+.hl { position:relative; height:2px; width:100%; }
+.hl::after { content:'▶'; position:absolute; right:-7px; top:50%; transform:translateY(-50%); font-size:8px; }
+.hlabel { font-size:8px; white-space:nowrap; margin-top:2px; }
+
+/* solid */
+.s-gray  .hl { background:#64748b; } .s-gray  .hl::after { color:#64748b; } .s-gray  .hlabel { color:#64748b; }
+.s-blue  .hl { background:#3b82f6; } .s-blue  .hl::after { color:#3b82f6; } .s-blue  .hlabel { color:#3b82f6; }
+/* dashed */
+.d-red   .hl { background:repeating-linear-gradient(90deg,#ef4444 0,#ef4444 5px,transparent 5px,transparent 9px); }
+.d-red   .hl::after { color:#ef4444; } .d-red   .hlabel { color:#ef4444; }
+.d-gray  .hl { background:repeating-linear-gradient(90deg,#94a3b8 0,#94a3b8 5px,transparent 5px,transparent 9px); }
+.d-gray  .hl::after { color:#94a3b8; } .d-gray  .hlabel { color:#94a3b8; }
+.d-blue  .hl { background:repeating-linear-gradient(90deg,#3b82f6 0,#3b82f6 5px,transparent 5px,transparent 9px); }
+.d-blue  .hl::after { color:#3b82f6; } .d-blue  .hlabel { color:#3b82f6; }
+.d-violet .hl { background:repeating-linear-gradient(90deg,#7c3aed 0,#7c3aed 5px,transparent 5px,transparent 9px); }
+.d-violet .hl::after { color:#7c3aed; } .d-violet .hlabel { color:#7c3aed; }
+
+/* ── VERTICAL ARROW ── */
+.varrow { display:flex; flex-direction:column; align-items:center; gap:1px; padding:2px 0; }
+.vl { width:2px; height:16px; position:relative; }
+.vl::after { content:'▼'; position:absolute; bottom:-7px; left:50%; transform:translateX(-50%); font-size:8px; }
+.vl-dred  { background:repeating-linear-gradient(180deg,#ef4444 0,#ef4444 4px,transparent 4px,transparent 8px); }
+.vl-dred::after  { color:#ef4444; }
+.vl-dviolet { background:repeating-linear-gradient(180deg,#7c3aed 0,#7c3aed 4px,transparent 4px,transparent 8px); }
+.vl-dviolet::after { color:#7c3aed; }
+.vl-gray { background:#94a3b8; } .vl-gray::after { color:#94a3b8; }
+.vlabel { font-size:8px; }
+.vlabel-red { color:#ef4444; font-size:8px; }
+.vlabel-violet { color:#7c3aed; font-size:8px; }
+
+/* ── APP ZONE INTERNAL ── */
+.app-flow {
+  display:grid;
+  grid-template-columns: 160px 28px 1fr 28px 200px;
+  gap:0;
+  align-items:start;
+}
+.app-right { display:flex; flex-direction:column; gap:8px; }
+
+/* ── BRANCH ARROW (split to 2) ── */
+.branch {
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  align-self:stretch; position:relative; gap:0;
+}
+.branch-line-v {
+  width:2px; flex:1;
+  background:repeating-linear-gradient(180deg,#ef4444 0,#ef4444 4px,transparent 4px,transparent 8px);
+}
+.branch-row { display:flex; align-items:center; width:100%; }
+.branch-h {
+  flex:1; height:2px;
+  background:repeating-linear-gradient(90deg,#ef4444 0,#ef4444 5px,transparent 5px,transparent 9px);
+  position:relative;
+}
+.branch-h::after { content:'▶'; position:absolute; right:-7px; top:50%; transform:translateY(-50%); font-size:8px; color:#ef4444; }
+.branch-dot { width:6px; height:6px; border-radius:50%; background:#ef4444; flex-shrink:0; }
+.branch-label { font-size:8px; color:#ef4444; text-align:center; white-space:nowrap; padding:1px 0; }
+
+/* ── EXTERNAL BOX ── */
+.ext-box {
+  border-radius:8px; padding:8px 10px;
+  border:1.5px dashed #6366f1; background:#f5f3ff;
+  margin-top:8px;
+}
+.ext-title { font-size:9px; font-weight:800; letter-spacing:1px; color:#4338ca; text-transform:uppercase; margin-bottom:4px; }
+.ext-row { display:flex; gap:16px; flex-wrap:wrap; }
+.ext-item { font-size:10px; color:#4338ca; padding-left:8px; position:relative; }
+.ext-item::before { content:'·'; position:absolute; left:0; color:#a78bfa; }
+
+/* ── WEBRTC badge ── */
+.webrtc-badge {
+  display:inline-flex; align-items:center; gap:3px;
+  font-size:8px; font-weight:700; padding:2px 5px; border-radius:3px;
+  background:#fef3c7; color:#92400e; margin-left:4px; vertical-align:middle;
+}
+
+/* ── LEGEND ── */
+.legend {
+  margin-top:18px; display:flex; align-items:flex-start;
+  justify-content:space-between; font-size:10px; color:#64748b; flex-wrap:wrap; gap:16px;
+}
+.leg-group { display:flex; flex-direction:column; gap:5px; }
+.leg-title { font-size:9px; font-weight:800; letter-spacing:1px; text-transform:uppercase; color:#475569; margin-bottom:1px; }
+.leg-row { display:flex; align-items:center; gap:7px; }
+.leg-line { width:30px; height:2px; position:relative; }
+.leg-line::after { content:'▶'; position:absolute; right:-6px; top:50%; transform:translateY(-50%); font-size:7px; }
+.ll-solid  .leg-line { background:#64748b; } .ll-solid  .leg-line::after { color:#64748b; }
+.ll-dashed .leg-line { background:repeating-linear-gradient(90deg,#64748b 0,#64748b 5px,transparent 5px,transparent 9px); }
+.ll-dashed .leg-line::after { color:#64748b; }
+.leg-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.leg-box { width:13px; height:9px; border-radius:2px; flex-shrink:0; }
+</style>
+</head>
+<body>
+
+<div class="title-block">
+  <h1>CCTV AI Monitoring System — Application Architecture</h1>
+  <p>대상: 개발자 · 레벨: Application / Logical View · 흐름: Left → Right, Top → Bottom</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     MAIN CANVAS
+═══════════════════════════════════════════════════════════ -->
+<div class="canvas">
+
+  <!-- ① CLIENT -->
+  <div class="zone z-client">
+    <div class="zone-header">① Client</div>
+
+    <div class="card c-blue">
+      <div class="card-title">Browser</div>
+      <div class="card-item">Vue 3 + Pinia</div>
+      <div class="card-item">Dashboard (Live 이벤트)</div>
+      <div class="card-item">Natural Language Search</div>
+      <div class="card-item">Clip Detail Player</div>
+      <div class="card-item">Manual <span class="tag tag-new">페이지</span></div>
+      <div class="card-item">Channel Settings</div>
+    </div>
+
+    <div class="card c-slate">
+      <div class="card-title">Camera / Source</div>
+      <div class="card-item">RTSP 카메라</div>
+      <div class="card-item">Webcam <span class="webrtc-badge">WHIP</span></div>
+      <div class="card-item">File 소스</div>
+      <div class="card-item">YouTube 스트림</div>
+    </div>
+  </div>
+
+  <!-- ARROW ①→② -->
+  <div class="harrow">
+    <div class="s-blue">
+      <div class="hl"></div>
+      <div class="hlabel">HTTPS</div>
+    </div>
+    <div style="height:10px"></div>
+    <div class="d-blue">
+      <div class="hl"></div>
+      <div class="hlabel">WS<br>WHEP</div>
+    </div>
+    <div style="height:10px"></div>
+    <div class="s-gray">
+      <div class="hl"></div>
+      <div class="hlabel">RTSP</div>
+    </div>
+  </div>
+
+  <!-- ② GATEWAY -->
+  <div class="zone z-gateway">
+    <div class="zone-header">② Gateway</div>
+
+    <div class="card c-slate">
+      <div class="card-title">Nginx</div>
+      <div class="card-item">Reverse Proxy</div>
+      <div class="card-item">Vue 정적 파일 서빙</div>
+      <div class="card-item">클립 / 썸네일</div>
+    </div>
+
+    <div class="card c-slate">
+      <div class="card-title">MediaMTX</div>
+      <div class="card-item">RTSP Relay (카메라 중계)</div>
+      <div class="card-item">WHIP (웹캠 수신)</div>
+      <div class="card-item">WHEP (브라우저 송출) <span class="webrtc-badge">WebRTC</span></div>
+    </div>
+  </div>
+
+  <!-- ARROW ②→③ -->
+  <div class="harrow">
+    <div class="s-blue">
+      <div class="hl"></div>
+      <div class="hlabel">HTTP<br>proxy</div>
+    </div>
+    <div style="height:10px"></div>
+    <div class="s-gray">
+      <div class="hl"></div>
+      <div class="hlabel">RTSP<br>pull</div>
+    </div>
+  </div>
+
+  <!-- ③ APPLICATION -->
+  <div class="zone z-app">
+    <div class="zone-header">③ Application (Private · Docker Compose)</div>
+
+    <!-- TOP FLOW: Ingestion → Inference → Backend+Notification -->
+    <div class="app-flow">
+
+      <!-- Ingestion Sub-zone -->
+      <div class="subzone sz-ingestion">
+        <div class="sz-label">Ingestion Service ×4</div>
+        <div class="card c-green" style="padding:7px 9px">
+          <div class="card-title">Frame Governor</div>
+          <div class="card-item">FpsSampler (2 FPS 샘플링)</div>
+          <div class="card-item">cam0 ~ cam3 독립 컨테이너</div>
+          <div class="card-item">File / RTSP / YouTube 지원</div>
+        </div>
+        <div class="card c-green" style="padding:7px 9px">
+          <div class="card-title">Frame Publisher</div>
+          <div class="card-item">JPEG → /frames/{cam}/{ts}.jpg</div>
+          <div class="card-item">Redis frames 스트림 발행</div>
+        </div>
+      </div>
+
+      <!-- ARROW: Ingestion → Inference (async, frames) -->
+      <div class="harrow">
+        <div class="d-violet">
+          <div class="hl"></div>
+          <div class="hlabel">frames<br>stream</div>
+        </div>
+      </div>
+
+      <!-- Inference Sub-zone -->
+      <div class="subzone sz-inference">
+        <div class="sz-label">AI Inference Pipeline</div>
+        <div class="card c-violet" style="padding:7px 9px">
+          <div class="card-title">s0 Unified Orchestrator</div>
+          <div class="card-item">frames 스트림 구독 (Consumer Group)</div>
+          <div class="card-item">3개 모델 병렬 fan-out → 결과 집계</div>
+        </div>
+        <div class="row">
+          <div class="card c-red" style="flex:1; padding:7px 9px">
+            <div class="card-title">Track A — Emergency</div>
+            <div class="card-item">Fire YOLO + Pose YOLO 병렬</div>
+            <div class="card-item">Fire/Smoke → alerts 즉시 발행</div>
+            <div class="card-item">Fallen → N프레임 누적 후 발행</div>
+          </div>
+          <div class="card c-violet" style="flex:1; padding:7px 9px">
+            <div class="card-title">Track B — General</div>
+            <div class="card-item">General YOLO → 후보 버퍼링</div>
+            <div class="card-item">GPT-4o Vision 분석 <span class="tag tag-fix">fix</span></div>
+            <div class="card-item">events 스트림 발행</div>
+          </div>
+        </div>
+        <div class="card c-slate" style="padding:6px 9px">
+          <div class="card-title">s9 Cleaner</div>
+          <div class="card-item">처리 완료 프레임 파일 비동기 삭제</div>
+        </div>
+      </div>
+
+      <!-- BRANCH ARROW: Inference → Backend + Notification -->
+      <div class="branch">
+        <div style="flex:1; display:flex; align-items:center;">
+          <div class="branch-row">
+            <div class="branch-dot"></div>
+            <div style="display:flex; flex-direction:column; flex:1; gap:0;">
+              <!-- top branch -->
+              <div style="display:flex; align-items:center; height:50%;">
+                <div style="width:2px; height:100%; background:repeating-linear-gradient(180deg,#ef4444 0,#ef4444 4px,transparent 4px,transparent 8px);"></div>
+                <div class="branch-h" style="flex:1;"></div>
+              </div>
+              <!-- gap -->
+              <div style="height:30px; border-left:2px solid transparent; margin-left:1px;
+                background:repeating-linear-gradient(180deg,#ef4444 0,#ef4444 4px,transparent 4px,transparent 8px);
+                background-size:2px 8px; background-repeat:repeat-y; width:2px;"></div>
+              <!-- bottom branch -->
+              <div style="display:flex; align-items:center; height:50%;">
+                <div style="width:2px; height:100%; background:repeating-linear-gradient(180deg,#ef4444 0,#ef4444 4px,transparent 4px,transparent 8px);"></div>
+                <div class="branch-h" style="flex:1;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="branch-label">alerts /<br>events</div>
+      </div>
+
+      <!-- Right column: Backend + Notification -->
+      <div class="app-right">
+
+        <!-- Backend Sub-zone -->
+        <div class="subzone sz-backend">
+          <div class="sz-label">Backend Service</div>
+          <div class="row">
+            <div class="card c-indigo" style="flex:1; padding:7px 9px">
+              <div class="card-title">FastAPI</div>
+              <div class="card-item">REST API <span class="tag tag-fix">fix</span></div>
+              <div class="card-item">WebSocket (실시간 push)</div>
+            </div>
+            <div class="card c-indigo" style="flex:1.4; padding:7px 9px">
+              <div class="card-title">Semantic Search <span class="tag tag-new">v2</span></div>
+              <div class="card-item">Time Parser</div>
+              <div class="card-item">Query Expander (gpt-4o-mini)</div>
+              <div class="card-item">Embed Describer (gpt-4o-mini)</div>
+              <div class="card-item">Multi-Vector pgvector</div>
+            </div>
+          </div>
+          <div class="card c-indigo" style="padding:7px 9px">
+            <div class="card-title">Event Ingestion Worker</div>
+            <div class="card-item">alerts / events 스트림 구독 → LLM 설명 → 임베딩 → DB 저장</div>
+            <div class="card-item">클립 / 썸네일 비동기 생성 · 중복 이벤트 필터 (30s)</div>
+          </div>
+        </div>
+
+        <!-- Notification Sub-zone -->
+        <div class="subzone sz-notif">
+          <div class="sz-label">Notification Service <span class="tag tag-new">누락</span></div>
+          <div class="card c-pink" style="padding:7px 9px">
+            <div class="card-title">Slack Alert Worker</div>
+            <div class="card-item">alerts → 긴급 알림 (15분 dedup)</div>
+            <div class="card-item">events → 일반 알림 (critical만)</div>
+            <div class="card-item">Slack Webhook HTTP POST</div>
+          </div>
+        </div>
+
+      </div><!-- /app-right -->
+
+    </div><!-- /app-flow -->
+
+    <!-- External OpenAI -->
+    <div class="ext-box">
+      <div class="ext-title">External — OpenAI API (동기 호출)</div>
+      <div class="ext-row">
+        <div class="ext-item">gpt-4o — VLM 영상 분석</div>
+        <div class="ext-item">gpt-4o-mini — Query Expansion / Embed Description</div>
+        <div class="ext-item">text-embedding-3-small — Vector(1536) 생성</div>
+      </div>
+    </div>
+
+  </div><!-- /zone-app -->
+
+  <!-- ARROW ③→④ -->
+  <div class="harrow">
+    <div class="s-gray">
+      <div class="hl"></div>
+      <div class="hlabel">SQL</div>
+    </div>
+    <div style="height:8px"></div>
+    <div class="d-red">
+      <div class="hl"></div>
+      <div class="hlabel">Streams</div>
+    </div>
+    <div style="height:8px"></div>
+    <div class="s-gray">
+      <div class="hl"></div>
+      <div class="hlabel">File I/O</div>
+    </div>
+  </div>
+
+  <!-- ④ STORAGE -->
+  <div class="zone z-storage">
+    <div class="zone-header">④ Storage</div>
+
+    <div class="card c-amber">
+      <div class="card-title">PostgreSQL + pgvector</div>
+      <div class="card-item">cctv_channels</div>
+      <div class="card-item">event_logs</div>
+      <div class="card-item">embedding Vector(1536)</div>
+      <div class="card-item">Cosine Distance Index</div>
+    </div>
+
+    <div class="card c-amber">
+      <div class="card-title">Redis</div>
+      <div class="card-item">frames stream (Ingestion → Inference)</div>
+      <div class="card-item">alerts stream (→ Backend, Notification)</div>
+      <div class="card-item">events stream (→ Backend, Notification)</div>
+      <div class="card-item">delete_queue (프레임 삭제 큐)</div>
+    </div>
+
+    <div class="card c-green">
+      <div class="card-title">File Storage (Docker Volume)</div>
+      <div class="card-item">/frames/{cam}/*.jpg</div>
+      <div class="card-item">/frames/clips/*.mp4</div>
+      <div class="card-item">/frames/thumbnails/*.jpg</div>
+    </div>
+
+  </div>
+
+</div><!-- /canvas -->
+
+<!-- ═══════════════════════════════════════════════════════════
+     LEGEND
+═══════════════════════════════════════════════════════════ -->
+<div class="legend">
+
+  <div class="leg-group">
+    <div class="leg-title">Communication</div>
+    <div class="leg-row ll-solid">
+      <div class="leg-line"></div>
+      <span>동기 호출 — HTTP REST, RTSP, SQL</span>
+    </div>
+    <div class="leg-row ll-dashed">
+      <div class="leg-line"></div>
+      <span>비동기 이벤트 — Redis Streams, WebSocket Push</span>
+    </div>
+  </div>
+
+  <div class="leg-group">
+    <div class="leg-title">Zone</div>
+    <div class="leg-row"><div class="leg-box" style="background:#eff6ff;border:1.5px solid #bfdbfe;"></div><span>Client</span></div>
+    <div class="leg-row"><div class="leg-box" style="background:#f8fafc;border:1.5px solid #cbd5e1;"></div><span>Gateway (Nginx + MediaMTX)</span></div>
+    <div class="leg-row"><div class="leg-box" style="background:#f5f3ff;border:1.5px solid #c4b5fd;"></div><span>Application (Docker Compose)</span></div>
+    <div class="leg-row"><div class="leg-box" style="background:#fffbeb;border:1.5px solid #fde68a;"></div><span>Storage</span></div>
+  </div>
+
+  <div class="leg-group">
+    <div class="leg-title">Sub-zone</div>
+    <div class="leg-row"><div class="leg-box" style="background:#ecfdf5;border:1px dashed #6ee7b7;"></div><span>Ingestion Service (cam×4)</span></div>
+    <div class="leg-row"><div class="leg-box" style="background:#fdf4ff;border:1px dashed #d8b4fe;"></div><span>AI Inference Pipeline</span></div>
+    <div class="leg-row"><div class="leg-box" style="background:#eef2ff;border:1px dashed #a5b4fc;"></div><span>Backend Service</span></div>
+    <div class="leg-row"><div class="leg-box" style="background:#fff1f2;border:1px dashed #fda4af;"></div><span>Notification Service</span></div>
+  </div>
+
+  <div class="leg-group">
+    <div class="leg-title">Tags</div>
+    <div class="leg-row"><span class="tag tag-new">NEW / 누락</span><span>이번 브랜치 또는 기존 누락 항목</span></div>
+    <div class="leg-row"><span class="tag tag-fix">FIX</span><span>이번 브랜치 버그 수정</span></div>
+    <div class="leg-row"><span class="webrtc-badge">WHIP/WHEP</span><span>WebRTC 프로토콜</span></div>
+  </div>
+
+</div>
+
+</body>
+</html>
