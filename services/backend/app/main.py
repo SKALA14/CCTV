@@ -46,11 +46,13 @@ async def lifespan(app: FastAPI):
                 "channelName": ch.camera_name,
                 "rtspUrl": ch.source_url,
                 "sourceType": ch.source_type,
-                "description": "",
+                "description": ch.description or "",
                 "options": [],
             }
             await _r.set(f"camera:{ch.camera_id}:source_url", ch.source_url)
             await _r.set(f"camera:{ch.camera_id}:source_type", ch.source_type)
+            if ch.description:
+                await _r.set(f"camera_instruction:{ch.camera_id}", ch.description)
         await _r.aclose()
     logger.info("채널 복구 완료: %d개", len(_store))
 

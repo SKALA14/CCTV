@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     EVENTS_STREAM: str = "events"
     ALERTS_STREAM: str = "alerts"
 
+    INCIDENT_GAP_SEC: float = 30.0  # 동일 (camera, event_type) 이벤트 간격이 이 시간 이내면 한 incident로 묶음
+
     class Config:
         env_file = ".env"
 
