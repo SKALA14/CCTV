@@ -101,6 +101,7 @@ services:
       DEVICE: cpu
     volumes:
       - ../frames:/frames
+      - ../prompts:/prompts
     depends_on:
       - redis
 
