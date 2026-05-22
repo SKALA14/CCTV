@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy import delete as sa_delete, update as sa_update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from app.api.agent.instruction_agent import analyze_instruction
 from app.config import config
 from app.db.session import AsyncSessionLocal
 from app.db.models import CctvChannel
@@ -202,3 +203,50 @@ async def delete_channel(channel_name: str) -> None:
                 )
 
     _store.pop(channel_name)
+
+
+class InstructionAnalyzeRequest(BaseModel):
+    text: str
+
+
+class InstructionConfirmRequest(BaseModel):
+    static: list[str]
+    dynamic: list[str]
+
+
+@router.post("/{camera_id}/instruction/analyze")
+async def analyze_channel_instruction(camera_id: str, body: InstructionAnalyzeRequest) -> dict:
+    """채널별 자유 텍스트를 에이전트로 분석해 static/dynamic 초안 반환."""
+    try:
+        result = await analyze_instruction(body.text)
+    except Exception as e:
+        logger.error("채널 instruction 분석 실패 camera_id=%s: %s", camera_id, e)
+        raise HTTPException(status_code=500, detail="분석에 실패했습니다. 다시 시도해주세요.")
+    return {
+        "camera_id": camera_id,
+        "static": result.get("static", []),
+        "dynamic": result.get("dynamic", []),
+    }
+
+
+@router.patch("/{camera_id}/instruction/confirm")
+async def confirm_channel_instruction(camera_id: str, body: InstructionConfirmRequest) -> dict:
+    """확정된 채널별 체크리스트를 Redis camera_instruction:{camera_id}에 저장.
+
+    inference의 render_prompt()가 이 키를 읽어 VLM 프롬프트에 주입한다.
+    """
+    static_part = "\n".join(f"- {item}" for item in body.static) if body.static else ""
+    dynamic_part = "\n".join(f"- {item}" for item in body.dynamic) if body.dynamic else ""
+
+    parts = []
+    if static_part:
+        parts.append(f"[Static 추가]\n{static_part}")
+    if dynamic_part:
+        parts.append(f"[Dynamic 추가]\n{dynamic_part}")
+
+    instruction_value = "\n\n".join(parts)
+    await _redis.set(f"camera_instruction:{camera_id}", instruction_value)
+
+    logger.info("채널 instruction 저장: camera_id=%s static=%d dynamic=%d",
+                camera_id, len(body.static), len(body.dynamic))
+    return {"camera_id": camera_id, "status": "saved"}
