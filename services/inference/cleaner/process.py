@@ -13,8 +13,11 @@ from config import config
 logger = logging.getLogger(__name__)
 
 
+SKIP_DIRS = {"snapshots"}
+
+
 def _scan_and_delete() -> int:
-    """frames 디렉토리를 재귀 스캔해 TTL 초과 파일을 삭제하고 삭제 개수 반환."""
+    """frames 디렉토리의 카메라별 jpg만 TTL 기반 삭제. snapshots는 제외."""
     base = Path(config.FRAME_STORAGE_PATH)
     if not base.exists():
         return 0
@@ -22,7 +25,7 @@ def _scan_and_delete() -> int:
     deleted = 0
 
     for cam_dir in os.scandir(base):
-        if not cam_dir.is_dir():
+        if not cam_dir.is_dir() or cam_dir.name in SKIP_DIRS:
             continue
         for entry in os.scandir(cam_dir.path):
             if not entry.is_file() or not entry.name.lower().endswith((".jpg", ".jpeg")):
