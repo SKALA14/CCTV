@@ -11,7 +11,7 @@ from pathlib import Path
 
 from config import config
 from redis_client import get_client, xadd
-from vlm.client import VLMClient
+from vlm.client import VLMClient, render_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -41,21 +41,25 @@ def latest_frame_path(camera_id: str) -> str | None:
     return latest[1] if latest else None
 
 
-async def analyze_camera(vlm: VLMClient, prompt: str, camera_id: str) -> None:
+async def analyze_camera(vlm: VLMClient, prompt_file: str, camera_id: str) -> None:
     """단일 카메라에 대한 static VLM 호출. 이상 응답이면 events 발행."""
     frame_path = latest_frame_path(camera_id)
     if frame_path is None:
         return
 
+    prompt = render_prompt(prompt_file, camera_id)
+    logger.info("[static.vlm] → VLM 호출: camera=%s", camera_id)
+    t0 = time.monotonic()
     loop = asyncio.get_running_loop()
     try:
         result = await loop.run_in_executor(None, vlm.analyze, [frame_path], prompt)
     except Exception as e:
         logger.error("[static.vlm] camera=%s analyze error: %s", camera_id, e)
         return
+    elapsed = time.monotonic() - t0
 
     if result.get("result") == "normal":
-        logger.debug("[static.vlm] normal: camera=%s", camera_id)
+        logger.info("[static.vlm] ← normal (%.1fs): camera=%s", elapsed, camera_id)
         return
 
     xadd(config.EVENTS_STREAM, {
@@ -66,16 +70,16 @@ async def analyze_camera(vlm: VLMClient, prompt: str, camera_id: str) -> None:
         "description": result.get("description", ""),
         "timestamp": str(time.time()),
         "frame_path": frame_path,
-    })
-    logger.info("[static.vlm] event published: camera=%s type=%s",
-                camera_id, result.get("anomaly_type"))
+    }, maxlen=config.EVENTS_MAXLEN)
+    logger.info("[static.vlm] ← anomaly (%.1fs): camera=%s type=%s",
+                elapsed, camera_id, result.get("anomaly_type"))
 
 
-async def run_once(vlm: VLMClient, prompt: str) -> None:
+async def run_once(vlm: VLMClient, prompt_file: str) -> None:
     """모든 활성 카메라에 대해 동시 VLM 호출."""
     cameras = list_active_cameras()
     if not cameras:
         logger.debug("[static.vlm] no active cameras")
         return
     logger.info("[static.vlm] scanning %d cameras", len(cameras))
-    await asyncio.gather(*[analyze_camera(vlm, prompt, c) for c in cameras])
+    await asyncio.gather(*[analyze_camera(vlm, prompt_file, c) for c in cameras])
