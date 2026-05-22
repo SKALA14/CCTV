@@ -94,7 +94,6 @@ services:
       CAMERA_ID: ${CAMERA_ID:-video0}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
-      PROMPT_DIR: /service/prompts
       FRAME_STORAGE_PATH: /frames
       FRAMES_STREAM: frames
       EVENTS_STREAM: events
