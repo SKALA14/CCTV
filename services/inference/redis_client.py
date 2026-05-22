@@ -1,31 +1,36 @@
-# Redis 연결과 Streams 유틸 함수를 정의한다.
-# 정의: get_client·ensure_group·xreadgroup·xadd·xack·mark_processed.
-# 입력: config.REDIS_URL (연결), stream/group/consumer 문자열 (각 함수 인자).
-# 출력: 메시지 리스트(xreadgroup), msg_id(xadd), ACK 카운트(xack), 삭제 등록 여부(mark_processed).
+# services/inference/redis_client.py
+"""Redis 연결 및 Streams 헬퍼."""
+
+from __future__ import annotations
 
 import redis as _redis
+
 from config import config
+
 
 _client: _redis.Redis | None = None
 
 
-def get_client() -> _redis.Redis: # 
+def get_client() -> _redis.Redis:
+    """프로세스별로 lazy-initialized Redis 클라이언트 반환."""
     global _client
     if _client is None:
         _client = _redis.from_url(config.REDIS_URL, decode_responses=True)
     return _client
 
 
-def _ensure_group(stream: str, group: str) -> None:
+def ensure_group(stream: str, group: str) -> None:
+    """Consumer Group이 없으면 생성, 있으면 무시."""
     try:
         get_client().xgroup_create(stream, group, id="$", mkstream=True)
     except _redis.exceptions.ResponseError:
-        pass  # 이미 존재하는 그룹
+        pass
 
 
 def init_consumer_groups() -> None:
-    """서비스 시작 시 필요한 모든 스트림·그룹을 한 번에 선언한다."""
-    _ensure_group(config.FRAMES_STREAM, config.UNIFIED_GROUP)
+    """frames 스트림에 emergency / dynamic 두 Consumer Group을 선언한다."""
+    ensure_group(config.FRAMES_STREAM, config.EMERGENCY_GROUP)
+    ensure_group(config.FRAMES_STREAM, config.DYNAMIC_GROUP)
 
 
 def xreadgroup(
@@ -35,13 +40,14 @@ def xreadgroup(
     count: int = 1,
     block_ms: int = 1000,
 ) -> list[tuple[str, dict]]:
+    """단일 stream에서 메시지를 읽는다. block 동안 대기."""
     result = get_client().xreadgroup(
         group, consumer, {stream: ">"}, count=count, block=block_ms
     )
     if not result:
         return []
     _, messages = result[0]
-    return messages  # [(msg_id, {field: value, ...}), ...]
+    return messages
 
 
 def xadd(stream: str, fields: dict) -> str:
@@ -50,11 +56,3 @@ def xadd(stream: str, fields: dict) -> str:
 
 def xack(stream: str, group: str, *msg_ids: str) -> int:
     return get_client().xack(stream, group, *msg_ids)
-
-
-def mark_processed(frame_path: str) -> bool:
-    if not frame_path:
-        return False
-
-    get_client().rpush("delete_queue", frame_path)
-    return True
