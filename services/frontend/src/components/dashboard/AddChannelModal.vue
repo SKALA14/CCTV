@@ -71,6 +71,46 @@
           ></textarea>
         </div>
 
+        <!-- 추가 탐지 항목 -->
+        <div>
+          <label class="block text-xs mb-1.5" style="color: var(--text-muted);">추가 탐지 항목 설명</label>
+          <div class="flex gap-2">
+            <textarea
+              v-model="instructionText"
+              placeholder="이 채널에서 추가로 탐지할 항목을 자유롭게 입력하세요 (예: '지게차 주차구역 이탈 모니터링')"
+              rows="2"
+              class="flex-1 px-3 py-2.5 rounded-lg text-sm focus:outline-none resize-none"
+              style="background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-primary);"
+              :disabled="instruction.loading"
+            />
+            <button
+              class="px-3 py-2 rounded-lg text-sm self-end transition-colors"
+              style="background: var(--bg-elevated); color: var(--text-primary); border: 1px solid var(--border);"
+              :disabled="instruction.loading || !instructionText.trim()"
+              @click="analyzeInstructionText"
+            >분석</button>
+          </div>
+          <p v-if="instruction.error" class="text-xs mt-1" style="color: var(--red);">{{ instruction.error }}</p>
+          <p v-if="instruction.confirmed" class="text-xs mt-1" style="color: var(--green, #16a34a);">추가 항목이 저장되었습니다.</p>
+        </div>
+
+        <!-- 채널별 체크리스트 미니 리뷰 -->
+        <div
+          v-if="instruction.static.length || instruction.dynamic.length"
+          class="rounded-lg p-3"
+          style="background: var(--bg-elevated); border: 1px solid var(--border);"
+        >
+          <ChecklistReview
+            :session-id="instruction.sessionId"
+            :static="instruction.static"
+            :dynamic="instruction.dynamic"
+            :loading="instruction.loading"
+            :error="instruction.error"
+            @refine="() => {}"
+            @confirm="onInstructionConfirm"
+          />
+        </div>
+
       </div>
 
       <div class="flex justify-end gap-2 mt-6 pt-5" style="border-top: 1px solid var(--border);">
@@ -89,8 +129,10 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue'
+import { ref, reactive } from 'vue'
 import { detectSourceType } from '../../utils/detectSourceType.js'
+import { analyzeInstruction, confirmInstruction } from '../../api/manuals.js'
+import ChecklistReview from '../manual/ChecklistReview.vue'
 
 const props = defineProps({
   slotIndex: { type: Number, default: 0 },
@@ -109,6 +151,16 @@ const form = reactive({
 })
 
 const errors = reactive({ name: '', rtspUrl: '' })
+
+const instructionText = ref('')
+const instruction = reactive({
+  sessionId: '',
+  static: [],
+  dynamic: [],
+  loading: false,
+  error: '',
+  confirmed: false,
+})
 
 function validate() {
   errors.name    = ''
@@ -133,6 +185,42 @@ function validate() {
   }
 
   return true
+}
+
+async function analyzeInstructionText() {
+  if (!instructionText.value.trim()) return
+  const cameraId = `cam${props.slotIndex}`
+  instruction.sessionId = ''
+  instruction.static = []
+  instruction.dynamic = []
+  instruction.confirmed = false
+  instruction.error = ''
+  instruction.loading = true
+  try {
+    const result = await analyzeInstruction(cameraId, instructionText.value)
+    instruction.sessionId = cameraId
+    instruction.static = result.static
+    instruction.dynamic = result.dynamic
+  } catch {
+    instruction.error = '분석에 실패했습니다. 다시 시도해주세요.'
+  } finally {
+    instruction.loading = false
+  }
+}
+
+async function onInstructionConfirm({ static: s, dynamic: d }) {
+  const cameraId = `cam${props.slotIndex}`
+  instruction.loading = true
+  try {
+    await confirmInstruction(cameraId, s, d)
+    instruction.confirmed = true
+    instruction.static = s
+    instruction.dynamic = d
+  } catch {
+    instruction.error = '저장에 실패했습니다.'
+  } finally {
+    instruction.loading = false
+  }
 }
 
 function submit() {

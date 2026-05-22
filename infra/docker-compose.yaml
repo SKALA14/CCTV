@@ -15,6 +15,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cctv -d cctv"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   mediamtx:
     image: bluenviron/mediamtx
@@ -122,8 +127,10 @@ services:
       - ../frames:/frames
       - ../services/backend/prompts:/service/prompts   # PDF analyze/confirm 결과 저장
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_healthy
 
   notification:
     build:
