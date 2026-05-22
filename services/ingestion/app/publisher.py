@@ -34,7 +34,7 @@ class FramePublisher:
             "frame_path": path,
             "camera_id": config.CAMERA_ID,
             "timestamp": str(ts),
-        })
+        }, maxlen=2000, approximate=True)
 
         logger.info("프레임 발행 성공: camera=%s count=%d", config.CAMERA_ID, self._counter)
 
