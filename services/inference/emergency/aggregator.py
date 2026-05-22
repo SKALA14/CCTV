@@ -43,6 +43,7 @@ def drain_results(
     result_queue: "queue.Queue[ModelResult]",
     pending: dict[str, PendingFrame],
     fallen_timestamps: dict[str, deque],
+    fire_last_published: dict[tuple[str, str], float],
 ) -> None:
     """result_queue를 비우며 PendingFrame에 누적하고 emergency 분기 처리."""
     while True:
@@ -64,7 +65,7 @@ def drain_results(
                            result.model_name, result.msg_id, result.error)
 
         for det in result.detections:
-            _handle_detection(state, det, fallen_timestamps)
+            _handle_detection(state, det, fallen_timestamps, fire_last_published)
 
         result_queue.task_done()
 
@@ -88,6 +89,7 @@ def _handle_detection(
     state: PendingFrame,
     det: dict,
     fallen_timestamps: dict[str, deque],
+    fire_last_published: dict[tuple[str, str], float],
 ) -> None:
     anomaly_type = det.get("anomaly_type", "")
     job = state.job
@@ -97,9 +99,24 @@ def _handle_detection(
     state.alerted_keys.add(key)
 
     if anomaly_type in ("fire", "smoke"):
-        _publish_emergency(job, det)
+        _handle_fire(fire_last_published, job, det)
     elif anomaly_type == "fallen":
         _handle_fallen(fallen_timestamps, job, det)
+
+
+def _handle_fire(
+    fire_last_published: dict[tuple[str, str], float],
+    job: FrameJob,
+    det: dict,
+) -> None:
+    """같은 (camera, anomaly_type)은 FIRE_DEDUP_SEC 안에 1회만 발행."""
+    key = (job.camera_id, det.get("anomaly_type", ""))
+    now = time.time()
+    last = fire_last_published.get(key, 0.0)
+    if now - last < config.FIRE_DEDUP_SEC:
+        return
+    fire_last_published[key] = now
+    _publish_emergency(job, det)
 
 
 def _publish_emergency(job: FrameJob, det: dict) -> None:
@@ -112,7 +129,7 @@ def _publish_emergency(job: FrameJob, det: dict) -> None:
         "confidence": str(det.get("confidence", "")),
         "timestamp": job.timestamp,
         "frame_path": job.frame_path,
-    })
+    }, maxlen=config.ALERTS_MAXLEN)
 
 
 def _handle_fallen(
