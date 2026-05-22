@@ -5,12 +5,12 @@ import httpx
 import redis.asyncio as aioredis
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import delete as sa_delete
+from sqlalchemy import delete as sa_delete, update as sa_update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.config import config
 from app.db.session import AsyncSessionLocal
-from app.db.models import CctvChannel, EventLog
+from app.db.models import CctvChannel
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +114,10 @@ async def create_channel(body: ChannelCreate) -> dict:
 
     await _redis.set(f"camera:{cam_id}:source_url", ingestion_url)
     await _redis.set(f"camera:{cam_id}:source_type", ingestion_type)
+    if body.description:
+        await _redis.set(f"camera_instruction:{cam_id}", body.description)
+    else:
+        await _redis.delete(f"camera_instruction:{cam_id}")
 
     async with AsyncSessionLocal() as session:
         async with session.begin():
@@ -122,12 +126,14 @@ async def create_channel(body: ChannelCreate) -> dict:
                 camera_name=body.channelName,
                 source_type=ingestion_type,
                 source_url=ingestion_url,
+                description=body.description or None,
             ).on_conflict_do_update(
                 index_elements=["camera_id"],
                 set_={
                     "camera_name": body.channelName,
                     "source_type": ingestion_type,
                     "source_url": ingestion_url,
+                    "description": body.description or None,
                 },
             )
             await session.execute(stmt)
@@ -154,6 +160,22 @@ async def update_channel(channel_name: str, body: ChannelUpdate) -> dict:
     if body.description is not None: channel["description"] = body.description
     if body.options     is not None: channel["options"]     = body.options
 
+    if body.description is not None:
+        slot = channel.get("slot")
+        if slot is not None:
+            cam_id = f"cam{slot}"
+            if body.description:
+                await _redis.set(f"camera_instruction:{cam_id}", body.description)
+            else:
+                await _redis.delete(f"camera_instruction:{cam_id}")
+            async with AsyncSessionLocal() as session:
+                async with session.begin():
+                    await session.execute(
+                        sa_update(CctvChannel)
+                        .where(CctvChannel.camera_id == cam_id)
+                        .values(description=body.description or None)
+                    )
+
     return channel
 
 
@@ -167,12 +189,14 @@ async def delete_channel(channel_name: str) -> None:
     slot = _store[channel_name].get("slot")
     if slot is not None:
         cam_id = f"cam{slot}"
-        await _redis.delete(f"camera:{cam_id}:source_url", f"camera:{cam_id}:source_type")
+        await _redis.delete(
+            f"camera:{cam_id}:source_url",
+            f"camera:{cam_id}:source_type",
+            f"camera_instruction:{cam_id}",
+        )
         async with AsyncSessionLocal() as session:
             async with session.begin():
-                await session.execute(
-                    sa_delete(EventLog).where(EventLog.camera_id == cam_id)
-                )
+                # EventLog는 의도적으로 남겨둠 — 채널 삭제 후에도 검색/snapshot 접근 가능
                 await session.execute(
                     sa_delete(CctvChannel).where(CctvChannel.camera_id == cam_id)
                 )
