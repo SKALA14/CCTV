@@ -8,9 +8,11 @@ import json
 import logging
 from pathlib import Path
 
+from jinja2 import Template
 from openai import OpenAI
 
 from config import config
+from redis_client import get_client
 
 logger = logging.getLogger(__name__)
 
@@ -59,8 +61,7 @@ class VLMClient:
 
         response = self._client.chat.completions.create(
             model=self.model,
-            max_tokens=self.max_tokens,
-            temperature=self.temperature,
+            max_completion_tokens=self.max_tokens,
             messages=[{"role": "user", "content": content}],
         )
         return response.choices[0].message.content.strip()
@@ -121,6 +122,33 @@ class VLMClient:
         return self._parse(raw)
 
 
-def load_prompt(filename: str) -> str:
-    """prompts 디렉토리에서 텍스트 프롬프트 1회 로드."""
-    return (Path(config.PROMPT_DIR) / filename).read_text(encoding="utf-8")
+_template_cache: dict[str, Template] = {}
+
+
+def _get_template(filename: str) -> Template:
+    """Jinja2 Template을 파일별로 1회 로드 후 캐싱."""
+    if filename not in _template_cache:
+        text = (Path(config.PROMPT_DIR) / filename).read_text(encoding="utf-8")
+        _template_cache[filename] = Template(text)
+    return _template_cache[filename]
+
+
+def _load_checklist(track: str) -> str:
+    """체크리스트 파일을 매번 디스크에서 읽어 반환. 향후 RAG로 교체 지점."""
+    path = Path(config.CHECKLIST_DIR) / f"{track}_checklist.md"
+    if not path.exists():
+        logger.warning("체크리스트 파일 없음: %s", path)
+        return ""
+    return path.read_text(encoding="utf-8")
+
+
+def render_prompt(filename: str, camera_id: str) -> str:
+    """camera_id, Redis camera_instruction, 체크리스트를 주입해 프롬프트 렌더링."""
+    track = filename.split("_", 1)[0]  # "dynamic_prompt.j2" → "dynamic"
+    instruction = get_client().get(f"camera_instruction:{camera_id}") or ""
+    checklist = _load_checklist(track)
+    return _get_template(filename).render(
+        camera_id=camera_id,
+        instruction=instruction,
+        checklist=checklist,
+    )
