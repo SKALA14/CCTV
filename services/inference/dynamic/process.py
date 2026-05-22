@@ -96,11 +96,12 @@ def _flush_expired(
             cooldown = buffer.in_cooldown(cam_id)
 
         if len(frames) < config.GENERAL_MIN_FRAMES:
-            logger.debug("[dynamic] frames=%d < min, skip: camera=%s", len(frames), cam_id)
+            logger.info("[dynamic] skip (frames=%d < min=%d): camera=%s",
+                        len(frames), config.GENERAL_MIN_FRAMES, cam_id)
             _ack_all(frames)
             continue
         if cooldown:
-            logger.debug("[dynamic] cooldown, skip: camera=%s", cam_id)
+            logger.info("[dynamic] skip (cooldown): camera=%s", cam_id)
             _ack_all(frames)
             continue
 

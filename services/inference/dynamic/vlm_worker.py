@@ -6,11 +6,12 @@ from __future__ import annotations
 import logging
 import queue
 import threading
+import time
 
 from config import config
 from dynamic.buffer import Candidate, DynamicBuffer
 from redis_client import xack, xadd
-from vlm.client import VLMClient, load_prompt
+from vlm.client import VLMClient, render_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,6 @@ def run(
 ) -> None:
     """dynamic VLM 스레드 진입점."""
     vlm: VLMClient | None = None
-    prompt = load_prompt(config.DYNAMIC_PROMPT_FILE)
     logger.info("[dynamic.vlm] worker started")
 
     while True:
@@ -41,7 +41,11 @@ def run(
 
             frame_paths = [fp for _, fp, _ in frames][:config.GENERAL_BUFFER_SIZE]
             timestamp = frames[0][2]
+            prompt = render_prompt(config.DYNAMIC_PROMPT_FILE, cam_id)
+            logger.info("[dynamic.vlm] → VLM 호출: camera=%s frames=%d", cam_id, len(frame_paths))
+            t0 = time.monotonic()
             result = vlm.analyze(frame_paths, prompt)
+            elapsed = time.monotonic() - t0
 
             if result.get("result") != "normal":
                 with buffer_lock:
@@ -54,11 +58,11 @@ def run(
                     "description": result.get("description", ""),
                     "timestamp": timestamp,
                     "frame_path": frame_paths[0],
-                })
-                logger.info("[dynamic.vlm] event published: camera=%s type=%s",
-                            cam_id, result.get("anomaly_type"))
+                }, maxlen=config.EVENTS_MAXLEN)
+                logger.info("[dynamic.vlm] ← anomaly (%.1fs): camera=%s type=%s",
+                            elapsed, cam_id, result.get("anomaly_type"))
             else:
-                logger.debug("[dynamic.vlm] normal: camera=%s", cam_id)
+                logger.info("[dynamic.vlm] ← normal (%.1fs): camera=%s", elapsed, cam_id)
         except Exception as e:
             logger.error("[dynamic.vlm] camera=%s error: %s", cam_id, e)
         finally:
