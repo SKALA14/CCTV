@@ -1,5 +1,9 @@
 # backend 서비스
 
+> **⚠️ 미구현 엔드포인트**
+> 프론트엔드 매뉴얼 페이지(`/manual` 탭)가 `GET /manuals`, `POST /manuals`, `DELETE /manuals/{id}`를 호출하지만 백엔드에는 구현되어 있지 않다. 매뉴얼 탭 진입 시 404 로그가 찍힌다.
+> 향후 RAG 등 매뉴얼 활용 기능 추가 시 함께 구현 필요.
+
 ## 역할
 Redis Streams `events` 채널을 구독해 분석 결과를 PostgreSQL에 저장하고,
 프론트엔드 대시보드에 REST API와 WebSocket을 제공한다.
