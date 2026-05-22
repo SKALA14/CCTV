@@ -101,7 +101,7 @@ services:
       DEVICE: cpu
     volumes:
       - ../frames:/frames
-      - ../prompts:/prompts
+      - ../services/backend/prompts:/prompts   # 글로벌 체크리스트 (backend가 쓰는 위치를 그대로 공유)
     depends_on:
       - redis
 
@@ -117,8 +117,10 @@ services:
       ALERTS_STREAM: alerts
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       FRAME_STORAGE_PATH: /frames
+      PROMPTS_DIR: /service/prompts
     volumes:
       - ../frames:/frames
+      - ../services/backend/prompts:/service/prompts   # PDF analyze/confirm 결과 저장
     depends_on:
       - redis
       - postgres

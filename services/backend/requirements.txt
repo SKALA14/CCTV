@@ -8,3 +8,4 @@ pgvector
 openai
 httpx
 opencv-python-headless
+pdfplumber

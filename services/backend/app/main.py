@@ -17,7 +17,7 @@ from app.config import config
 from app.db.session import engine, Base, AsyncSessionLocal
 from app.db.models import CctvChannel
 from app.worker import run_worker
-from app.api import events, ws, channels
+from app.api import events, ws, channels, manuals
 from app.api.channels import _store
 
 logger = logging.getLogger(__name__)
@@ -93,3 +93,4 @@ async def log_requests(request: Request, call_next):
 app.include_router(events.router)
 app.include_router(ws.router)
 app.include_router(channels.router)
+app.include_router(manuals.router)
