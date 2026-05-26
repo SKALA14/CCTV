@@ -41,39 +41,23 @@
       <!-- 테마 토글 -->
       <div class="px-2 w-full">
         <div class="mb-2" style="border-top: 1px solid var(--border);"></div>
-        <div
-          class="flex rounded-xl overflow-hidden text-[9px] font-semibold"
-          style="border: 1px solid var(--border);"
+        <button
+          class="flex flex-col items-center gap-1 w-full py-2.5 rounded-xl text-[9px] font-semibold transition-colors"
+          style="background: var(--bg-elevated); color: var(--text-muted);"
+          @click="toggle()"
         >
-          <button
-            class="flex-1 flex flex-col items-center gap-1 py-2 transition-colors"
-            :style="isDark
-              ? 'background: var(--bg-elevated); color: var(--text-primary);'
-              : 'background: transparent; color: var(--text-muted);'"
-            @click="isDark || toggle()"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
-            </svg>
-            <span>Dark</span>
-          </button>
-          <button
-            class="flex-1 flex flex-col items-center gap-1 py-2 transition-colors"
-            :style="!isDark
-              ? 'background: var(--bg-elevated); color: var(--text-primary);'
-              : 'background: transparent; color: var(--text-muted);'"
-            @click="isDark && toggle()"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="5"/>
-              <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
-              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-              <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
-              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-            </svg>
-            <span>Light</span>
-          </button>
-        </div>
+          <svg v-if="isDark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+          </svg>
+          <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+          <span>{{ isDark ? 'Dark' : 'Light' }}</span>
+        </button>
       </div>
     </aside>
 
