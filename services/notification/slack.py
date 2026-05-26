@@ -1,5 +1,6 @@
 import logging
-from datetime import datetime, timedelta
+import os
+import time
 from typing import Any
 
 import requests
@@ -7,23 +8,9 @@ import requests
 logger = logging.getLogger(__name__)
 
 HIGH_SEVERITIES = {"critical"}
-EMERGENCY_DEDUPE_WINDOW = timedelta(minutes=15)
-_emergency_last_sent_at: dict[tuple[str, str], datetime] = {}
 
-def _parse_timestamp(value: Any) -> datetime:
-    if isinstance(value, datetime):
-        return value
-
-    if isinstance(value, (int, float)):
-        return datetime.fromtimestamp(value)
-
-    if isinstance(value, str) and value.strip():
-        try:
-            return datetime.fromisoformat(value.strip())
-        except ValueError:
-            logger.debug("failed to parse alert timestamp: %s", value)
-
-    return datetime.now()
+INCIDENT_GAP_SEC: float = float(os.environ.get("INCIDENT_GAP_SEC", "30"))
+_last_sent: dict[tuple[str, str], float] = {}
 
 
 def should_notify_general(vlm_result: dict[str, Any]) -> bool:
@@ -141,23 +128,14 @@ def build_emergency_payload(alert: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def should_notify_emergency(alert: dict[str, Any]) -> bool:
-    camera_id    = str(alert.get("camera_id", "unknown"))
-    anomaly_type = str(alert.get("anomaly_type", "emergency"))
-    dedupe_key   = (camera_id, anomaly_type)
-
-    last_sent_at = _emergency_last_sent_at.get(dedupe_key)
-    now = datetime.now()
-    if last_sent_at and now - last_sent_at < EMERGENCY_DEDUPE_WINDOW:
-        logger.info(
-            "duplicate emergency alert skipped: camera_id=%s anomaly_type=%s last_sent_at=%s",
-            camera_id,
-            anomaly_type,
-            last_sent_at,
-        )
-        return False
-
-    return True
+def _dedup(camera_id: str, event_type: str) -> bool:
+    """INCIDENT_GAP_SEC 이내 같은 (camera_id, event_type)이면 True(skip) 반환."""
+    key = (camera_id, event_type)
+    now = time.monotonic()
+    if now - _last_sent.get(key, 0.0) < INCIDENT_GAP_SEC:
+        return True
+    _last_sent[key] = now
+    return False
 
 
 def _post_to_slack(webhook_url: str, payload: dict[str, Any]) -> None:
@@ -173,18 +151,24 @@ def _post_to_slack(webhook_url: str, payload: dict[str, Any]) -> None:
 
 
 def send_emergency_alert(alert: dict[str, Any], webhook_url: str) -> None:
-    if not should_notify_emergency(alert):
+    camera_id    = str(alert.get("camera_id", "unknown"))
+    anomaly_type = str(alert.get("anomaly_type", "emergency"))
+    if _dedup(camera_id, anomaly_type):
+        logger.info("emergency alert deduped (incident): camera=%s type=%s", camera_id, anomaly_type)
         return
 
     _post_to_slack(webhook_url, build_emergency_payload(alert))
-    camera_id    = str(alert.get("camera_id", "unknown"))
-    anomaly_type = str(alert.get("anomaly_type", "emergency"))
-    _emergency_last_sent_at[(camera_id, anomaly_type)] = datetime.now()
 
 
 def send_general_alert(vlm_result: dict[str, Any], webhook_url: str) -> None:
     if not should_notify_general(vlm_result):
         logger.info("general alert condition not met; skip Slack notification")
+        return
+
+    camera_id  = str(vlm_result.get("camera_id", "unknown"))
+    event_type = str(vlm_result.get("anomaly_type") or vlm_result.get("event_type", "general"))
+    if _dedup(camera_id, event_type):
+        logger.info("general alert deduped (incident): camera=%s type=%s", camera_id, event_type)
         return
 
     _post_to_slack(webhook_url, build_general_payload(vlm_result))
