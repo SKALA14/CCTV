@@ -151,30 +151,45 @@ async def update_channel(channel_name: str, body: ChannelUpdate) -> dict:
         raise HTTPException(status_code=404, detail="채널을 찾을 수 없습니다.")
 
     channel = _store[channel_name]
+    slot = channel.get("slot")
+    cam_id = f"cam{slot}" if slot is not None else None
 
-    if body.rtspUrl and body.rtspUrl != channel.get("rtspUrl"):
-        await _mediamtx_delete(channel_name)
-        await _mediamtx_add(channel_name, body.rtspUrl)
+    new_ingestion_url: str | None = None
+    if body.rtspUrl is not None and body.rtspUrl != channel.get("rtspUrl"):
+        source_type = channel.get("sourceType", "")
+        if source_type in ("rtsp", "webcam"):
+            await _mediamtx_delete(channel_name)
+            await _mediamtx_add(channel_name, body.rtspUrl)
+            # ingestion_url은 rtsp://mediamtx:8554/{channelName}으로 고정 — 변경 불필요
+        elif source_type == "file":
+            filename = body.rtspUrl.lstrip("/").removeprefix("sample/")
+            new_ingestion_url = f"/sample/{filename}"
+            channel["ingestion_url"] = new_ingestion_url
+            if cam_id:
+                await _redis.set(f"camera:{cam_id}:source_url", new_ingestion_url)
 
     if body.name        is not None: channel["name"]        = body.name
     if body.rtspUrl     is not None: channel["rtspUrl"]     = body.rtspUrl
     if body.description is not None: channel["description"] = body.description
     if body.options     is not None: channel["options"]     = body.options
 
-    if body.description is not None:
-        slot = channel.get("slot")
-        if slot is not None:
-            cam_id = f"cam{slot}"
+    if cam_id:
+        db_values: dict = {}
+        if new_ingestion_url is not None:
+            db_values["source_url"] = new_ingestion_url
+        if body.description is not None:
+            db_values["description"] = body.description or None
             if body.description:
                 await _redis.set(f"camera_instruction:{cam_id}", body.description)
             else:
                 await _redis.delete(f"camera_instruction:{cam_id}")
+        if db_values:
             async with AsyncSessionLocal() as session:
                 async with session.begin():
                     await session.execute(
                         sa_update(CctvChannel)
                         .where(CctvChannel.camera_id == cam_id)
-                        .values(description=body.description or None)
+                        .values(**db_values)
                     )
 
     return channel
