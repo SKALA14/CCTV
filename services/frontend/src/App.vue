@@ -68,7 +68,9 @@
         <div :style="isDashboard ? 'height: 100%' : 'visibility: hidden; position: absolute; inset: 0; pointer-events: none'">
           <DashboardView />
         </div>
-        <router-view v-if="!isDashboard" />
+        <keep-alive include="ManualView">
+          <router-view v-if="!isDashboard" />
+        </keep-alive>
       </main>
     </div>
   </div>

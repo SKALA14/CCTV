@@ -42,12 +42,12 @@ export async function analyzeManual(file) {
       session_id: crypto.randomUUID(),
       static: ['소화기 비치 위치가 접근 불가 상태로 차단됨', '안전 통로에 장애물이 방치됨'],
       dynamic: ['작업자가 바닥에 쓰러지거나 낙상하는 상황', 'PPE 미착용 상태로 작업 중인 상황'],
+      zones: [],
     }
   }
   const form = new FormData()
   form.append('file', file)
-  // gpt-4o 3단계 호출이므로 90초 타임아웃 적용
-  return api.post('/manuals/analyze', form, { timeout: 90000 }).then(r => r.data)
+  return api.post('/manuals/analyze', form, { timeout: 120000 }).then(r => r.data)
 }
 
 export async function refineManual(sessionId, feedback) {
@@ -61,14 +61,28 @@ export async function refineManual(sessionId, feedback) {
   return api.post('/manuals/refine', { session_id: sessionId, feedback }).then(r => r.data)
 }
 
-export async function confirmManual(sessionId, staticItems, dynamicItems) {
+export async function confirmManual(sessionId, staticItems, dynamicItems, zones = []) {
   if (DUMMY_MODE) return { status: 'saved' }
   return api.post('/manuals/confirm', {
     session_id: sessionId,
     static: staticItems,
     dynamic: dynamicItems,
+    zones,
   }).then(r => r.data)
 }
+
+export async function registerZones(zonesFile) {
+  if (DUMMY_MODE) return { status: 'saved', zones: ['크레인 작업구역', '용접 작업구역'] }
+  const form = new FormData()
+  form.append('zones_file', zonesFile)
+  return api.post('/manuals/zones', form).then(r => r.data)
+}
+
+export async function fetchZones() {
+  if (DUMMY_MODE) return ['크레인 작업구역', '용접 작업구역', '고소 작업구역']
+  return api.get('/manuals/zones').then(r => r.data)
+}
+
 
 export async function analyzeInstruction(cameraId, text) {
   if (DUMMY_MODE) {

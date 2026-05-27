@@ -60,57 +60,19 @@
           >브라우저 웹캠을 사용합니다 (저장 후 권한 요청)</p>
         </div>
 
+        <!-- 구역 선택 -->
         <div>
-          <label class="block text-xs mb-1.5" style="color: var(--text-muted);">상세 설명</label>
-          <textarea
-            v-model="form.description"
-            placeholder="채널 위치, 용도 등 메모"
-            rows="2"
-            class="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none focus:border-blue-500 transition-colors resize-none"
-            style="background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-primary);"
-          ></textarea>
+          <label class="block text-xs mb-1.5" style="color: var(--text-muted);">구역</label>
+          <select
+            v-model="form.zone"
+            :disabled="!zones.length"
+            class="w-full h-10 px-3 rounded-lg text-sm focus:outline-none transition-colors"
+            :style="`background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-primary); opacity: ${zones.length ? 1 : 0.5};`"
+          >
+            <option value="">없음</option>
+            <option v-for="z in zones" :key="z" :value="z">{{ z }}</option>
+          </select>
         </div>
-
-        <!-- 추가 탐지 항목 -->
-        <div>
-          <label class="block text-xs mb-1.5" style="color: var(--text-muted);">추가 탐지 항목 설명</label>
-          <div class="flex gap-2">
-            <textarea
-              v-model="instructionText"
-              placeholder="이 채널에서 추가로 탐지할 항목을 자유롭게 입력하세요 (예: '지게차 주차구역 이탈 모니터링')"
-              rows="2"
-              class="flex-1 px-3 py-2.5 rounded-lg text-sm focus:outline-none resize-none"
-              style="background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-primary);"
-              :disabled="instruction.loading"
-            />
-            <button
-              class="px-3 py-2 rounded-lg text-sm self-end transition-colors"
-              style="background: var(--bg-elevated); color: var(--text-primary); border: 1px solid var(--border);"
-              :disabled="instruction.loading || !instructionText.trim()"
-              @click="analyzeInstructionText"
-            >분석</button>
-          </div>
-          <p v-if="instruction.error" class="text-xs mt-1" style="color: var(--red);">{{ instruction.error }}</p>
-          <p v-if="instruction.confirmed" class="text-xs mt-1" style="color: var(--green, #16a34a);">추가 항목이 저장되었습니다.</p>
-        </div>
-
-        <!-- 채널별 체크리스트 미니 리뷰 -->
-        <div
-          v-if="instruction.static.length || instruction.dynamic.length"
-          class="rounded-lg p-3"
-          style="background: var(--bg-elevated); border: 1px solid var(--border);"
-        >
-          <ChecklistReview
-            :session-id="instruction.sessionId"
-            :static="instruction.static"
-            :dynamic="instruction.dynamic"
-            :loading="instruction.loading"
-            :error="instruction.error"
-            @refine="() => {}"
-            @confirm="onInstructionConfirm"
-          />
-        </div>
-
       </div>
 
       <div class="flex justify-end gap-2 mt-6 pt-5" style="border-top: 1px solid var(--border);">
@@ -129,10 +91,9 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, watch, onMounted } from 'vue'
 import { detectSourceType } from '../../utils/detectSourceType.js'
-import { analyzeInstruction, confirmInstruction } from '../../api/manuals.js'
-import ChecklistReview from '../manual/ChecklistReview.vue'
+import { fetchZones } from '../../api/manuals.js'
 
 const props = defineProps({
   slotIndex: { type: Number, default: 0 },
@@ -143,23 +104,22 @@ const emit = defineEmits(['close', 'submit'])
 
 const isEdit = !!props.initial?.name
 
+const zones = ref([])
+onMounted(async () => {
+  try { zones.value = await fetchZones() } catch { /* zones 없으면 드롭다운 비움 */ }
+})
+
 const form = reactive({
-  name:        props.initial?.name        || '',
-  sourceType:  props.initial?.url === 'webcam' ? 'webcam' : 'url',
-  rtspUrl:     props.initial?.rtspUrl     || '',
-  description: props.initial?.description || '',
+  name:       props.initial?.name    || '',
+  sourceType: props.initial?.url === 'webcam' ? 'webcam' : 'url',
+  rtspUrl:    props.initial?.rtspUrl || '',
+  zone:       props.initial?.zone    || '',
 })
 
 const errors = reactive({ name: '', rtspUrl: '' })
 
-const instructionText = ref('')
-const instruction = reactive({
-  sessionId: '',
-  static: [],
-  dynamic: [],
-  loading: false,
-  error: '',
-  confirmed: false,
+watch(() => form.zone, (zone) => {
+  form.name = zone
 })
 
 function validate() {
@@ -171,64 +131,21 @@ function validate() {
     errors.name = '채널명을 입력해주세요.'
     return false
   }
-  const duplicate = props.existingNames
-    .map(n => n.trim().toLowerCase())
-    .includes(trimmed.toLowerCase())
-  if (duplicate) {
+  if (props.existingNames.map(n => n.trim().toLowerCase()).includes(trimmed.toLowerCase())) {
     errors.name = '이미 사용 중인 채널명입니다.'
     return false
   }
-
   if (form.sourceType === 'url' && !form.rtspUrl.trim()) {
     errors.rtspUrl = 'URL을 입력해주세요.'
     return false
   }
-
   return true
-}
-
-async function analyzeInstructionText() {
-  if (!instructionText.value.trim()) return
-  const cameraId = `cam${props.slotIndex}`
-  instruction.sessionId = ''
-  instruction.static = []
-  instruction.dynamic = []
-  instruction.confirmed = false
-  instruction.error = ''
-  instruction.loading = true
-  try {
-    const result = await analyzeInstruction(cameraId, instructionText.value)
-    instruction.sessionId = cameraId
-    instruction.static = result.static
-    instruction.dynamic = result.dynamic
-  } catch {
-    instruction.error = '분석에 실패했습니다. 다시 시도해주세요.'
-  } finally {
-    instruction.loading = false
-  }
-}
-
-async function onInstructionConfirm({ static: s, dynamic: d }) {
-  const cameraId = `cam${props.slotIndex}`
-  instruction.loading = true
-  try {
-    await confirmInstruction(cameraId, s, d)
-    instruction.confirmed = true
-    instruction.static = s
-    instruction.dynamic = d
-  } catch {
-    instruction.error = '저장에 실패했습니다.'
-  } finally {
-    instruction.loading = false
-  }
 }
 
 function submit() {
   if (!validate()) return
-
   const isWebcam = form.sourceType === 'webcam'
   const trimmedUrl = form.rtspUrl.trim()
-
   emit('submit', {
     slot:        props.slotIndex,
     name:        form.name.trim(),
@@ -236,7 +153,7 @@ function submit() {
     rtspUrl:     isWebcam ? null : trimmedUrl,
     channelName: `cam${props.slotIndex}`,
     sourceType:  isWebcam ? 'webcam' : detectSourceType(trimmedUrl),
-    description: form.description,
+    zone:        form.zone,
   })
 }
 </script>

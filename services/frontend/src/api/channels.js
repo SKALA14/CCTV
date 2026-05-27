@@ -6,9 +6,9 @@ export async function getChannels() {
     return api.get('/channels')
 }
 
-export async function postChannel({ slot, name, channelName, rtspUrl, sourceType, description, options }) {
+export async function postChannel({ slot, name, channelName, rtspUrl, sourceType, description, options, zone }) {
     if (DUMMY_MODE) return
-    await api.post('/channels', { slot, name, channelName, rtspUrl, sourceType, description, options })
+    await api.post('/channels', { slot, name, channelName, rtspUrl, sourceType, description, options, zone })
 }
 
 export async function putChannel(channelName, patch) {
