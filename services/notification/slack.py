@@ -7,7 +7,7 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-HIGH_SEVERITIES = {"critical"}
+HIGH_SEVERITIES = {"critical", "high"}
 
 INCIDENT_GAP_SEC: float = float(os.environ.get("INCIDENT_GAP_SEC", "30"))
 _last_sent: dict[tuple[str, str], float] = {}
