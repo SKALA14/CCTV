@@ -5,7 +5,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=[".env", "../../infra/.env"],
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     # Redis
     REDIS_URL: str = "redis://redis:6379"
