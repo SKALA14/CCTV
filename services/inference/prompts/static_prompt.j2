@@ -20,11 +20,16 @@
 {
   "result": "normal" | "anomaly",
   "anomaly_type": "stacking" | "blocked_path" | "damaged_facility" | "equipment_issue" | "normal",
-  "danger_level": "critical" | "none",
+  "danger_level": "critical" | "high" | "low" | "none",
   "description": "판단 근거 한국어 1~2문장",
   "confidence": 0.0 ~ 1.0
 }
 
 [작성 규칙]
 - 이상 없음이면 result="normal", anomaly_type="normal", danger_level="none"
+- danger_level 판단 기준:
+  · none     — 이상 없음
+  · low      — 경미한 위반, 즉각 위험 없음 (예: 소화기 위치 부적절, 표지판 훼손)
+  · high     — 명확한 위반, 작업 중단 권고 수준 (예: 안전통로 차단, PPE 미착용 위험구역)
+  · critical — 즉각적 인명·재산 위험 (예: 구조물 손상, 위험물 노출)
 - 확신이 낮으면 confidence를 낮추고 description에 불확실 이유를 명시

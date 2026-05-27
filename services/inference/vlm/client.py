@@ -16,7 +16,7 @@ from redis_client import get_client
 
 logger = logging.getLogger(__name__)
 
-_VALID_LEVELS = {"critical", "none"}
+_VALID_LEVELS = {"critical", "high", "low", "none"}
 _REFUSAL_PHRASES = ("i'm sorry", "i cannot", "i can't", "i am sorry", "cannot assist", "can't assist")
 
 
@@ -133,9 +133,19 @@ def _get_template(filename: str) -> Template:
     return _template_cache[filename]
 
 
-def _load_checklist(track: str) -> str:
-    """체크리스트 파일을 매번 디스크에서 읽어 반환. 향후 RAG로 교체 지점."""
-    path = Path(config.CHECKLIST_DIR) / f"{track}_checklist.md"
+def _load_checklist(track: str, camera_id: str = "") -> str:
+    """체크리스트 파일을 매번 디스크에서 읽어 반환.
+    camera_id가 있으면 구역별 파일 우선, 없으면 글로벌 fallback.
+    """
+    checklist_dir = Path(config.CHECKLIST_DIR)
+    if camera_id:
+        zone = get_client().get(f"camera:{camera_id}:zone") or ""
+        if zone:
+            safe = zone.replace(" ", "_")
+            zone_path = checklist_dir / f"zone_{safe}_{track}.md"
+            if zone_path.exists():
+                return zone_path.read_text(encoding="utf-8")
+    path = checklist_dir / f"{track}_checklist.md"
     if not path.exists():
         logger.warning("체크리스트 파일 없음: %s", path)
         return ""
@@ -146,7 +156,7 @@ def render_prompt(filename: str, camera_id: str) -> str:
     """camera_id, Redis camera_instruction, 체크리스트를 주입해 프롬프트 렌더링."""
     track = filename.split("_", 1)[0]  # "dynamic_prompt.j2" → "dynamic"
     instruction = get_client().get(f"camera_instruction:{camera_id}") or ""
-    checklist = _load_checklist(track)
+    checklist = _load_checklist(track, camera_id)
     return _get_template(filename).render(
         camera_id=camera_id,
         instruction=instruction,

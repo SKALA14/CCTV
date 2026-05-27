@@ -21,11 +21,16 @@
 {
   "result": "normal" | "anomaly",
   "anomaly_type": "intrusion" | "fight" | "fall" | "evacuation" | "normal",
-  "danger_level": "critical" | "none",
+  "danger_level": "critical" | "high" | "low" | "none",
   "description": "판단 근거 한국어 1~2문장",
   "confidence": 0.0 ~ 1.0
 }
 
 [작성 규칙]
 - 이상 없음이면 result="normal", anomaly_type="normal", danger_level="none"
+- danger_level 판단 기준:
+  · none     — 정상 움직임
+  · low      — 이상 가능성 있으나 불명확 (예: 급격한 방향 전환, 비정상적 속도)
+  · high     — 명확한 이상 행동, 개입 필요 (예: 무단 침입, 충돌 직전)
+  · critical — 즉각 응급 대응 필요 (예: 낙상, 폭력, 의식 불명)
 - 확신이 낮으면 confidence를 낮추고 description에 불확실 이유를 명시
