@@ -9,4 +9,5 @@ openai
 httpx
 opencv-python-headless
 pdfplumber
+openpyxl
 python-multipart
