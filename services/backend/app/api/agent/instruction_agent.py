@@ -9,7 +9,7 @@ from app.config import config
 logger = logging.getLogger(__name__)
 _openai: AsyncOpenAI | None = None
 
-_MODEL = "gpt-4o"
+_MODEL = config.OPENAI_MODEL
 
 
 def _get_openai() -> AsyncOpenAI:

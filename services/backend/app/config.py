@@ -16,6 +16,9 @@ class Settings(BaseSettings):
 
     PROMPTS_DIR: str = "/service/prompts"  # PDF 분석/instruction confirm 결과 글로벌 체크리스트 저장 위치
 
+    OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-5.2"
+
     class Config:
         env_file = ".env"
 

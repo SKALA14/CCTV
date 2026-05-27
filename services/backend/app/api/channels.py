@@ -1,4 +1,6 @@
+import json
 import logging
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -23,6 +25,21 @@ _store: dict[str, dict[str, Any]] = {}
 _redis = aioredis.from_url(config.REDIS_URL, decode_responses=True)
 
 
+def _get_zone_note(zone_name: str) -> str:
+    """zones.json에서 해당 구역의 비고 반환. 없으면 빈 문자열."""
+    zones_path = Path(config.PROMPTS_DIR) / "zones.json"
+    if not zones_path.exists():
+        return ""
+    try:
+        data = json.loads(zones_path.read_text(encoding="utf-8"))
+        for z in data:
+            if isinstance(z, dict) and z.get("zone") == zone_name:
+                return z.get("note", "")
+    except Exception:
+        pass
+    return ""
+
+
 class ChannelCreate(BaseModel):
     slot:        int
     name:        str
@@ -31,6 +48,7 @@ class ChannelCreate(BaseModel):
     sourceType:  str
     description: str = ""
     options:     list[str] = []
+    zone:        str = ""
 
 
 class ChannelUpdate(BaseModel):
@@ -38,6 +56,7 @@ class ChannelUpdate(BaseModel):
     rtspUrl:     str | None = None
     description: str | None = None
     options:     list[str] | None = None
+    zone:        str | None = None
 
 
 async def _mediamtx_add(channel_name: str, rtsp_url: str) -> None:
@@ -115,9 +134,15 @@ async def create_channel(body: ChannelCreate) -> dict:
 
     await _redis.set(f"camera:{cam_id}:source_url", ingestion_url)
     await _redis.set(f"camera:{cam_id}:source_type", ingestion_type)
-    if body.description:
-        await _redis.set(f"camera_instruction:{cam_id}", body.description)
+    if body.zone:
+        await _redis.set(f"camera:{cam_id}:zone", body.zone)
+        note = _get_zone_note(body.zone)
+        if note:
+            await _redis.set(f"camera_instruction:{cam_id}", note)
+        else:
+            await _redis.delete(f"camera_instruction:{cam_id}")
     else:
+        await _redis.delete(f"camera:{cam_id}:zone")
         await _redis.delete(f"camera_instruction:{cam_id}")
 
     async with AsyncSessionLocal() as session:
@@ -172,6 +197,7 @@ async def update_channel(channel_name: str, body: ChannelUpdate) -> dict:
     if body.rtspUrl     is not None: channel["rtspUrl"]     = body.rtspUrl
     if body.description is not None: channel["description"] = body.description
     if body.options     is not None: channel["options"]     = body.options
+    if body.zone        is not None: channel["zone"]        = body.zone
 
     if cam_id:
         db_values: dict = {}
@@ -179,9 +205,16 @@ async def update_channel(channel_name: str, body: ChannelUpdate) -> dict:
             db_values["source_url"] = new_ingestion_url
         if body.description is not None:
             db_values["description"] = body.description or None
-            if body.description:
-                await _redis.set(f"camera_instruction:{cam_id}", body.description)
+        if body.zone is not None:
+            if body.zone:
+                await _redis.set(f"camera:{cam_id}:zone", body.zone)
+                note = _get_zone_note(body.zone)
+                if note:
+                    await _redis.set(f"camera_instruction:{cam_id}", note)
+                else:
+                    await _redis.delete(f"camera_instruction:{cam_id}")
             else:
+                await _redis.delete(f"camera:{cam_id}:zone")
                 await _redis.delete(f"camera_instruction:{cam_id}")
         if db_values:
             async with AsyncSessionLocal() as session:
@@ -208,6 +241,7 @@ async def delete_channel(channel_name: str) -> None:
         await _redis.delete(
             f"camera:{cam_id}:source_url",
             f"camera:{cam_id}:source_type",
+            f"camera:{cam_id}:zone",
             f"camera_instruction:{cam_id}",
         )
         async with AsyncSessionLocal() as session:

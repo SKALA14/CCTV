@@ -13,6 +13,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text, select
 
+from pathlib import Path
+
 from app.config import config
 from app.db.session import engine, Base, AsyncSessionLocal
 from app.db.models import CctvChannel
@@ -25,6 +27,15 @@ logger = logging.getLogger(__name__)
 # 서버 시작 시 DB 테이블을 생성하고 백그라운드 워커를 띄운다. 서버 종료 시 워커를 정리한다.
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    prompts_dir = Path(config.PROMPTS_DIR)
+    if prompts_dir.exists():
+        for f in prompts_dir.glob("*.md"):
+            f.unlink()
+        zones_json = prompts_dir / "zones.json"
+        if zones_json.exists():
+            zones_json.unlink()
+    logger.info("체크리스트 파일 초기화 완료")
+
     async with engine.begin() as conn:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
