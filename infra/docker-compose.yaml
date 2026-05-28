@@ -15,6 +15,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cctv -d cctv"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   mediamtx:
     image: bluenviron/mediamtx
@@ -51,6 +56,7 @@ services:
       REDIS_URL: redis://redis:6379
     volumes:
       - ../frames:/frames
+      - ../sample:/sample
     depends_on:
       - redis
     restart: always
@@ -65,6 +71,7 @@ services:
       REDIS_URL: redis://redis:6379
     volumes:
       - ../frames:/frames
+      - ../sample:/sample
     depends_on:
       - redis
     restart: always
@@ -79,6 +86,7 @@ services:
       REDIS_URL: redis://redis:6379
     volumes:
       - ../frames:/frames
+      - ../sample:/sample
     depends_on:
       - redis
     restart: always
@@ -91,7 +99,6 @@ services:
       CAMERA_ID: ${CAMERA_ID:-video0}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
-      PROMPT_DIR: /service/prompts
       FRAME_STORAGE_PATH: /frames
       FRAMES_STREAM: frames
       EVENTS_STREAM: events
@@ -99,6 +106,7 @@ services:
       DEVICE: cpu
     volumes:
       - ../frames:/frames
+      - ../services/backend/prompts:/prompts   # 글로벌 체크리스트 (backend가 쓰는 위치를 그대로 공유)
     depends_on:
       - redis
 
@@ -113,9 +121,16 @@ services:
       EVENTS_STREAM: events
       ALERTS_STREAM: alerts
       OPENAI_API_KEY: ${OPENAI_API_KEY}
+      FRAME_STORAGE_PATH: /frames
+      PROMPTS_DIR: /service/prompts
+    volumes:
+      - ../frames:/frames
+      - ../services/backend/prompts:/service/prompts   # PDF analyze/confirm 결과 저장
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_healthy
 
   notification:
     build:
@@ -125,6 +140,7 @@ services:
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
       ALERTS_STREAM: alerts
       EVENTS_STREAM: events
+      INCIDENT_GAP_SEC: "10"
     depends_on:
       - redis
     restart: always
@@ -136,6 +152,7 @@ services:
       - "80:80"
     volumes:
       - ../sample:/sample
+      - ../frames:/frames
     depends_on:
       - backend
       - mediamtx

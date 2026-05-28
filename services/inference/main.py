@@ -1,53 +1,67 @@
-# 독립 프로세스를 띄워 서비스를 시작하는 진입점.
-# 정의: main() — multiprocessing.Process로 unified pipeline을 실행.
-# 입력: 없음 (각 프로세스가 Redis에서 직접 읽음).
-# 출력: 없음 (프로세스들이 종료될 때까지 블로킹).
+# services/inference/main.py
+"""Inference 서비스 진입점. emergency/dynamic/static/cleaner 4개 프로세스를 spawn한다."""
 
-import multiprocessing
+from __future__ import annotations
+
 import logging
+import multiprocessing
+import signal
+import sys
 
-from pipelines.s0_unified import run as unified_run
-from pipelines.s9_cleaner import cleaner_process
+from cleaner import process as cleaner_process
+from dynamic import process as dynamic_process
+from emergency import process as emergency_process
 from redis_client import init_consumer_groups
+from static import process as static_process
 
-logging.basicConfig(level=logging.INFO, format="%(processName)s %(levelname)s %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(processName)s [%(levelname)s] %(message)s")
+logger = logging.getLogger(__name__)
 
 WORKERS = [
-    ("unified", unified_run),
-    ("cleaner", cleaner_process),
+    ("emergency", emergency_process.run),
+    ("dynamic", dynamic_process.run),
+    ("static", static_process.run),
+    ("cleaner", cleaner_process.run),
 ]
 
 
-def main():
+def _shutdown(processes: list[multiprocessing.Process]) -> None:
+    for p in processes:
+        if p.is_alive():
+            p.terminate()
+    for p in processes:
+        p.join()
+
+
+def main() -> None:
     init_consumer_groups()
-    
+
     processes = [
-        multiprocessing.Process(target=fn, name=name, daemon=True)
+        multiprocessing.Process(target=fn, name=name, daemon=False)
         for name, fn in WORKERS
     ]
-
     for p in processes:
         p.start()
-        logging.info("started %s (pid=%d)", p.name, p.pid)
+        logger.info("started %s (pid=%d)", p.name, p.pid)
 
-    # 하나라도 죽으면 전체 종료
+    def _sigint_handler(_signum, _frame):
+        logger.info("SIGINT received — shutting down")
+        _shutdown(processes)
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, _sigint_handler)
+    signal.signal(signal.SIGTERM, _sigint_handler)
+
     try:
         while True:
             for p in processes:
                 p.join(timeout=1)
                 if not p.is_alive():
-                    logging.error("%s exited (code=%s) — shutting down", p.name, p.exitcode)
-                    for other in processes:
-                        other.terminate()
-                    for other in processes:
-                        other.join()  # 추가
+                    logger.error("%s exited (code=%s) — shutting down all", p.name, p.exitcode)
+                    _shutdown(processes)
                     return
     except KeyboardInterrupt:
-        logging.info("interrupted — shutting down")
-        for p in processes:
-            p.terminate()
-        for p in processes:
-            p.join()  # 추가
+        _shutdown(processes)
 
 
 if __name__ == "__main__":

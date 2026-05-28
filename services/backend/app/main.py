@@ -5,26 +5,67 @@
 
 import asyncio
 import logging
+import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+import redis.asyncio as aioredis
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text
+from sqlalchemy import text, select
+
+from pathlib import Path
 
 from app.config import config
-from app.db.session import engine, Base
+from app.db.session import engine, Base, AsyncSessionLocal
+from app.db.models import CctvChannel
 from app.worker import run_worker
-from app.api import events, ws, channels
+from app.api import events, ws, channels, manuals
+from app.api.channels import _store
 
 logger = logging.getLogger(__name__)
 
 # 서버 시작 시 DB 테이블을 생성하고 백그라운드 워커를 띄운다. 서버 종료 시 워커를 정리한다.
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    prompts_dir = Path(config.PROMPTS_DIR)
+    if prompts_dir.exists():
+        for f in prompts_dir.glob("*.md"):
+            f.unlink()
+        zones_json = prompts_dir / "zones.json"
+        if zones_json.exists():
+            zones_json.unlink()
+    logger.info("체크리스트 파일 초기화 완료")
+
     async with engine.begin() as conn:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
+        await conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_event_logs_embedding_hnsw
+            ON event_logs USING hnsw (embedding vector_cosine_ops)
+            WITH (m = 16, ef_construction = 64)
+        """))
     logger.info("DB 테이블 생성 완료")
+
+    async with AsyncSessionLocal() as session:
+        rows = await session.execute(select(CctvChannel))
+        _r = aioredis.from_url(config.REDIS_URL, decode_responses=True)
+        for ch in rows.scalars().all():
+            slot = int(ch.camera_id.replace("cam", ""))
+            _store[ch.camera_name] = {
+                "slot": slot,
+                "name": ch.camera_name,
+                "channelName": ch.camera_name,
+                "rtspUrl": ch.source_url,
+                "sourceType": ch.source_type,
+                "description": ch.description or "",
+                "options": [],
+            }
+            await _r.set(f"camera:{ch.camera_id}:source_url", ch.source_url)
+            await _r.set(f"camera:{ch.camera_id}:source_type", ch.source_type)
+            if ch.description:
+                await _r.set(f"camera_instruction:{ch.camera_id}", ch.description)
+        await _r.aclose()
+    logger.info("채널 복구 완료: %d개", len(_store))
 
     worker_task = asyncio.create_task(run_worker())
     logger.info("백그라운드 워커 시작")
@@ -49,6 +90,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.time()
+    logger.info("→ %s %s", request.method, request.url.path)
+    response = await call_next(request)
+    elapsed = (time.time() - start) * 1000
+    logger.info("← %s %s %d (%.1fms)", request.method, request.url.path, response.status_code, elapsed)
+    return response
+
+
 app.include_router(events.router)
 app.include_router(ws.router)
 app.include_router(channels.router)
+app.include_router(manuals.router)

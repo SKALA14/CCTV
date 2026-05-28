@@ -6,6 +6,7 @@
     <div v-else-if="error" class="text-[#dc2626] text-center py-8 text-sm">{{ error }}</div>
     <ClipDetail
       v-else-if="event"
+      :key="props.id"
       :event="event"
       :related-events="relatedEvents"
     />
@@ -13,7 +14,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import ClipDetail from '../components/search/ClipDetail.vue'
 import { fetchEventById } from '../api/events.js'
@@ -30,18 +31,20 @@ const event = ref(null)
 const loading = ref(false)
 const error = ref(null)
 
-onMounted(async () => {
+watch(() => props.id, async (id) => {
+  if (!id) return
   if (DUMMY_MODE) {
-    event.value = DUMMY_EVENTS.find(e => e.id === props.id) ?? null
+    event.value = DUMMY_EVENTS.find(e => e.id === id) ?? null
     return
   }
   loading.value = true
+  error.value   = null
   try {
-    event.value = await fetchEventById(props.id)
+    event.value = await fetchEventById(id)
   } catch (e) {
     error.value = e.message
   } finally {
     loading.value = false
   }
-})
+}, { immediate: true })
 </script>

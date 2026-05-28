@@ -52,17 +52,6 @@
               :style="`background: var(--input-bg); border: 1px solid ${errors.rtspUrl ? '#ef4444' : 'var(--input-border)'}; color: var(--text-primary);`"
             />
             <p v-if="errors.rtspUrl" class="text-xs mt-1 text-red-400">{{ errors.rtspUrl }}</p>
-            <input
-              v-model="form.channelName"
-              type="text"
-              placeholder="mediamtx 스트림 경로 (예: cam0)"
-              class="w-full h-10 px-3 rounded-lg text-sm font-mono focus:outline-none transition-colors"
-              :style="`background: var(--input-bg); border: 1px solid ${errors.channelName ? '#ef4444' : 'var(--input-border)'}; color: var(--text-primary);`"
-            />
-            <p v-if="errors.channelName" class="text-xs mt-1 text-red-400">{{ errors.channelName }}</p>
-            <p class="text-xs" style="color: var(--text-muted);">
-              rtsp://는 mediamtx WebRTC 경유 재생
-            </p>
           </div>
           <p
             v-if="form.sourceType === 'webcam'"
@@ -71,31 +60,18 @@
           >브라우저 웹캠을 사용합니다 (저장 후 권한 요청)</p>
         </div>
 
+        <!-- 구역 선택 -->
         <div>
-          <label class="block text-xs mb-1.5" style="color: var(--text-muted);">상세 설명</label>
-          <textarea
-            v-model="form.description"
-            placeholder="채널 위치, 용도 등 메모"
-            rows="2"
-            class="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none focus:border-blue-500 transition-colors resize-none"
-            style="background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-primary);"
-          ></textarea>
-        </div>
-
-        <div>
-          <label class="block text-xs mb-2" style="color: var(--text-muted);">General 옵션 (복수 선택)</label>
-          <div class="flex flex-wrap gap-2">
-            <span
-              v-for="opt in GENERAL_OPTIONS"
-              :key="opt"
-              class="px-3 py-1 rounded-full text-sm cursor-pointer transition-colors select-none"
-              :class="form.options.includes(opt) ? 'bg-blue-600 text-white' : ''"
-              :style="!form.options.includes(opt)
-                ? 'border: 1px solid var(--input-border); color: var(--text-muted);'
-                : 'border: 1px solid transparent;'"
-              @click="toggleOption(opt)"
-            >{{ opt }}</span>
-          </div>
+          <label class="block text-xs mb-1.5" style="color: var(--text-muted);">구역</label>
+          <select
+            v-model="form.zone"
+            :disabled="!zones.length"
+            class="w-full h-10 px-3 rounded-lg text-sm focus:outline-none transition-colors"
+            :style="`background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-primary); opacity: ${zones.length ? 1 : 0.5};`"
+          >
+            <option value="">없음</option>
+            <option v-for="z in zones" :key="z" :value="z">{{ z }}</option>
+          </select>
         </div>
       </div>
 
@@ -115,9 +91,9 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue'
-import { GENERAL_OPTIONS } from '../../constants/events.js'
+import { ref, reactive, watch, onMounted } from 'vue'
 import { detectSourceType } from '../../utils/detectSourceType.js'
+import { fetchZones } from '../../api/manuals.js'
 
 const props = defineProps({
   slotIndex: { type: Number, default: 0 },
@@ -128,69 +104,56 @@ const emit = defineEmits(['close', 'submit'])
 
 const isEdit = !!props.initial?.name
 
-const form = reactive({
-  name:        props.initial?.name        || '',
-  sourceType:  props.initial?.url === 'webcam' ? 'webcam' : 'url',
-  rtspUrl:     props.initial?.rtspUrl     || '',
-  channelName: props.initial?.channelName || `cam${props.slotIndex}`,
-  description: props.initial?.description || '',
-  options:     props.initial?.options     || [],
+const zones = ref([])
+onMounted(async () => {
+  try { zones.value = await fetchZones() } catch { /* zones 없으면 드롭다운 비움 */ }
 })
 
-const errors = reactive({ name: '', rtspUrl: '', channelName: '' })
+const form = reactive({
+  name:       props.initial?.name    || '',
+  sourceType: props.initial?.url === 'webcam' ? 'webcam' : 'url',
+  rtspUrl:    props.initial?.rtspUrl || '',
+  zone:       props.initial?.zone    || '',
+})
+
+const errors = reactive({ name: '', rtspUrl: '' })
+
+watch(() => form.zone, (zone) => {
+  form.name = zone
+})
 
 function validate() {
-  errors.name        = ''
-  errors.rtspUrl     = ''
-  errors.channelName = ''
+  errors.name    = ''
+  errors.rtspUrl = ''
 
   const trimmed = form.name.trim()
   if (!trimmed) {
     errors.name = '채널명을 입력해주세요.'
     return false
   }
-  const duplicate = props.existingNames
-    .map(n => n.trim().toLowerCase())
-    .includes(trimmed.toLowerCase())
-  if (duplicate) {
+  if (props.existingNames.map(n => n.trim().toLowerCase()).includes(trimmed.toLowerCase())) {
     errors.name = '이미 사용 중인 채널명입니다.'
     return false
   }
-
-  if (form.sourceType === 'url') {
-    if (!form.rtspUrl.trim()) {
-      errors.rtspUrl = 'URL을 입력해주세요.'
-      return false
-    }
-    if (!form.channelName.trim()) {
-      errors.channelName = '스트림 경로를 입력해주세요.'
-      return false
-    }
+  if (form.sourceType === 'url' && !form.rtspUrl.trim()) {
+    errors.rtspUrl = 'URL을 입력해주세요.'
+    return false
   }
-
   return true
-}
-
-function toggleOption(opt) {
-  const idx = form.options.indexOf(opt)
-  idx === -1 ? form.options.push(opt) : form.options.splice(idx, 1)
 }
 
 function submit() {
   if (!validate()) return
-
   const isWebcam = form.sourceType === 'webcam'
   const trimmedUrl = form.rtspUrl.trim()
-
   emit('submit', {
     slot:        props.slotIndex,
     name:        form.name.trim(),
     url:         isWebcam ? 'webcam' : trimmedUrl,
     rtspUrl:     isWebcam ? null : trimmedUrl,
-    channelName: isWebcam ? null : form.channelName.trim(),
+    channelName: `cam${props.slotIndex}`,
     sourceType:  isWebcam ? 'webcam' : detectSourceType(trimmedUrl),
-    description: form.description,
-    options:     form.options,
+    zone:        form.zone,
   })
 }
 </script>

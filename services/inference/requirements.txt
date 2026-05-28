@@ -1,6 +1,11 @@
-openai
-redis
-pydantic-settings
-jinja2
-ultralytics
-opencv-python-headless
+redis>=5.0
+openai>=1.40
+pydantic-settings>=2.0
+jinja2>=3.1
+ultralytics>=8.2
+opencv-python-headless>=4.9
+numpy>=1.26
+# GPU 환경에서는 아래 torch를 CUDA 버전으로 교체할 것
+# 예: torch==2.3.0+cu118 --index-url https://download.pytorch.org/whl/cu118
+torch>=2.2
+torchvision>=0.17

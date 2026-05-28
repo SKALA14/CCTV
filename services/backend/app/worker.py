@@ -10,22 +10,36 @@ alerts(emergency), events(general) 두 스트림을 asyncio.gather로 동시에 
 
 import asyncio
 import logging
+import os
+import time
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
+import shutil
 import redis.asyncio as aioredis
 from openai import AsyncOpenAI
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 
+from app.api.embed_describer import describe_for_embedding as _describe_embed
 from app.config import config
 from app.db.session import AsyncSessionLocal
 from app.db.models import CctvChannel, EventLog
+
+FRAMES_BASE     = Path(os.getenv("FRAME_STORAGE_PATH", "/frames"))
+SNAPSHOTS_DIR   = FRAMES_BASE / "snapshots"
+SNAPSHOT_WINDOW_SEC = 5.0
+SNAPSHOT_COUNT  = 5
 
 logger = logging.getLogger(__name__)
 
 CONSUMER_GROUP = "backend"
 CONSUMER_NAME  = "backend-worker"
+
+# 같은 (camera_id, event_type)이 INCIDENT_GAP_SEC 안에 또 들어오면 snapshot 생성 skip.
+# 대표(=incident 첫 이벤트)에만 snapshot이 남고, 후속은 snapshot_urls=NULL로 적재됨.
+_snapshot_last: dict[tuple[str, str], float] = {}
 
 _redis_client: aioredis.Redis | None = None
 
@@ -38,11 +52,77 @@ def _get_client() -> aioredis.Redis:
 
 
 async def _ensure_consumer_groups() -> None:
-    for stream in (config.ALERTS_STREAM, config.EVENTS_STREAM):
+    # DB 적재는 VLM(events) 결과만 수행. YOLO(alerts)는 notification/ws가 자체적으로 처리.
+    try:
+        await _get_client().xgroup_create(config.EVENTS_STREAM, CONSUMER_GROUP, id="0", mkstream=True)
+    except aioredis.ResponseError:
+        pass
+
+
+def _save_snapshots_sync(event_id: str, camera_id: str, frame_path: str) -> list[str]:
+    """이벤트 ±SNAPSHOT_WINDOW_SEC에서 SNAPSHOT_COUNT장 균등 선별해 저장."""
+    cam_dir = FRAMES_BASE / camera_id
+    if not cam_dir.exists():
+        logger.warning("snapshot: camera dir 없음 %s", cam_dir)
+        return []
+    try:
+        event_ts = float(Path(frame_path).name.split("-")[0])
+    except (ValueError, IndexError):
+        logger.warning("snapshot: frame_path timestamp 파싱 실패 %s", frame_path)
+        return []
+
+    start_ts, end_ts = event_ts - SNAPSHOT_WINDOW_SEC, event_ts + SNAPSHOT_WINDOW_SEC
+    candidates = []
+    for f in sorted(cam_dir.glob("*.jpg")):
         try:
-            await _get_client().xgroup_create(stream, CONSUMER_GROUP, id="0", mkstream=True)
-        except aioredis.ResponseError:
-            pass  # 이미 존재하는 그룹
+            ts = float(f.name.split("-")[0])
+            if start_ts <= ts <= end_ts:
+                candidates.append(f)
+        except ValueError:
+            continue
+
+    if not candidates:
+        return []
+
+    n = min(SNAPSHOT_COUNT, len(candidates))
+    if n == 1:
+        selected = [candidates[0]]
+    else:
+        step = (len(candidates) - 1) / (n - 1)
+        selected = [candidates[round(i * step)] for i in range(n)]
+
+    event_dir = SNAPSHOTS_DIR / event_id
+    event_dir.mkdir(parents=True, exist_ok=True)
+    urls: list[str] = []
+    for i, src in enumerate(selected, 1):
+        dst = event_dir / f"{i:02d}.jpg"
+        try:
+            shutil.copy2(src, dst)
+            urls.append(f"/snapshots/{event_id}/{i:02d}.jpg")
+        except OSError as e:
+            logger.warning("snapshot 복사 실패 %s → %s: %s", src, dst, e)
+    return urls
+
+
+async def _save_snapshots(event_id: uuid.UUID, camera_id: str, frame_path: str | None) -> None:
+    if not frame_path:
+        return
+    try:
+        loop = asyncio.get_event_loop()
+        urls = await loop.run_in_executor(
+            None, _save_snapshots_sync, str(event_id), camera_id, frame_path
+        )
+        if urls:
+            async with AsyncSessionLocal() as session:
+                async with session.begin():
+                    await session.execute(
+                        update(EventLog)
+                        .where(EventLog.event_id == event_id)
+                        .values(snapshot_urls=urls, thumbnail_url=urls[0])
+                    )
+            logger.info("snapshots 저장 완료: event_id=%s count=%d", event_id, len(urls))
+    except Exception as e:
+        logger.warning("snapshots 저장 실패 event_id=%s: %s", event_id, e)
 
 
 # description 텍스트를 OpenAI Embeddings API로 VECTOR(1536)으로 변환한다.
@@ -98,27 +178,57 @@ async def _process_message(
     event_type   = fields.get("anomaly_type", "normal")
     danger_level = fields.get("danger_level", "none")
     description  = fields.get("description", "")
-    source_path  = fields.get("source_path")
+    frame_path   = fields.get("frame_path")
+    confidence   = fields.get("confidence")
+    source_model = fields.get("source_model")
+    track        = fields.get("track")
     occurred_at  = await _parse_occurred_at(fields.get("timestamp", ""))
-    embedding    = await _generate_embedding(openai_client, description)
+    embed_text   = await _describe_embed(
+        event_type=fields.get("anomaly_type") or fields.get("event_type", ""),
+        danger_level=fields.get("danger_level", ""),
+        description=description,
+    )
+    embedding    = await _generate_embedding(openai_client, embed_text)
+
+    event_id = uuid.uuid4()
 
     async with AsyncSessionLocal() as session:
         async with session.begin():
             await _ensure_channel(session, camera_id)
+            camera_name = await session.scalar(
+                select(CctvChannel.camera_name).where(CctvChannel.camera_id == camera_id)
+            )
 
             session.add(EventLog(
-                event_id=uuid.uuid4(),
+                event_id=event_id,
                 camera_id=camera_id,
-                pipeline=pipeline,
+                camera_name=camera_name,
+                pipeline=track or pipeline,
                 event_type=event_type,
                 danger_level=danger_level,
                 description=description,
-                source_path=source_path,
+                frame_path=frame_path,
+                confidence=float(confidence) if confidence else None,
+                source_model=source_model,
+                source_path=frame_path,
                 occurred_at=occurred_at,
                 embedding=embedding,
             ))
 
     logger.info("saved: pipeline=%s camera=%s event_type=%s", pipeline, camera_id, event_type)
+
+    # incident 첫 이벤트(=GAP 밖)에만 snapshot 생성. 후속은 skip해서 디스크 절약.
+    dedup_key = (camera_id, event_type)
+    now_mono  = time.monotonic()
+    if now_mono - _snapshot_last.get(dedup_key, 0) >= config.INCIDENT_GAP_SEC:
+        _snapshot_last[dedup_key] = now_mono
+        task = asyncio.create_task(_save_snapshots(event_id, camera_id, frame_path))
+        task.add_done_callback(
+            lambda t: logger.warning("snapshots 태스크 예외: %s", t.exception())
+            if not t.cancelled() and t.exception() else None
+        )
+    else:
+        logger.debug("snapshot skip (incident 후속): camera=%s event_type=%s", camera_id, event_type)
 
 
 # 지정한 Redis 스트림을 무한 루프로 구독하며 메시지가 올 때마다 _process_message를 호출한다.
@@ -152,14 +262,12 @@ async def _consume_stream(
             await asyncio.sleep(3)
 
 
-# 워커 진입점. Redis 연결 후 alerts/events 스트림을 asyncio.gather로 동시에 구독 시작한다.
+# 워커 진입점. events 스트림(VLM 결과)만 구독해 DB에 적재한다.
+# alerts(YOLO)는 notification과 ws.py가 자체적으로 처리하므로 backend는 보지 않는다.
 async def run_worker() -> None:
     openai_client = AsyncOpenAI()
 
     await _ensure_consumer_groups()
-    logger.info("backend worker started")
+    logger.info("backend worker started (events stream only)")
 
-    await asyncio.gather(
-        _consume_stream(config.ALERTS_STREAM, "emergency", openai_client),
-        _consume_stream(config.EVENTS_STREAM, "general",   openai_client),
-    )
+    await _consume_stream(config.EVENTS_STREAM, "general", openai_client)

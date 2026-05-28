@@ -12,6 +12,13 @@ class Settings(BaseSettings):
     EVENTS_STREAM: str = "events"
     ALERTS_STREAM: str = "alerts"
 
+    INCIDENT_GAP_SEC: float = 30.0  # 동일 (camera, event_type) 이벤트 간격이 이 시간 이내면 한 incident로 묶음
+
+    PROMPTS_DIR: str = "/service/prompts"  # PDF 분석/instruction confirm 결과 글로벌 체크리스트 저장 위치
+
+    OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-5.2"
+
     class Config:
         env_file = ".env"
 
