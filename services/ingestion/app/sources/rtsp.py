@@ -17,12 +17,14 @@ class RtspSource(FrameSource):
 
     def open(self, path: str) -> None:
         for i in range(10):
+            logger.info("RTSP 연결 시도 중: url=%s (%d/10)", path, i + 1)
             self._cap = cv2.VideoCapture(path)
             if self._cap.isOpened():
                 logger.info("RTSP 연결 성공: %s", path)
                 return
-            logger.warning("RTSP 연결 실패, 재시도 %d/10", i + 1)
+            logger.warning("RTSP 연결 실패 (url=%s), 3초 후 재시도 %d/10", path, i + 1)
             time.sleep(3)
+        logger.error("RTSP 연결 최종 실패 (url=%s), 10회 모두 실패", path)
         raise RuntimeError(f"RTSP 스트림을 열 수 없습니다: {path}")
 
     def read_frame(self) -> np.ndarray | None:

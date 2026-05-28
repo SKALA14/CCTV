@@ -13,6 +13,8 @@ from .redis_client import get_client
 
 logger = logging.getLogger(__name__)
 
+LOG_INTERVAL = 100  # 100프레임마다 누적 카운트 출력
+
 
 class FramePublisher:
 
@@ -27,12 +29,17 @@ class FramePublisher:
         filename = f"{ts:.3f}-{self._counter:05d}.jpg"
         path = os.path.join(self._cam_dir, filename)
         cv2.imwrite(path, frame)
-        self._counter += 1
 
         get_client().xadd(config.FRAMES_STREAM, {
             "frame_path": path,
             "camera_id": config.CAMERA_ID,
             "timestamp": str(ts),
-        })
+        }, maxlen=2000, approximate=True)
 
+        logger.info("프레임 발행 성공: camera=%s count=%d", config.CAMERA_ID, self._counter)
+
+        if self._counter % LOG_INTERVAL == 0:
+            logger.info("프레임 발행 누적: camera=%s count=%d", config.CAMERA_ID, self._counter)
+
+        self._counter += 1
         return path

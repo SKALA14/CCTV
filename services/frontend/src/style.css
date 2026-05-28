@@ -172,7 +172,7 @@ body {
 /* ── 빈 슬롯 (채널 추가) ── */
 .add-slot {
     border-radius: 12px;
-    border: 2px dashed var(--border);
+    border: 2px dashed var(--input-border);
     display: flex;
     flex-direction: column;
     align-items: center;

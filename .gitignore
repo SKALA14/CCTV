@@ -23,11 +23,27 @@ dist/
 *.local
 
 # =====================
-# 환경변수
+# 환경변수 / 보안
 # =====================
 .env
 .env.*
 !.env.example
+infra/.env
+services/**/.env
+services/frontend/.env.local
+*.key
+*.pem
+*.p12
+*.secret
+
+# =====================
+# 런타임 생성 파일
+# =====================
+*.mp4
+
+
+services/backend/prompts/*.md
+services/backend/prompts/zones.json
 
 # =====================
 # 프레임 저장소 (로컬 볼륨)
@@ -35,6 +51,10 @@ dist/
 frames/**/*.jpg
 frames/**/*.jpeg
 frames/**/*.png
+frames/**/*.mp4
+frames/**/*.webm
+frames/thumbnails/
+frames/clips/
 
 # =====================
 # IDE
@@ -53,3 +73,23 @@ Thumbs.db
 # Docker
 # =====================
 *.log
+
+# =====================
+# 테스트 / 커버리지
+# =====================
+.coverage
+htmlcov/
+coverage.xml
+*.coverage
+
+# =====================
+# Claude / AI 도구
+# =====================
+CLAUDE.md
+.claude/
+
+# =====================
+# 임시 파일
+# =====================
+*.tmp
+a.txt

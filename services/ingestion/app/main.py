@@ -15,7 +15,7 @@ from .publisher import FramePublisher
 logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s %(name)s %(levelname)s %(message)s",
+    format="%(name)s [%(levelname)s] %(message)s",
 )
 
 _SOURCES = {
@@ -38,32 +38,39 @@ def wait_for_source():
 
 def main():
     client = get_client()
-    if not config.SOURCE_PATH or not config.SOURCE_TYPE:
-        source_path, source_type = wait_for_source()
-    else:
+    if config.SOURCE_PATH and config.SOURCE_TYPE:
         source_path, source_type = config.SOURCE_PATH, config.SOURCE_TYPE
+    else:
+        source_path, source_type = wait_for_source()
 
-    cls = _SOURCES.get(source_type)
-    if cls is None:
-        raise ValueError(f"지원하지 않는 SOURCE_TYPE: {source_type}")
+    while True:
+        cls = _SOURCES.get(source_type)
+        if cls is None:
+            raise ValueError(f"지원하지 않는 SOURCE_TYPE: {source_type}")
 
-    source = cls()
-    source.open(source_path)
+        source = cls()
+        source.open(source_path)
 
-    realtime = source_type in ("youtube", "file")
-    sampler = FpsSampler(source, realtime=realtime)
-    publisher = FramePublisher()
+        realtime = source_type in ("youtube", "file")
+        sampler = FpsSampler(source, realtime=realtime)
+        publisher = FramePublisher()
 
-    check_interval = max(1, int(config.SAMPLE_FPS) * 5)  # 5초마다 확인
-    for i, frame in enumerate(sampler.frames()):
-        if i % check_interval == 0:
-            if not client.exists(f"camera:{config.CAMERA_ID}:source_url"):
-                logger.info("소스 키 삭제됨, ingestion 종료 (camera_id=%s)", config.CAMERA_ID)
-                break
-        path = publisher.publish(frame)
-        print(f"저장: {path}")
+        check_interval = max(1, int(config.SAMPLE_FPS) * 5)  # 5초마다 확인
+        for i, frame in enumerate(sampler.frames()):
+            if i % check_interval == 0:
+                if not client.exists(f"camera:{config.CAMERA_ID}:source_url"):
+                    logger.info("소스 키 삭제됨, ingestion 종료 (camera_id=%s)", config.CAMERA_ID)
+                    break
+            publisher.publish(frame)
 
-    source.close()
+        source.close()
+
+        if source_type == "file":
+            client.delete(f"camera:{config.CAMERA_ID}:source_url")
+            client.delete(f"camera:{config.CAMERA_ID}:source_type")
+            logger.info("파일 재생 완료, 다음 소스 대기 (camera_id=%s)", config.CAMERA_ID)
+
+        source_path, source_type = wait_for_source()
 
 
 if __name__ == "__main__":
