@@ -43,6 +43,7 @@ services/frontend/.env.local
 
 
 services/backend/prompts/*.md
+services/backend/prompts/zones.json
 
 # =====================
 # 프레임 저장소 (로컬 볼륨)
