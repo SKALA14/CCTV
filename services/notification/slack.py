@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 HIGH_SEVERITIES = {"critical", "high"}
 
-INCIDENT_GAP_SEC: float = float(os.environ.get("INCIDENT_GAP_SEC", "30"))
+INCIDENT_GAP_SEC: float = float(os.environ.get("INCIDENT_GAP_SEC", "10"))
 _last_sent: dict[tuple[str, str], float] = {}
 
 
@@ -128,14 +128,17 @@ def build_emergency_payload(alert: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _normalize_event_type(event_type: str) -> str:
+    return "fire" if event_type == "smoke" else event_type
+
+
 def _dedup(camera_id: str, event_type: str) -> bool:
-    """INCIDENT_GAP_SEC 이내 같은 (camera_id, event_type)이면 True(skip) 반환."""
-    key = (camera_id, event_type)
+    """마지막 탐지로부터 INCIDENT_GAP_SEC 이상 끊기면 새 사건으로 판단."""
+    key = (camera_id, _normalize_event_type(event_type))
     now = time.monotonic()
-    if now - _last_sent.get(key, 0.0) < INCIDENT_GAP_SEC:
-        return True
+    last = _last_sent.get(key, 0.0)
     _last_sent[key] = now
-    return False
+    return now - last < INCIDENT_GAP_SEC
 
 
 def _post_to_slack(webhook_url: str, payload: dict[str, Any]) -> None:
