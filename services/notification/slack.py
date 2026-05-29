@@ -103,12 +103,12 @@ def build_emergency_payload(alert: dict[str, Any]) -> dict[str, Any]:
             {
                 "type": "section",
                 "fields": [
-                    {"type": "mrkdwn", "text": f"*이상 유형:*\n{anomaly_ko}"},
+                    {"type": "mrkdwn", "text": f"*이상 유형:* {anomaly_ko}"},
                 ],
             },
             {
                 "type": "section",
-                "text": {"type": "mrkdwn", "text": f"*설명:*\n{description}"},
+                "text": {"type": "mrkdwn", "text": f"*설명:* {description}"},
             },
             {"type": "divider"},
         ],
