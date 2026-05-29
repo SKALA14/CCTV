@@ -9,7 +9,14 @@ logger = logging.getLogger(__name__)
 
 HIGH_SEVERITIES = {"critical", "high"}
 
-INCIDENT_GAP_SEC: float = float(os.environ.get("INCIDENT_GAP_SEC", "10"))
+ANOMALY_TYPE_KO: dict[str, str] = {
+    "fire":      "화재",
+    "fallen":    "쓰러짐",
+    "fight":     "폭행",
+    "intrusion": "침입",
+}
+
+INCIDENT_GAP_SEC: float = float(os.environ.get("INCIDENT_GAP_SEC", "30"))
 _last_sent: dict[tuple[str, str], float] = {}
 
 
@@ -82,63 +89,40 @@ def build_general_payload(vlm_result: dict[str, Any]) -> dict[str, Any]:
 
 
 def build_emergency_payload(alert: dict[str, Any]) -> dict[str, Any]:
-    camera_id    = alert.get("camera_id", "unknown")
-    timestamp    = alert.get("timestamp", "")
     anomaly_type = alert.get("anomaly_type", "emergency")
-    danger_level = alert.get("danger_level", "critical")
+    anomaly_ko   = ANOMALY_TYPE_KO.get(anomaly_type, anomaly_type)
     description  = alert.get("description", "")
-    frame        = alert.get("frame", "")
-    source_model = alert.get("source_model", "")
-    confidence   = alert.get("confidence", "")
-    try:
-        conf_display = f"{float(confidence):.2f}"
-    except (TypeError, ValueError):
-        conf_display = "-"
-
-    fallback_text = f"[EMERGENCY] {camera_id} | {timestamp} | {anomaly_type}"
 
     return {
-        "text": fallback_text,
+        "text": f"[긴급] {anomaly_ko} 감지",
         "blocks": [
             {
                 "type": "header",
-                "text": {"type": "plain_text", "text": "긴급 상황 감지 알림"},
+                "text": {"type": "plain_text", "text": "🚨 긴급 상황 감지"},
             },
             {
                 "type": "section",
                 "fields": [
-                    {"type": "mrkdwn", "text": f"*카메라 ID:*\n{camera_id}"},
-                    {"type": "mrkdwn", "text": f"*발생 시각:*\n{timestamp}"},
-                    {"type": "mrkdwn", "text": f"*이상 유형:*\n{anomaly_type}"},
-                    {"type": "mrkdwn", "text": f"*위험도:*\n{danger_level}"},
-                    {"type": "mrkdwn", "text": f"*신뢰도:*\n{conf_display}"},
-                    {"type": "mrkdwn", "text": f"*프레임:*\n{frame}"},
+                    {"type": "mrkdwn", "text": f"*이상 유형:* {anomaly_ko}"},
                 ],
             },
             {
                 "type": "section",
-                "text": {"type": "mrkdwn", "text": f"*탐지 모델:*\n{source_model}"},
-            },
-            {
-                "type": "section",
-                "text": {"type": "mrkdwn", "text": f"*설명:*\n{description}"},
+                "text": {"type": "mrkdwn", "text": f"*설명:* {description}"},
             },
             {"type": "divider"},
         ],
     }
 
 
-def _normalize_event_type(event_type: str) -> str:
-    return "fire" if event_type == "smoke" else event_type
-
-
 def _dedup(camera_id: str, event_type: str) -> bool:
-    """마지막 탐지로부터 INCIDENT_GAP_SEC 이상 끊기면 새 사건으로 판단."""
-    key = (camera_id, _normalize_event_type(event_type))
+    """INCIDENT_GAP_SEC 이내 같은 (camera_id, event_type)이면 True(skip) 반환."""
+    key = (camera_id, event_type)
     now = time.monotonic()
-    last = _last_sent.get(key, 0.0)
+    if now - _last_sent.get(key, 0.0) < INCIDENT_GAP_SEC:
+        return True
     _last_sent[key] = now
-    return now - last < INCIDENT_GAP_SEC
+    return False
 
 
 def _post_to_slack(webhook_url: str, payload: dict[str, Any]) -> None:

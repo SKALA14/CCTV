@@ -33,6 +33,7 @@ class FireYOLO:
                     "description": "화재 위험 감지",
                     "confidence": round(float(box.conf[0].item()), 4),
                     "source_model": "fire_yolo",
+                    "bbox": box.xyxy[0].tolist(),  # [x1, y1, x2, y2]
                 })
 
         return detections
