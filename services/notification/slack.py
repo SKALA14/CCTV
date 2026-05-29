@@ -11,6 +11,7 @@ HIGH_SEVERITIES = {"critical", "high"}
 
 ANOMALY_TYPE_KO: dict[str, str] = {
     "fire":      "화재",
+    "smoke":     "화재",
     "fallen":    "쓰러짐",
     "fight":     "폭행",
     "intrusion": "침입",
