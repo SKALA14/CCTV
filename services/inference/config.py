@@ -39,8 +39,10 @@ class Settings(BaseSettings):
     YOLO_IMGSZ: int = 640
 
     # Fire
-    FIRE_MODEL_PATH: str = "models/fire.pt"
-    FIRE_CONF: float = 0.3
+    FIRE_MODEL_PATH: str = "models/fire_smoke.pt"
+    FIRE_CONF: float = 0.15
+    FIRE_PIXEL_DIFF_THRESH: float = 3.0    # grayscale MAD 임계값 (정적 이미지 ≈ 0~0.5, 실제 화재 ≈ 3+)
+    FIRE_PIXEL_HISTORY: int = 2            # 픽셀 차분용 보관 프레임 수
 
     # Pose
     POSE_MODEL_PATH: str = "models/yolo26m-pose.pt"

@@ -27,6 +27,7 @@ def run() -> None:
     pending: dict[str, PendingFrame] = {}
     fallen_timestamps: dict[str, deque] = {}
     fire_last_published: dict[tuple[str, str], float] = {}
+    fire_frame_buffers: dict[str, deque] = {}
 
     result_queue: queue.Queue[ModelResult] = queue.Queue(maxsize=config.RESULT_QUEUE_SIZE)
     model_queues: dict[str, queue.Queue[FrameJob | None]] = {
@@ -68,7 +69,7 @@ def run() -> None:
                     )
                     aggregator.dispatch_frame(job, model_queues, pending)
 
-                aggregator.drain_results(result_queue, pending, fallen_timestamps, fire_last_published)
+                aggregator.drain_results(result_queue, pending, fallen_timestamps, fire_last_published, fire_frame_buffers)
                 aggregator.finalize_ready_frames(pending)
             except Exception as e:
                 logger.error("[emergency] loop error: %s", e)

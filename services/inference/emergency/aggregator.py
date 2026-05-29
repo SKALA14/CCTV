@@ -9,6 +9,9 @@ import time
 from collections import deque
 from pathlib import Path
 
+import cv2
+import numpy as np
+
 from config import config
 from redis_client import xack, xadd
 from schema import FrameJob, ModelResult, PendingFrame
@@ -44,6 +47,7 @@ def drain_results(
     pending: dict[str, PendingFrame],
     fallen_timestamps: dict[str, deque],
     fire_last_published: dict[tuple[str, str], float],
+    fire_frame_buffers: dict[str, deque],
 ) -> None:
     """result_queue를 비우며 PendingFrame에 누적하고 emergency 분기 처리."""
     while True:
@@ -65,7 +69,7 @@ def drain_results(
                            result.model_name, result.msg_id, result.error)
 
         for det in result.detections:
-            _handle_detection(state, det, fallen_timestamps, fire_last_published)
+            _handle_detection(state, det, fallen_timestamps, fire_last_published, fire_frame_buffers)
 
         result_queue.task_done()
 
@@ -90,6 +94,7 @@ def _handle_detection(
     det: dict,
     fallen_timestamps: dict[str, deque],
     fire_last_published: dict[tuple[str, str], float],
+    fire_frame_buffers: dict[str, deque],
 ) -> None:
     anomaly_type = det.get("anomaly_type", "")
     job = state.job
@@ -99,21 +104,54 @@ def _handle_detection(
     state.alerted_keys.add(key)
 
     if anomaly_type in ("fire", "smoke"):
-        _handle_fire(fire_last_published, job, det)
+        _handle_fire(fire_last_published, job, det, fire_frame_buffers)
     elif anomaly_type == "fallen":
         _handle_fallen(fallen_timestamps, job, det)
+
+
+def _pixel_motion_ok(frame: np.ndarray, bbox: list[float], buf: deque) -> bool:
+    """bbox 영역의 픽셀 변화량이 임계값 이상이면 True(실제 화재). 포스터 등 정적 이미지 오탐 제거."""
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    scale = 0.25
+    small = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+    buf.append(small)
+
+    if len(buf) < 2:
+        return False
+
+    x1, y1, x2, y2 = (int(c * scale) for c in bbox[:4])
+    h, w = small.shape
+    x1, y1 = max(0, x1), max(0, y1)
+    x2, y2 = min(w, x2), min(h, y2)
+    if x2 <= x1 or y2 <= y1:
+        return True
+
+    curr = small[y1:y2, x1:x2].astype(np.float32)
+    prev = buf[-2][y1:y2, x1:x2].astype(np.float32)
+    if curr.shape != prev.shape:
+        return True
+
+    diff = float(np.mean(np.abs(curr - prev)))
+    return diff >= config.FIRE_PIXEL_DIFF_THRESH
 
 
 def _handle_fire(
     fire_last_published: dict[tuple[str, str], float],
     job: FrameJob,
     det: dict,
+    fire_frame_buffers: dict[str, deque],
 ) -> None:
-    """같은 (camera, anomaly_type)은 FIRE_DEDUP_SEC 안에 1회만 발행."""
+    """픽셀 차분으로 정적 오탐 제거 후 FIRE_DEDUP_SEC 안에 1회만 발행."""
+    bbox = det.get("bbox")
+    if job.frame is not None and bbox:
+        fire_frame_buffers.setdefault(job.camera_id, deque(maxlen=config.FIRE_PIXEL_HISTORY))
+        if not _pixel_motion_ok(job.frame, bbox, fire_frame_buffers[job.camera_id]):
+            logger.debug("[emergency] 화재 픽셀 변화 없음 → 오탐 기각: camera=%s", job.camera_id)
+            return
+
     key = (job.camera_id, det.get("anomaly_type", ""))
     now = time.time()
-    last = fire_last_published.get(key, 0.0)
-    if now - last < config.FIRE_DEDUP_SEC:
+    if now - fire_last_published.get(key, 0.0) < config.FIRE_DEDUP_SEC:
         return
     fire_last_published[key] = now
     _publish_emergency(job, det)
