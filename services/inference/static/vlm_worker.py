@@ -12,6 +12,7 @@ from pathlib import Path
 from config import config
 from redis_client import get_client, xadd
 from vlm.client import VLMClient, render_prompt
+from vlm.gate import should_publish, mark_published
 
 logger = logging.getLogger(__name__)
 
@@ -47,12 +48,12 @@ async def analyze_camera(vlm: VLMClient, prompt_file: str, camera_id: str) -> No
     if frame_path is None:
         return
 
-    prompt = render_prompt(prompt_file, camera_id)
+    prompt, categories = render_prompt(prompt_file, camera_id)
     logger.info("[static.vlm] → VLM 호출: camera=%s", camera_id)
     t0 = time.monotonic()
     loop = asyncio.get_running_loop()
     try:
-        result = await loop.run_in_executor(None, vlm.analyze, [frame_path], prompt)
+        result = await loop.run_in_executor(None, vlm.analyze, [frame_path], prompt, categories)
     except Exception as e:
         logger.error("[static.vlm] camera=%s analyze error: %s", camera_id, e)
         return
@@ -60,6 +61,9 @@ async def analyze_camera(vlm: VLMClient, prompt_file: str, camera_id: str) -> No
 
     if result.get("result") == "normal":
         logger.info("[static.vlm] ← normal (%.1fs): camera=%s", elapsed, camera_id)
+        return
+
+    if not should_publish(result, camera_id, "static"):
         return
 
     xadd(config.EVENTS_STREAM, {
@@ -71,6 +75,7 @@ async def analyze_camera(vlm: VLMClient, prompt_file: str, camera_id: str) -> No
         "timestamp": str(time.time()),
         "frame_path": frame_path,
     }, maxlen=config.EVENTS_MAXLEN)
+    mark_published(camera_id, "static")
     logger.info("[static.vlm] ← anomaly (%.1fs): camera=%s type=%s",
                 elapsed, camera_id, result.get("anomaly_type"))
 

@@ -36,12 +36,12 @@ class Settings(BaseSettings):
 
     # YOLO 공통
     DEVICE: str = "cpu"
-    YOLO_IMGSZ: int = 640
+    YOLO_IMGSZ: int = 320   # CPU 추론 속도 우선: 640→320 약 4배 빠름
 
     # Fire
     FIRE_MODEL_PATH: str = "models/fire_smoke.pt"
     FIRE_CONF: float = 0.15
-    FIRE_PIXEL_DIFF_THRESH: float = 3.0    # grayscale MAD 임계값 (정적 이미지 ≈ 0~0.5, 실제 화재 ≈ 3+)
+    FIRE_PIXEL_DIFF_THRESH: float = 0.0    # 0.0=비활성(YOLO conf만 사용), >0=픽셀차분 참고로그만 출력
     FIRE_PIXEL_HISTORY: int = 2            # 픽셀 차분용 보관 프레임 수
 
     # Pose
@@ -52,12 +52,12 @@ class Settings(BaseSettings):
     FALL_BBOX_RATIO_THRESH: float = 1.3
 
     # Emergency
-    FRAME_RESULT_TIMEOUT_SEC: float = 5.0
+    FRAME_RESULT_TIMEOUT_SEC: float = 30.0  # CPU 추론 지연 대비 (640→320 후 ~1-2s/frame)
     FALL_MIN_FRAMES: int = 3
 
     FALL_WINDOW_SEC: float = 5.0
     FIRE_DEDUP_SEC: float = 2.0  # fire/smoke 발행 후 같은 (camera, type) 발행 억제 시간
-    MODEL_QUEUE_SIZE: int = 30
+    MODEL_QUEUE_SIZE: int = 10   # 적정 버퍼: 과부하 프레임 드롭 허용하되 카메라별 기회 보장
     RESULT_QUEUE_SIZE: int = 90
 
     # Dynamic (Optical Flow + VLM)
@@ -69,6 +69,10 @@ class Settings(BaseSettings):
 
     # Static
     STATIC_INTERVAL_SEC: float = 1800.0
+
+    # Quality Gate
+    MIN_CONFIDENCE: float = 0.6
+    DEDUP_TTL_SEC: int = 60
 
     # Cleaner
     CLEANER_INTERVAL_SEC: float = 10.0
