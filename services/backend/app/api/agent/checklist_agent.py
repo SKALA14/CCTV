@@ -160,3 +160,57 @@ async def refine_checklist(session_id: str, feedback: str) -> dict:
     messages.append({"role": "assistant", "content": raw})
     await _save_session(session_id, messages)
     return result
+
+
+_NORMALIZE_SYSTEM = (
+    "다음은 CCTV 안전 체크리스트 항목들이다.\n"
+    "의미가 겹치거나 같은 위험 유형에 속하는 항목들을 묶어 카테고리를 만들어라.\n"
+    "반드시 JSON 형식으로만 응답하라.\n\n"
+    "[규칙]\n"
+    "- 카테고리 코드: 영문+언더스코어, 20자 이내, 명사형 (예: PPE_MISSING, ACCESS_VIOLATION)\n"
+    "- 의미가 명확히 다른 항목은 별도 카테고리로 분리\n"
+    "- 항목이 1개만 있어도 카테고리로 만들 것\n"
+    "- 항목 원문은 절대 수정하지 말 것\n\n"
+    '{"categories": [{"code": "...", "label": "...(한국어 명사형)", "items": ["원문 질문?"]}]}'
+)
+
+
+async def normalize_categories(items: list[str]) -> list[dict]:
+    """항목 리스트를 의미 기반으로 카테고리 코드와 함께 묶어 반환.
+
+    반환: [{"code": "PPE_MISSING", "label": "보호장비 미착용", "items": [...]}]
+    빈 입력이면 [] 반환. API 오류·파싱 실패 시 GENERAL 단일 카테고리로 fallback.
+    """
+    if not items:
+        return []
+
+    messages = [
+        {"role": "system", "content": _NORMALIZE_SYSTEM},
+        {"role": "user", "content": json.dumps(items, ensure_ascii=False)},
+    ]
+    try:
+        resp = await _get_openai().chat.completions.create(
+            model=_MODEL,
+            messages=messages,
+            response_format={"type": "json_object"},
+        )
+        raw = resp.choices[0].message.content or ""
+        if not raw:
+            return [{"code": "GENERAL", "label": "일반", "items": items}]
+
+        data = json.loads(raw)
+        categories = data.get("categories", [])
+        if not categories:
+            return [{"code": "GENERAL", "label": "일반", "items": items}]
+
+        # 누락 항목 보완
+        categorized = {item for cat in categories if isinstance(cat, dict) for item in cat.get("items", [])}
+        missing = [item for item in items if item not in categorized]
+        if missing:
+            categories.append({"code": "UNCATEGORIZED", "label": "미분류", "items": missing})
+
+        return categories
+
+    except Exception as e:
+        logger.warning("카테고리 정규화 실패: %s", e)
+        return [{"code": "GENERAL", "label": "일반", "items": items}]

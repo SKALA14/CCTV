@@ -10,7 +10,7 @@ import redis.asyncio as aioredis
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from app.api.agent.checklist_agent import analyze_pdf, refine_checklist, subset_by_zones
+from app.api.agent.checklist_agent import analyze_pdf, refine_checklist, subset_by_zones, normalize_categories
 from app.api.agent.pdf_parser import extract_text_from_pdf
 from app.config import config
 
@@ -36,6 +36,12 @@ class RefineRequest(BaseModel):
     feedback: str
 
 
+class CategoryItem(BaseModel):
+    code: str
+    label: str
+    items: list[str]
+
+
 class ZoneChecklist(BaseModel):
     zone: str
     static: list[str]
@@ -46,7 +52,39 @@ class ConfirmRequest(BaseModel):
     session_id: str
     static: list[str]
     dynamic: list[str]
+    static_categories: list[CategoryItem] = []   # 없으면 기존 형식 유지
+    dynamic_categories: list[CategoryItem] = []  # 없으면 기존 형식 유지
     zones: list[ZoneChecklist] = []
+
+
+def _format_checklist(items: list[str], categories: list) -> str:
+    """번호 형식 체크리스트 텍스트 생성.
+
+    categories 여부와 무관하게 항상 번호 형식 반환.
+    코드 매핑은 _build_categories_map()이 별도 처리.
+    """
+    if not items:
+        return ""
+    return "\n".join(f"{i + 1}. {item}" for i, item in enumerate(items))
+
+
+def _build_categories_map(items: list[str], categories: list) -> dict[str, str]:
+    """항목 인덱스(1-based 문자열) → 카테고리 코드 매핑 dict 생성.
+
+    Redis HSET mapping으로 바로 사용 가능.
+    categories 없으면 {} 반환.
+    categories에 없는 항목은 'GENERAL' 코드 부여.
+    """
+    if not items or not categories:
+        return {}
+    item_to_code: dict[str, str] = {}
+    for cat in categories:
+        for item in cat.items:
+            item_to_code[item] = cat.code
+    return {
+        str(i + 1): item_to_code.get(item, "GENERAL")
+        for i, item in enumerate(items)
+    }
 
 
 @router.get("")
@@ -118,8 +156,27 @@ async def analyze_manual(file: UploadFile = File(...)) -> dict:
         logger.error("에이전트 분석 실패: %s", e)
         raise HTTPException(status_code=500, detail="체크리스트 분석에 실패했습니다. 다시 시도해주세요.")
 
-    def _flatten(categories: list) -> list[str]:
-        return [item for cat in categories for item in (cat.get("items", []) if isinstance(cat, dict) else [])]
+    def _flatten(section: list) -> list[str]:
+        """analyze_pdf 결과의 카테고리 구조에서 항목 문자열만 추출."""
+        items: list[str] = []
+        for entry in section:
+            if isinstance(entry, dict):
+                items.extend(entry.get("items", []))
+            elif isinstance(entry, str):
+                items.append(entry)
+        return items
+
+    static_items = _flatten(result.get("static", []))
+    dynamic_items = _flatten(result.get("dynamic", []))
+
+    # 카테고리 정규화 (실패해도 기존 items는 정상 반환)
+    try:
+        static_categories = await normalize_categories(static_items)
+        dynamic_categories = await normalize_categories(dynamic_items)
+    except Exception as e:
+        logger.warning("카테고리 정규화 실패, 빈 배열로 대체: %s", e)
+        static_categories = []
+        dynamic_categories = []
 
     zone_results = []
     zones_path = Path(config.PROMPTS_DIR) / "zones.json"
@@ -138,8 +195,10 @@ async def analyze_manual(file: UploadFile = File(...)) -> dict:
 
     return {
         "session_id": session_id,
-        "static": _flatten(result.get("static", [])),
-        "dynamic": _flatten(result.get("dynamic", [])),
+        "static": static_items,
+        "dynamic": dynamic_items,
+        "static_categories": static_categories,
+        "dynamic_categories": dynamic_categories,
         "zones": zone_results,
     }
 
@@ -234,24 +293,62 @@ async def list_zones() -> list[str]:
 async def confirm_manual(body: ConfirmRequest) -> dict:
     """확정된 체크리스트를 backend/prompts/에 저장.
 
-    - 글로벌: {static,dynamic}_checklist.md
-    - 구역별: zone_{safe_name}_{static,dynamic}.md
-    inference의 _load_checklist()가 같은 파일을 매 VLM 호출 시 읽음 — 즉시 반영.
+    - 글로벌: {static,dynamic}_checklist.md — 번호 형식 저장
+    - 글로벌: Redis checklist:{track}:categories hash — 인덱스→코드 매핑
+    - 구역별: zone_{safe_name}_{static,dynamic}.md + Redis zone hash
+    inference의 _load_checklist()와 render_prompt()가 매 VLM 호출 시 읽음 — 즉시 반영.
     """
     prompts_dir = Path(config.PROMPTS_DIR)
     prompts_dir.mkdir(parents=True, exist_ok=True)
+    redis = _get_redis()
 
-    (prompts_dir / _STATIC_FILE).write_text("\n".join(f"- {item}" for item in body.static), encoding="utf-8")
-    (prompts_dir / _DYNAMIC_FILE).write_text("\n".join(f"- {item}" for item in body.dynamic), encoding="utf-8")
+    # 글로벌 .md 저장 (번호 형식)
+    (prompts_dir / _STATIC_FILE).write_text(
+        _format_checklist(body.static, body.static_categories), encoding="utf-8"
+    )
+    (prompts_dir / _DYNAMIC_FILE).write_text(
+        _format_checklist(body.dynamic, body.dynamic_categories), encoding="utf-8"
+    )
 
+    # 글로벌 categories → Redis hash
+    # 빈 map이어도 무조건 delete — 이전 categories가 남지 않도록
+    static_map = _build_categories_map(body.static, body.static_categories)
+    dynamic_map = _build_categories_map(body.dynamic, body.dynamic_categories)
+    await redis.delete("checklist:static:categories")
+    if static_map:
+        await redis.hset("checklist:static:categories", mapping=static_map)
+    await redis.delete("checklist:dynamic:categories")
+    if dynamic_map:
+        await redis.hset("checklist:dynamic:categories", mapping=dynamic_map)
+
+    # 구역별 .md + Redis hash
     for z in body.zones:
         safe = z.zone.replace(" ", "_")
+        static_cats = [
+            c for c in body.static_categories
+            if any(item in z.static for item in c.items)
+        ]
+        dynamic_cats = [
+            c for c in body.dynamic_categories
+            if any(item in z.dynamic for item in c.items)
+        ]
+
         (prompts_dir / f"zone_{safe}_static.md").write_text(
-            "\n".join(f"- {item}" for item in z.static), encoding="utf-8"
+            _format_checklist(z.static, static_cats), encoding="utf-8"
         )
         (prompts_dir / f"zone_{safe}_dynamic.md").write_text(
-            "\n".join(f"- {item}" for item in z.dynamic), encoding="utf-8"
+            _format_checklist(z.dynamic, dynamic_cats), encoding="utf-8"
         )
+
+        zone_static_map  = _build_categories_map(z.static,  static_cats)
+        zone_dynamic_map = _build_categories_map(z.dynamic, dynamic_cats)
+        # 빈 map이어도 무조건 delete
+        await redis.delete(f"checklist:zone_{safe}:static:categories")
+        if zone_static_map:
+            await redis.hset(f"checklist:zone_{safe}:static:categories", mapping=zone_static_map)
+        await redis.delete(f"checklist:zone_{safe}:dynamic:categories")
+        if zone_dynamic_map:
+            await redis.hset(f"checklist:zone_{safe}:dynamic:categories", mapping=zone_dynamic_map)
 
     logger.info("체크리스트 저장 완료: static=%d, dynamic=%d, zones=%d",
                 len(body.static), len(body.dynamic), len(body.zones))
