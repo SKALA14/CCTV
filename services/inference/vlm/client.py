@@ -66,8 +66,12 @@ class VLMClient:
         )
         return response.choices[0].message.content.strip()
 
-    def _parse(self, raw_text: str) -> dict:
-        """VLM 응답을 표준 dict로 파싱. 실패 시 normal fallback."""
+    def _parse(self, raw_text: str, categories: dict[str, str] | None = None) -> dict:
+        """VLM 응답을 표준 dict로 파싱. 실패 시 normal fallback.
+
+        categories: {"1": "SAFETY_BARRIERS", ...} — violated_index 조회용.
+        categories 없거나 비어있으면 anomaly_type = "GENERAL" fallback.
+        """
         normal = {
             "result": "normal",
             "anomaly_type": "normal",
@@ -95,9 +99,25 @@ class VLMClient:
         try:
             result = str(data.get("result", "normal"))
             level = data.get("danger_level", "none")
-            anomaly_type = str(data.get("anomaly_type", "normal"))
+
+            if result != "anomaly":
+                return {
+                    "result": "normal",
+                    "anomaly_type": "normal",
+                    "danger_level": "none",
+                    "description": str(data.get("description", "")),
+                    "confidence": float(max(0.0, min(1.0, data.get("confidence", 0.5)))),
+                }
+
+            # violated_index → anomaly_type 변환
+            violated_index = str(data.get("violated_index") or "").strip()
+            if categories and violated_index:
+                anomaly_type = categories.get(violated_index, "GENERAL")
+            else:
+                anomaly_type = "GENERAL"
+
             return {
-                "result": result if result in ("normal", "anomaly") else "normal",
+                "result": "anomaly",
                 "anomaly_type": anomaly_type,
                 "danger_level": level if level in _VALID_LEVELS else "none",
                 "description": str(data.get("description", "")),
@@ -107,7 +127,7 @@ class VLMClient:
             logger.warning("VLM 값 변환 실패: %s | data: %s", e, data)
             return normal
 
-    def analyze(self, frame_paths: list[str], prompt: str) -> dict:
+    def analyze(self, frame_paths: list[str], prompt: str, categories: dict[str, str] | None = None) -> dict:
         """이미지 리스트와 prompt로 VLM 분석 수행. 결과 dict 반환."""
         if not frame_paths:
             return {
@@ -119,7 +139,7 @@ class VLMClient:
             }
         raw = self._predict(prompt, frame_paths)
         logger.debug("VLM raw: %s", raw[:200])
-        return self._parse(raw)
+        return self._parse(raw, categories)
 
 
 _template_cache: dict[str, Template] = {}
@@ -152,13 +172,40 @@ def _load_checklist(track: str, camera_id: str = "") -> str:
     return path.read_text(encoding="utf-8")
 
 
-def render_prompt(filename: str, camera_id: str) -> str:
-    """camera_id, Redis camera_instruction, 체크리스트를 주입해 프롬프트 렌더링."""
+def _get_categories_key(track: str, camera_id: str) -> str:
+    """카메라의 구역을 조회해 적절한 Redis 카테고리 키 반환.
+
+    구역 있으면: checklist:zone_{safe_name}:{track}:categories
+    구역 없으면: checklist:{track}:categories
+    """
+    zone = get_client().get(f"camera:{camera_id}:zone") or ""
+    if zone:
+        safe = zone.replace(" ", "_")
+        return f"checklist:zone_{safe}:{track}:categories"
+    return f"checklist:{track}:categories"
+
+
+def render_prompt(filename: str, camera_id: str) -> tuple[str, dict[str, str]]:
+    """camera_id, Redis camera_instruction, 체크리스트를 주입해 프롬프트 렌더링.
+
+    반환: (rendered_prompt, categories_dict)
+    categories_dict: {"1": "SAFETY_BARRIERS", "2": "SAFETY_SIGNS", ...}
+    Redis 조회 실패 시 categories_dict = {} (anomaly_type fallback 처리는 _parse()가 담당)
+    """
     track = filename.split("_", 1)[0]  # "dynamic_prompt.j2" → "dynamic"
     instruction = get_client().get(f"camera_instruction:{camera_id}") or ""
     checklist = _load_checklist(track, camera_id)
-    return _get_template(filename).render(
+
+    categories_key = _get_categories_key(track, camera_id)
+    try:
+        categories: dict[str, str] = get_client().hgetall(categories_key) or {}
+    except Exception as e:
+        logger.warning("categories 조회 실패 (camera=%s): %s", camera_id, e)
+        categories = {}
+
+    prompt = _get_template(filename).render(
         camera_id=camera_id,
         instruction=instruction,
         checklist=checklist,
     )
+    return prompt, categories

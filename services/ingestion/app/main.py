@@ -66,9 +66,18 @@ def main():
         source.close()
 
         if source_type == "file":
-            client.delete(f"camera:{config.CAMERA_ID}:source_url")
-            client.delete(f"camera:{config.CAMERA_ID}:source_type")
-            logger.info("파일 재생 완료, 다음 소스 대기 (camera_id=%s)", config.CAMERA_ID)
+            # 재생 완료 후 Redis에 저장된 URL이 우리가 재생한 URL과 동일한 경우에만 삭제.
+            # 재생 도중 새 영상으로 교체된 경우(URL 변경)엔 새 URL을 지우지 않는다.
+            current_url = client.get(f"camera:{config.CAMERA_ID}:source_url")
+            if current_url == source_path:
+                client.delete(f"camera:{config.CAMERA_ID}:source_url")
+                client.delete(f"camera:{config.CAMERA_ID}:source_type")
+                logger.info("파일 재생 완료, 다음 소스 대기 (camera_id=%s)", config.CAMERA_ID)
+            else:
+                logger.info(
+                    "파일 재생 완료, 소스가 변경됨 → 새 소스로 전환 (camera_id=%s, new_url=%s)",
+                    config.CAMERA_ID, current_url,
+                )
 
         source_path, source_type = wait_for_source()
 

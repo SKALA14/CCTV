@@ -61,12 +61,14 @@ export async function refineManual(sessionId, feedback) {
   return api.post('/manuals/refine', { session_id: sessionId, feedback }).then(r => r.data)
 }
 
-export async function confirmManual(sessionId, staticItems, dynamicItems, zones = []) {
+export async function confirmManual(sessionId, staticItems, dynamicItems, zones = [], staticCategories = [], dynamicCategories = []) {
   if (DUMMY_MODE) return { status: 'saved' }
   return api.post('/manuals/confirm', {
     session_id: sessionId,
     static: staticItems,
     dynamic: dynamicItems,
+    static_categories: staticCategories,
+    dynamic_categories: dynamicCategories,
     zones,
   }).then(r => r.data)
 }
