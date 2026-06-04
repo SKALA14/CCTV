@@ -167,6 +167,10 @@ async def create_channel(body: ChannelCreate) -> dict:
     channel = {**body.model_dump(), "ingestion_url": ingestion_url}
     _store[body.channelName] = channel
     logger.info("채널 등록: cam_id=%s ingestion_url=%s", cam_id, ingestion_url)
+
+    # static 프로세스에 즉시 스캔 트리거
+    await _redis.publish("camera:registered", cam_id)
+
     return channel
 
 
@@ -192,6 +196,7 @@ async def update_channel(channel_name: str, body: ChannelUpdate) -> dict:
             channel["ingestion_url"] = new_ingestion_url
             if cam_id:
                 await _redis.set(f"camera:{cam_id}:source_url", new_ingestion_url)
+                await _redis.publish("camera:registered", cam_id)
 
     if body.name        is not None: channel["name"]        = body.name
     if body.rtspUrl     is not None: channel["rtspUrl"]     = body.rtspUrl

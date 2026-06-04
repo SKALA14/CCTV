@@ -298,6 +298,8 @@ const checklist = reactive({
   sessionId: '',
   static: [],
   dynamic: [],
+  staticCategories: [],
+  dynamicCategories: [],
   zones: [],
   loading: false,
   error: '',
@@ -308,6 +310,8 @@ async function onAnalyze() {
   checklist.sessionId = ''
   checklist.static = []
   checklist.dynamic = []
+  checklist.staticCategories = []
+  checklist.dynamicCategories = []
   checklist.zones = []
   checklist.saved = false
   checklist.error = ''
@@ -317,6 +321,8 @@ async function onAnalyze() {
     checklist.sessionId = result.session_id
     checklist.static = result.static
     checklist.dynamic = result.dynamic
+    checklist.staticCategories = result.static_categories || []
+    checklist.dynamicCategories = result.dynamic_categories || []
     checklist.zones = result.zones || []
   } catch (e) {
     const detail = e?.response?.data?.detail
@@ -346,7 +352,7 @@ async function onConfirm({ sessionId, static: staticItems, dynamic: dynamicItems
   checklist.loading = true
   checklist.error = ''
   try {
-    await confirmManual(sessionId, staticItems, dynamicItems, checklist.zones)
+    await confirmManual(sessionId, staticItems, dynamicItems, checklist.zones, checklist.staticCategories, checklist.dynamicCategories)
     checklist.saved = true
   } catch {
     checklist.error = '저장에 실패했습니다. 다시 시도해주세요.'

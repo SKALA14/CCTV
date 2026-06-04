@@ -4,11 +4,13 @@
 from __future__ import annotations
 
 import redis as _redis
+import redis.asyncio as _aioredis
 
 from config import config
 
 
 _client: _redis.Redis | None = None
+_async_client: _aioredis.Redis | None = None
 
 
 def get_client() -> _redis.Redis:
@@ -17,6 +19,14 @@ def get_client() -> _redis.Redis:
     if _client is None:
         _client = _redis.from_url(config.REDIS_URL, decode_responses=True)
     return _client
+
+
+def get_async_client() -> _aioredis.Redis:
+    """asyncio 환경용 lazy-initialized Redis 클라이언트 반환."""
+    global _async_client
+    if _async_client is None:
+        _async_client = _aioredis.from_url(config.REDIS_URL, decode_responses=True)
+    return _async_client
 
 
 def ensure_group(stream: str, group: str) -> None:

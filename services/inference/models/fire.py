@@ -9,6 +9,7 @@ from config import config
 
 
 class FireYOLO:
+    # 소문자 정규화 후 비교 — 모델마다 대소문자 다름 (fire_smoke.pt: 'Fire'/'Smoke', fire.pt: 'fire'/'smoke')
     FIRE_CLASSES = {"fire", "smoke"}
 
     def __init__(self) -> None:
@@ -25,10 +26,11 @@ class FireYOLO:
         for box in results[0].boxes:
             cls_id = int(box.cls[0].item())
             class_name = self.model.names[cls_id]
-            if class_name in self.FIRE_CLASSES:
+            normalized = class_name.lower()   # 'Fire' → 'fire', 'Smoke' → 'smoke'
+            if normalized in self.FIRE_CLASSES:
                 detections.append({
                     "route": "emergency",
-                    "anomaly_type": class_name,
+                    "anomaly_type": normalized,  # 항상 소문자로 저장
                     "danger_level": "critical",
                     "description": "화재 위험 감지",
                     "confidence": round(float(box.conf[0].item()), 4),

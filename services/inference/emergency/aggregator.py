@@ -117,6 +117,7 @@ def _pixel_motion_ok(frame: np.ndarray, bbox: list[float], buf: deque) -> bool:
     buf.append(small)
 
     if len(buf) < 2:
+        logger.info("[emergency] 화재 픽셀 차분 버퍼 준비 중 (첫 프레임 수집)")
         return False
 
     x1, y1, x2, y2 = (int(c * scale) for c in bbox[:4])
@@ -132,7 +133,13 @@ def _pixel_motion_ok(frame: np.ndarray, bbox: list[float], buf: deque) -> bool:
         return True
 
     diff = float(np.mean(np.abs(curr - prev)))
-    return diff >= config.FIRE_PIXEL_DIFF_THRESH
+    ok = diff >= config.FIRE_PIXEL_DIFF_THRESH
+    if not ok:
+        logger.info(
+            "[emergency] 화재 픽셀 변화 기각: diff=%.2f < threshold=%.2f (정적 이미지 판정)",
+            diff, config.FIRE_PIXEL_DIFF_THRESH,
+        )
+    return ok
 
 
 def _handle_fire(
@@ -141,13 +148,21 @@ def _handle_fire(
     det: dict,
     fire_frame_buffers: dict[str, deque],
 ) -> None:
-    """픽셀 차분으로 정적 오탐 제거 후 FIRE_DEDUP_SEC 안에 1회만 발행."""
+    """FIRE_DEDUP_SEC 안에 같은 (camera, type) 1회만 발행.
+
+    픽셀 차분 필터(FIRE_PIXEL_DIFF_THRESH)는 YOLO가 정적 이미지를 탐지하는
+    오탐을 줄이기 위해 설계됐지만, 실제 화재 영상에서도 연속 프레임 간
+    차분이 임계값 이하일 경우 미탐을 유발한다.
+    현재는 YOLO confidence(FIRE_CONF=0.15)만으로 필터링하며,
+    픽셀 차분은 참고용 로그만 남긴다.
+    """
     bbox = det.get("bbox")
-    if job.frame is not None and bbox:
+    if job.frame is not None and bbox and config.FIRE_PIXEL_DIFF_THRESH > 0:
         fire_frame_buffers.setdefault(job.camera_id, deque(maxlen=config.FIRE_PIXEL_HISTORY))
-        if not _pixel_motion_ok(job.frame, bbox, fire_frame_buffers[job.camera_id]):
-            logger.debug("[emergency] 화재 픽셀 변화 없음 → 오탐 기각: camera=%s", job.camera_id)
-            return
+        ok = _pixel_motion_ok(job.frame, bbox, fire_frame_buffers[job.camera_id])
+        if not ok:
+            logger.info("[emergency] 픽셀 차분 미달 (참고용, 탐지는 계속): camera=%s", job.camera_id)
+            # FIRE_PIXEL_DIFF_THRESH=0 이면 이 블록 자체 진입 안 함 → 필터 완전 비활성
 
     key = (job.camera_id, det.get("anomaly_type", ""))
     now = time.time()
@@ -168,6 +183,8 @@ def _publish_emergency(job: FrameJob, det: dict) -> None:
         "timestamp": job.timestamp,
         "frame_path": job.frame_path,
     }, maxlen=config.ALERTS_MAXLEN)
+    # alerts 스트림 발행만 담당 (WebSocket toast + Slack 알림용).
+    # DB 저장은 VLM(events 스트림)이 담당하므로 dedup 키를 설정하지 않는다.
 
 
 def _handle_fallen(

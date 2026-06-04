@@ -3,8 +3,8 @@
 """
 Redis 스트림 구독 워커.
 
-alerts(emergency), events(general) 두 스트림을 asyncio.gather로 동시에 구독하며,
-메시지가 도착하면 OpenAI 임베딩을 생성해 PostgreSQL event_logs 테이블에 저장한다.
+events(VLM 결과) 스트림만 구독해 임베딩을 생성하고 PostgreSQL event_logs 테이블에 저장한다.
+alerts(YOLO)는 notification과 ws.py가 자체적으로 처리하므로 backend는 보지 않는다.
 진입점: run_worker() — main.py lifespan에서 asyncio.create_task로 실행된다.
 """
 
