@@ -36,7 +36,8 @@ class Settings(BaseSettings):
 
     # YOLO 공통
     DEVICE: str = "cpu"
-    YOLO_IMGSZ: int = 320   # CPU 추론 속도 우선: 640→320 약 4배 빠름
+    YOLO_IMGSZ: int = 320   # Fire 등 일반 YOLO 추론용 (CPU 속도 우선)
+    POSE_IMGSZ: int = 640   # Pose는 키포인트 정밀도를 위해 별도 해상도 사용
 
     # Fire
     FIRE_MODEL_PATH: str = "models/fire_smoke.pt"
@@ -48,8 +49,10 @@ class Settings(BaseSettings):
     POSE_MODEL_PATH: str = "models/yolo26m-pose.pt"
     POSE_CONF: float = 0.5
     POSE_KEYPOINT_CONF: float = 0.3
-    FALL_TORSO_ANGLE_THRESH: float = 55.0
+    FALL_TORSO_ANGLE_THRESH: float = 45.0   # 옆 낙상: torso 기울기 임계값 (기존 55→45)
     FALL_BBOX_RATIO_THRESH: float = 1.3
+    FALL_HEIGHT_DROP_RATIO: float = 0.5     # 정면 낙상: bbox 높이가 최근 최대의 50% 이하로 급감
+    FALL_HEIGHT_HISTORY_SEC: float = 3.0    # 높이 비교 윈도우 (초)
 
     # Emergency
     FRAME_RESULT_TIMEOUT_SEC: float = 30.0  # CPU 추론 지연 대비 (640→320 후 ~1-2s/frame)

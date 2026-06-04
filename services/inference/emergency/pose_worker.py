@@ -27,10 +27,14 @@ def run(
             break
         try:
             if job.frame is None:
+                logger.warning("[emergency.pose] frame=None (파일 없음?): camera=%s path=%s",
+                               job.camera_id, job.frame_path)
                 detections = []
             else:
                 h, w = job.frame.shape[:2]
-                detections = model.predict(job.frame, h, w)
+                detections = model.predict(job.frame, h, w, camera_id=job.camera_id)
+                logger.info("[emergency.pose] camera=%s detections=%d frame=%dx%d",
+                            job.camera_id, len(detections), w, h)
             result = ModelResult(job.msg_id, "pose", detections)
         except Exception as e:
             logger.error("[emergency.pose] msg_id=%s error: %s", job.msg_id, e)
