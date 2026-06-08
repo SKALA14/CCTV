@@ -38,6 +38,30 @@
 
       <div class="flex-1"></div>
 
+      <!-- 사용자 정보 + 로그아웃 -->
+      <div v-if="authStore.isLoggedIn" class="px-2 w-full mb-1">
+        <div class="mb-2" style="border-top: 1px solid var(--border);"></div>
+        <!-- 사용자 역할 배지 -->
+        <div class="flex justify-center mb-1">
+          <span
+            class="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider"
+            :style="authStore.isAdmin
+              ? 'background: #7f1d1d; color: #fca5a5;'
+              : 'background: #1f2937; color: #9ca3af;'"
+          >{{ authStore.isAdmin ? 'ADMIN' : 'VIEW' }}</span>
+        </div>
+        <button
+          class="flex flex-col items-center gap-1 w-full py-2.5 rounded-xl text-[9px] font-semibold transition-colors"
+          style="background: var(--bg-elevated); color: var(--text-muted);"
+          @click="handleLogout"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
+          </svg>
+          <span>로그아웃</span>
+        </button>
+      </div>
+
       <!-- 테마 토글 -->
       <div class="px-2 w-full">
         <div class="mb-2" style="border-top: 1px solid var(--border);"></div>
@@ -81,7 +105,7 @@
 
 <script setup>
 import { ref, computed, provide, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import AppNav from './components/layout/AppNav.vue'
 import DashboardView from './views/DashboardView.vue'
@@ -91,13 +115,22 @@ import { useChannelStore } from './stores/channelStore.js'
 import { MAX_CHANNELS } from './constants/events.js'
 import { useTheme } from './composables/useTheme.js'
 import { getChannels } from './api/channels.js'
+import { useAuthStore } from './stores/authStore.js'
 
 useWebSocket()
 
 const { isDark, toggle } = useTheme()
 
 const route = useRoute()
+const router = useRouter()
 const isDashboard = computed(() => route.path === '/')
+
+const authStore = useAuthStore()
+
+async function handleLogout() {
+  await authStore.logout()
+  router.replace({ name: 'login' })
+}
 
 const channelStore = useChannelStore()
 const { slots } = storeToRefs(channelStore)
