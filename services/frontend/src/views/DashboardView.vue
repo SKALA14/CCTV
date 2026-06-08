@@ -80,7 +80,7 @@ const { notifHistory } = storeToRefs(eventStore)
 
 const activeCount = computed(() => slots.value.filter(Boolean).length)
 const historyCount = computed(() => notifHistory.value.length)
-const panelOpen = ref(true)
+const panelOpen = ref(false)
 
 // 라이브 시계
 const clock = ref('')

@@ -40,7 +40,7 @@
       </div>
     </div>
 
-    <div class="hover-actions">
+    <div v-if="isAdmin" class="hover-actions">
       <button class="hover-btn" @click.stop="$emit('edit', channel)">수정</button>
       <button class="hover-btn" @click.stop="$emit('remove', channel.slot)">삭제</button>
     </div>
@@ -61,9 +61,11 @@ import { useWebRTC } from '../../composables/useWebRTC.js'
 import { useWebRTCPublish } from '../../composables/useWebRTCPublish.js'
 import { useChannelStore } from '../../stores/channelStore.js'
 import { useEventStore } from '../../stores/eventStore.js'
+import { useAuthStore } from '../../stores/authStore.js'
 import { MEDIAMTX_URL } from '../../constants/mediamtx.js'
 
 const props = defineProps({ channel: Object })
+const { isAdmin } = useAuthStore()
 defineEmits(['edit', 'remove'])
 
 const channelStore = useChannelStore()

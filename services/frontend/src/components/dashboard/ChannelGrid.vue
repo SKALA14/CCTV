@@ -10,7 +10,8 @@
       <div
         v-else
         class="add-slot"
-        @click="$emit('add', i - 1)"
+        :style="!isAdmin ? 'cursor: default; opacity: 0.4;' : ''"
+        @click="isAdmin && $emit('add', i - 1)"
       >
         <span class="text-5xl font-thin text-[#3a3a3c]">+</span>
         <span class="text-sm text-[#636366] mt-1">채널 추가</span>
@@ -22,7 +23,10 @@
 
 <script setup>
 import ChannelCard from './ChannelCard.vue'
+import { useAuthStore } from '../../stores/authStore.js'
 
 defineProps({ slots: Array })
 defineEmits(['add', 'edit', 'remove'])
+
+const { isAdmin } = useAuthStore()
 </script>
