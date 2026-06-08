@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import config
 from app.db.session import get_db
+from app.api.deps import get_current_user
 from app.db.models import EventLog, CctvChannel
 from app.api.schemas import EventLogRead, EventListResponse
 from app.api.time_parser import parse_time_expression
@@ -118,6 +119,7 @@ async def list_events(
     skip:  int = Query(0,  ge=0),
     limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
+    _user: dict = Depends(get_current_user),   # 인증 필요
 ):
     query = select(EventLog)
 
@@ -169,6 +171,7 @@ async def search_events(
     end_date:        Optional[datetime] = Query(None),
     skip_time_parse: bool = Query(False),
     db: AsyncSession = Depends(get_db),
+    _user: dict = Depends(get_current_user),   # 인증 필요
 ):
     if skip_time_parse:
         cleaned_query, active_start, active_end, applied_filter = q, None, None, None
@@ -264,6 +267,7 @@ async def search_events(
 async def get_event(
     event_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
+    _user: dict = Depends(get_current_user),   # 인증 필요
 ):
     event = await db.get(EventLog, event_id)
     if not event:

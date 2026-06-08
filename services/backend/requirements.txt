@@ -11,3 +11,5 @@ opencv-python-headless
 pdfplumber
 openpyxl
 python-multipart
+python-jose[cryptography]
+slowapi

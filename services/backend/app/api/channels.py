@@ -5,11 +5,12 @@ from typing import Any
 
 import httpx
 import redis.asyncio as aioredis
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import delete as sa_delete, update as sa_update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from app.api.deps import get_current_user, require_admin
 from app.api.agent.instruction_agent import analyze_instruction
 from app.config import config
 from app.db.session import AsyncSessionLocal
@@ -98,12 +99,17 @@ async def _mediamtx_delete(channel_name: str) -> None:
 
 
 @router.get("")
-async def list_channels() -> list[dict]:
+async def list_channels(
+    _user: dict = Depends(get_current_user),   # viewer 이상
+) -> list[dict]:
     return list(_store.values())
 
 
 @router.post("", status_code=201)
-async def create_channel(body: ChannelCreate) -> dict:
+async def create_channel(
+    body: ChannelCreate,
+    _user: dict = Depends(require_admin),   # admin만 허용
+) -> dict:
     if body.channelName in _store:
         raise HTTPException(status_code=409, detail="이미 등록된 channelName입니다.")
 
@@ -175,7 +181,11 @@ async def create_channel(body: ChannelCreate) -> dict:
 
 
 @router.put("/{channel_name}")
-async def update_channel(channel_name: str, body: ChannelUpdate) -> dict:
+async def update_channel(
+    channel_name: str,
+    body: ChannelUpdate,
+    _user: dict = Depends(require_admin),   # admin만 허용
+) -> dict:
     if channel_name not in _store:
         raise HTTPException(status_code=404, detail="채널을 찾을 수 없습니다.")
 
@@ -234,7 +244,10 @@ async def update_channel(channel_name: str, body: ChannelUpdate) -> dict:
 
 
 @router.delete("/{channel_name}", status_code=204)
-async def delete_channel(channel_name: str) -> None:
+async def delete_channel(
+    channel_name: str,
+    _user: dict = Depends(require_admin),   # admin만 허용
+) -> None:
     if channel_name not in _store:
         raise HTTPException(status_code=404, detail="채널을 찾을 수 없습니다.")
 
@@ -269,7 +282,7 @@ class InstructionConfirmRequest(BaseModel):
 
 
 @router.post("/{camera_id}/instruction/analyze")
-async def analyze_channel_instruction(camera_id: str, body: InstructionAnalyzeRequest) -> dict:
+async def analyze_channel_instruction(camera_id: str, body: InstructionAnalyzeRequest, _user: dict = Depends(require_admin)) -> dict:
     """채널별 자유 텍스트를 에이전트로 분석해 static/dynamic 초안 반환."""
     try:
         result = await analyze_instruction(body.text)
@@ -284,7 +297,7 @@ async def analyze_channel_instruction(camera_id: str, body: InstructionAnalyzeRe
 
 
 @router.patch("/{camera_id}/instruction/confirm")
-async def confirm_channel_instruction(camera_id: str, body: InstructionConfirmRequest) -> dict:
+async def confirm_channel_instruction(camera_id: str, body: InstructionConfirmRequest, _user: dict = Depends(require_admin)) -> dict:
     """확정된 채널별 체크리스트를 Redis camera_instruction:{camera_id}에 저장.
 
     inference의 render_prompt()가 이 키를 읽어 VLM 프롬프트에 주입한다.
