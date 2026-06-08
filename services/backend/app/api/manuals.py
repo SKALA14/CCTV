@@ -7,9 +7,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import redis.asyncio as aioredis
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
+from app.api.deps import require_admin
 from app.api.agent.checklist_agent import analyze_pdf, refine_checklist, subset_by_zones, normalize_categories
 from app.api.agent.pdf_parser import extract_text_from_pdf
 from app.config import config
@@ -88,14 +89,19 @@ def _build_categories_map(items: list[str], categories: list) -> dict[str, str]:
 
 
 @router.get("")
-async def list_manuals() -> list[dict]:
+async def list_manuals(
+    _user: dict = Depends(require_admin),   # admin만 허용
+) -> list[dict]:
     """업로드된 매뉴얼 파일 메타데이터 목록."""
     raw = await _get_redis().get(_MANUALS_KEY)
     return json.loads(raw) if raw else []
 
 
 @router.post("")
-async def upload_manual(file: UploadFile = File(...)) -> dict:
+async def upload_manual(
+    file: UploadFile = File(...),
+    _user: dict = Depends(require_admin),   # admin만 허용
+) -> dict:
     """매뉴얼 파일 메타데이터를 Redis에 저장."""
     meta = {
         "id": str(uuid.uuid4()),
@@ -116,7 +122,10 @@ async def upload_manual(file: UploadFile = File(...)) -> dict:
 
 
 @router.delete("/{file_id}")
-async def delete_manual(file_id: str) -> dict:
+async def delete_manual(
+    file_id: str,
+    _user: dict = Depends(require_admin),   # admin만 허용
+) -> dict:
     """매뉴얼 파일 메타데이터를 Redis에서 삭제."""
     r = _get_redis()
     raw = await r.get(_MANUALS_KEY)
@@ -127,7 +136,9 @@ async def delete_manual(file_id: str) -> dict:
 
 
 @router.get("/checklist")
-async def get_current_checklist() -> dict:
+async def get_current_checklist(
+    _user: dict = Depends(require_admin),   # admin만 허용
+) -> dict:
     """현재 적용 중인 글로벌 체크리스트 파일 내용 반환."""
     prompts_dir = Path(config.PROMPTS_DIR)
     static_path = prompts_dir / _STATIC_FILE
@@ -139,7 +150,10 @@ async def get_current_checklist() -> dict:
 
 
 @router.post("/analyze")
-async def analyze_manual(file: UploadFile = File(...)) -> dict:
+async def analyze_manual(
+    file: UploadFile = File(...),
+    _user: dict = Depends(require_admin),   # admin만 허용
+) -> dict:
     """PDF 업로드 → 체크리스트 분석. zones.json이 있으면 구역별 subset도 반환."""
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="PDF 파일만 분석 가능합니다.")
@@ -204,7 +218,10 @@ async def analyze_manual(file: UploadFile = File(...)) -> dict:
 
 
 @router.post("/refine")
-async def refine_manual(body: RefineRequest) -> dict:
+async def refine_manual(
+    body: RefineRequest,
+    _user: dict = Depends(require_admin),   # admin만 허용
+) -> dict:
     """피드백 반영해 체크리스트 재생성."""
     try:
         result = await refine_checklist(body.session_id, body.feedback)
@@ -259,7 +276,10 @@ def _parse_zones(content: bytes, filename: str) -> list[dict]:
 
 
 @router.post("/zones")
-async def register_zones(zones_file: UploadFile = File(...)) -> dict:
+async def register_zones(
+    zones_file: UploadFile = File(...),
+    _user: dict = Depends(require_admin),   # admin만 허용
+) -> dict:
     """구역 파일만 업로드해 zones.json 저장 + 비고를 Redis에 저장. LLM 호출 없음."""
     content = await zones_file.read()
     try:
@@ -279,7 +299,9 @@ async def register_zones(zones_file: UploadFile = File(...)) -> dict:
 
 
 @router.get("/zones")
-async def list_zones() -> list[str]:
+async def list_zones(
+    _user: dict = Depends(require_admin),   # admin만 허용
+) -> list[str]:
     """저장된 구역 이름 목록 반환."""
     prompts_dir = Path(config.PROMPTS_DIR)
     zones_file = prompts_dir / "zones.json"
@@ -290,7 +312,10 @@ async def list_zones() -> list[str]:
 
 
 @router.post("/confirm")
-async def confirm_manual(body: ConfirmRequest) -> dict:
+async def confirm_manual(
+    body: ConfirmRequest,
+    _user: dict = Depends(require_admin),   # admin만 허용
+) -> dict:
     """확정된 체크리스트를 backend/prompts/에 저장.
 
     - 글로벌: {static,dynamic}_checklist.md — 번호 형식 저장
