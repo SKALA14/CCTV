@@ -7,46 +7,47 @@
       class="flex items-center justify-between px-4 py-2.5 flex-shrink-0"
       style="border-bottom: 1px solid var(--border);"
     >
-      <span class="text-[11px] font-semibold tracking-wider uppercase" style="color: var(--text-muted);">이벤트</span>
-      <span
-        v-if="events.length > 0"
-        class="text-[10px] font-semibold px-1.5 py-0.5 rounded"
-        style="background: rgba(220,38,38,0.15); color: #dc2626;"
-      >{{ events.length }}</span>
+      <span class="text-[11px] font-semibold tracking-wider uppercase" style="color: var(--text-muted);">알림 히스토리</span>
+      <button
+        v-if="history.length > 0"
+        class="text-[10px] px-1.5 py-0.5 rounded transition-colors"
+        style="color: var(--text-subtle);"
+        @click="store.clearHistory()"
+      >지우기</button>
     </div>
 
-    <div v-if="events.length === 0" class="flex-1 flex items-center justify-center">
-      <span class="text-xs" style="color: var(--text-subtle);">감지된 이벤트 없음</span>
+    <div v-if="history.length === 0" class="flex-1 flex items-center justify-center">
+      <span class="text-xs" style="color: var(--text-subtle);">알림 없음</span>
     </div>
 
     <div v-else class="flex-1 overflow-y-auto">
       <div
-        v-for="(e, i) in events"
-        :key="i"
+        v-for="n in history"
+        :key="n._notifId"
         class="px-3 py-2.5"
         style="border-bottom: 1px solid var(--border);"
       >
         <div class="flex items-start gap-2">
           <span
             class="mt-[3px] flex-shrink-0 w-1.5 h-1.5 rounded-full"
-            :style="e.pipeline === 'emergency' ? 'background:#dc2626' : 'background:#f59e0b'"
+            :style="n.pipeline === 'emergency' ? 'background:#dc2626' : 'background:#f59e0b'"
           ></span>
           <div class="flex-1 min-w-0">
             <div class="flex items-center justify-between gap-1">
               <span class="text-xs font-medium truncate" style="color: var(--text-primary);">
-                {{ resolveChannelName(e) }}
+                {{ resolveChannelName(n) }}
               </span>
               <span class="text-[10px] flex-shrink-0" style="color: var(--text-subtle);">
-                {{ formatTime(e.timestamp) }}
+                {{ formatTime(n.timestamp) }}
               </span>
             </div>
             <div class="mt-1 flex items-center gap-1.5">
               <span
                 class="text-[10px] px-1.5 py-px rounded font-medium"
-                :class="dangerClass(e.danger_level)"
-              >{{ e.event_type }}</span>
+                :class="dangerClass(n.danger_level)"
+              >{{ n.event_type }}</span>
               <span
-                v-if="e.pipeline === 'emergency'"
+                v-if="n.pipeline === 'emergency'"
                 class="text-[9px] px-1 py-px rounded font-semibold tracking-wide"
                 style="background: rgba(220,38,38,0.12); color: #dc2626;"
               >EMG</span>
@@ -64,19 +65,16 @@ import { storeToRefs } from 'pinia'
 import { useEventStore } from '../../stores/eventStore.js'
 import { useChannels } from '../../composables/useChannels.js'
 
-const { liveEvents } = storeToRefs(useEventStore())
+const store = useEventStore()
+const { notifHistory } = storeToRefs(store)
 const { slots } = useChannels()
 
-const events = computed(() =>
-  liveEvents.value
-    .filter(e => e.danger_level && e.danger_level !== 'none' && e.event_type !== 'normal')
-    .slice(0, 30)
-)
+const history = computed(() => notifHistory.value)
 
-function resolveChannelName(e) {
-  const cameraId = String(e.channel_id || e.camera_id || '')
+function resolveChannelName(n) {
+  const cameraId = String(n.channel_id || n.camera_id || '')
   const ch = slots.value.find(c => c && String(c.camera_id || c.channelName || '') === cameraId)
-  return ch?.name || e.channel_name || cameraId || '알 수 없음'
+  return ch?.name || n.channel_name || cameraId || '알 수 없음'
 }
 
 function formatTime(ts) {

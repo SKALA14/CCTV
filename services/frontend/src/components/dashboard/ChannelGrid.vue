@@ -1,5 +1,5 @@
 <template>
-  <div class="grid grid-cols-2 grid-rows-2 gap-3 p-4" style="height: calc(100vh - 56px);">
+  <div class="grid grid-cols-2 grid-rows-2 gap-3 p-4" style="height: 100%;">
     <template v-for="i in 4" :key="i - 1">
       <ChannelCard
         v-if="slots[i - 1]"
