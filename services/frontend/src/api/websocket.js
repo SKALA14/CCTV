@@ -17,7 +17,15 @@ export function connectWS() {
         console.error('[WS] error', e)
     }
 
-    socket.onclose = () => {
+    socket.onclose = (event) => {
+        if (event.code === 4001) {
+            // JWT 만료/무효 — 재연결 금지, 로그인 페이지로 이동
+            console.warn('[WS] 인증 실패 (4001) — 로그인 페이지로 이동')
+            if (window.location.pathname !== '/login') {
+                window.location.href = '/login'
+            }
+            return
+        }
         setTimeout(connectWS, 3000)
     }
 }
