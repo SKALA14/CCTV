@@ -1,7 +1,8 @@
 <template>
   <div class="flex h-full">
-    <!-- 좌측 사이드바 -->
+    <!-- 좌측 사이드바 (로그인 등 공개 페이지에서는 숨김) -->
     <aside
+      v-if="!route.meta.public"
       class="flex flex-col items-center w-16 border-r flex-shrink-0 py-3"
       style="background: var(--bg-card); border-color: var(--border);"
     >

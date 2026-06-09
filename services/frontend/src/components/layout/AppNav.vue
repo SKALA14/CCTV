@@ -27,5 +27,18 @@
       </svg>
       <span>메뉴얼</span>
     </router-link>
+
+    <router-link v-if="authStore.isSuperadmin" to="/status" class="nav-tab" active-class="active">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M3 3v18h18"/>
+        <path d="M7 14l3-3 3 3 5-5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>현황</span>
+    </router-link>
   </nav>
 </template>
+
+<script setup>
+import { useAuthStore } from '../../stores/authStore.js'
+const authStore = useAuthStore()
+</script>

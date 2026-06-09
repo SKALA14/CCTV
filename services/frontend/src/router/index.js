@@ -7,6 +7,7 @@ import ManualView         from '../views/ManualView.vue'
 import LoginView          from '../views/LoginView.vue'
 import AdminView          from '../views/AdminView.vue'
 import PasswordChangeView from '../views/PasswordChangeView.vue'
+import StatusView         from '../views/StatusView.vue'
 
 const routes = [
     { path: '/login',           name: 'login',           component: LoginView,          meta: { public: true } },
@@ -15,6 +16,7 @@ const routes = [
     { path: '/search/:id',      name: 'clip-detail',      component: ClipDetailView,    props: true },
     { path: '/manual',          name: 'manual',           component: ManualView },
     { path: '/admin',           name: 'admin',            component: AdminView,          meta: { superadminOnly: true } },
+    { path: '/status',          name: 'status',           component: StatusView,         meta: { superadminOnly: true } },
     { path: '/password-change', name: 'password-change',  component: PasswordChangeView },
 ]
 

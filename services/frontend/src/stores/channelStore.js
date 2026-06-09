@@ -1,6 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
+const ALERT_CLEAR_MS = 30_000
+const _alertTimers = new Map()
+
 export const useChannelStore = defineStore('channel', () => {
     const slots = ref([null, null, null, null])
 
@@ -32,5 +35,15 @@ export const useChannelStore = defineStore('channel', () => {
         slots.value = [null, null, null, null]
     }
 
-    return { slots, addChannel, removeChannel, updateChannel, setChannelStatus, resetSlots }
+    // 이벤트가 올 때마다 호출. 30초 동안 새 이벤트 없으면 자동 해제.
+    function setAlertLevel(slot, level) {
+        updateChannel(slot, { alertLevel: level })
+        if (_alertTimers.has(slot)) clearTimeout(_alertTimers.get(slot))
+        _alertTimers.set(slot, setTimeout(() => {
+            updateChannel(slot, { alertLevel: null })
+            _alertTimers.delete(slot)
+        }, ALERT_CLEAR_MS))
+    }
+
+    return { slots, addChannel, removeChannel, updateChannel, setChannelStatus, resetSlots, setAlertLevel }
 })

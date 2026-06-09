@@ -76,6 +76,11 @@ body {
     box-shadow: 0 0 0 1px var(--red-glow);
 }
 
+.channel-card.warning-state {
+    border-color: var(--orange);
+    box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.25);
+}
+
 .video-area {
     position: relative;
     width: 100%;
@@ -105,6 +110,11 @@ body {
     color: #fff;
 }
 
+.badge-warning {
+    background: rgba(245, 158, 11, 0.85);
+    color: #fff;
+}
+
 .badge-ok {
     background: rgba(0, 0, 0, 0.55);
     color: #f5f5f7;
@@ -118,6 +128,10 @@ body {
 
 .badge-alert .status-dot {
     background: #fca5a5;
+}
+
+.badge-warning .status-dot {
+    background: #fde68a;
 }
 
 .badge-ok .status-dot {
@@ -246,6 +260,11 @@ body {
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.02em;
+    color: #fff;
+}
+
+.danger-badge.critical {
+    background: #b91c1c;
     color: #fff;
 }
 

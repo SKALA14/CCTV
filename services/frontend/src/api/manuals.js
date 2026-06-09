@@ -3,9 +3,10 @@ import api from './index.js'
 
 const STORAGE_KEY = 'cctv_manuals'
 
-export async function fetchManuals() {
+export async function fetchManuals(siteId = null) {
   if (DUMMY_MODE) return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
-  return api.get('/manuals').then(r => r.data)
+  const q = siteId ? `?site_id=${encodeURIComponent(siteId)}` : ''
+  return api.get(`/manuals${q}`).then(r => r.data)
 }
 
 export async function uploadManual(file) {
@@ -80,9 +81,16 @@ export async function registerZones(zonesFile) {
   return api.post('/manuals/zones', form).then(r => r.data)
 }
 
-export async function fetchZones() {
+export async function fetchZones(siteId = null) {
   if (DUMMY_MODE) return ['크레인 작업구역', '용접 작업구역', '고소 작업구역']
-  return api.get('/manuals/zones').then(r => r.data)
+  const q = siteId ? `?site_id=${encodeURIComponent(siteId)}` : ''
+  return api.get(`/manuals/zones${q}`).then(r => r.data)
+}
+
+export async function fetchChecklist(siteId = null) {
+  if (DUMMY_MODE) return { static: '', dynamic: '' }
+  const q = siteId ? `?site_id=${encodeURIComponent(siteId)}` : ''
+  return api.get(`/manuals/checklist${q}`).then(r => r.data)
 }
 
 
