@@ -17,49 +17,21 @@
       <!-- 네비게이션 -->
       <AppNav class="w-full" />
 
-      <!-- 채널 추가 버튼 (대시보드에서만) -->
-      <div v-if="isDashboard" class="mt-2 px-2 w-full">
-        <div class="mb-2" style="border-top: 1px solid var(--border);"></div>
-        <button
-          :disabled="isMaxChannels"
-          class="flex flex-col items-center gap-1 w-full py-2.5 rounded-xl transition-all"
-          :class="isMaxChannels
-            ? 'bg-[#2c2c2e] text-[#48484a] cursor-not-allowed'
-            : 'bg-blue-600 text-white hover:bg-blue-500 shadow-lg shadow-blue-900/40'"
-          @click="triggerAddModal"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="12" y1="5" x2="12" y2="19" stroke-linecap="round"/>
-            <line x1="5" y1="12" x2="19" y2="12" stroke-linecap="round"/>
-          </svg>
-          <span class="text-[9px] font-semibold">채널추가</span>
-        </button>
-      </div>
-
       <div class="flex-1"></div>
 
-      <!-- 사용자 정보 + 로그아웃 -->
-      <div v-if="authStore.isLoggedIn" class="px-2 w-full mb-1">
-        <div class="mb-2" style="border-top: 1px solid var(--border);"></div>
-        <!-- 사용자 역할 배지 -->
-        <div class="flex justify-center mb-1">
-          <span
-            class="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider"
-            :style="authStore.isAdmin
-              ? 'background: #7f1d1d; color: #fca5a5;'
-              : 'background: #1f2937; color: #9ca3af;'"
-          >{{ authStore.isAdmin ? 'ADMIN' : 'VIEW' }}</span>
-        </div>
-        <button
-          class="flex flex-col items-center gap-1 w-full py-2.5 rounded-xl text-[9px] font-semibold transition-colors"
-          style="background: var(--bg-elevated); color: var(--text-muted);"
-          @click="handleLogout"
+      <!-- 설정 버튼 -->
+      <div class="px-2 w-full mb-1">
+        <router-link
+          to="/settings"
+          class="nav-tab w-full"
+          active-class="active"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
           </svg>
-          <span>로그아웃</span>
-        </button>
+          <span>설정</span>
+        </router-link>
       </div>
 
       <!-- 테마 토글 -->
@@ -87,7 +59,6 @@
 
     <!-- 우측 메인 영역 -->
     <div class="flex flex-col flex-1 min-w-0">
-      <!-- 라우터 뷰 -->
       <main class="flex-1 overflow-auto" style="position: relative;">
         <div :style="isDashboard ? 'height: 100%' : 'visibility: hidden; position: absolute; inset: 0; pointer-events: none'">
           <DashboardView />
@@ -99,20 +70,18 @@
     </div>
   </div>
 
-  <!-- 우하단 알림 토스트 (어느 페이지에서나 표시) -->
+  <!-- 우하단 알림 토스트 -->
   <NotificationToast />
 </template>
 
 <script setup>
 import { ref, computed, provide, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { storeToRefs } from 'pinia'
+import { useRoute } from 'vue-router'
 import AppNav from './components/layout/AppNav.vue'
 import DashboardView from './views/DashboardView.vue'
 import NotificationToast from './components/dashboard/NotificationToast.vue'
 import { useWebSocket } from './composables/useWebSocket.js'
 import { useChannelStore } from './stores/channelStore.js'
-import { MAX_CHANNELS } from './constants/events.js'
 import { useTheme } from './composables/useTheme.js'
 import { getChannels } from './api/channels.js'
 import { useAuthStore } from './stores/authStore.js'
@@ -122,19 +91,11 @@ useWebSocket()
 const { isDark, toggle } = useTheme()
 
 const route = useRoute()
-const router = useRouter()
 const isDashboard = computed(() => route.path === '/')
 
 const authStore = useAuthStore()
 
-async function handleLogout() {
-  await authStore.logout()
-  router.replace({ name: 'login' })
-}
-
 const channelStore = useChannelStore()
-const { slots } = storeToRefs(channelStore)
-const isMaxChannels = computed(() => slots.value.every(s => s !== null))
 
 onMounted(async () => {
   try {
@@ -151,9 +112,4 @@ onMounted(async () => {
 
 const addModalSignal = ref(false)
 provide('addModalSignal', addModalSignal)
-
-function triggerAddModal() {
-  if (isMaxChannels.value) return
-  addModalSignal.value = true
-}
 </script>

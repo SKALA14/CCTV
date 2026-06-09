@@ -5,6 +5,7 @@ import SearchView     from '../views/SearchView.vue'
 import ClipDetailView from '../views/ClipDetailView.vue'
 import ManualView     from '../views/ManualView.vue'
 import LoginView      from '../views/LoginView.vue'
+import SettingsView   from '../views/SettingsView.vue'
 
 const routes = [
     { path: '/login', name: 'login', component: LoginView, meta: { public: true } },
@@ -16,7 +17,8 @@ const routes = [
         component: ClipDetailView,
         props: true,
     },
-    { path: '/manual', name: 'manual', component: ManualView },
+    { path: '/manual',   name: 'manual',   component: ManualView },
+    { path: '/settings', name: 'settings', component: SettingsView },
 ]
 
 const router = createRouter({

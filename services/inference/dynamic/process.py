@@ -1,5 +1,5 @@
 # services/inference/dynamic/process.py
-"""Dynamic 프로세스: Optical Flow로 움직임 후보를 모아 VLM 호출."""
+"""Dynamic 프로세스: Dual-EMA Trigger로 VLM 호출 후보를 선별."""
 
 from __future__ import annotations
 
@@ -12,7 +12,8 @@ import cv2
 from config import config
 from dynamic import vlm_worker
 from dynamic.buffer import DynamicBuffer
-from dynamic.optical_flow import OpticalFlowDetector
+from dynamic.optical_flow import FrameFeatureExtractor
+from dynamic.trigger import RealtimeTriggerSelector, TriggerConfig
 from redis_client import xack, xreadgroup
 
 logger = logging.getLogger(__name__)
@@ -25,7 +26,11 @@ def run() -> None:
     """Dynamic 메인 루프."""
     logging.basicConfig(level=logging.INFO, format="%(processName)s [%(levelname)s] %(message)s")
 
-    flow_detector = OpticalFlowDetector()
+    trigger_config = TriggerConfig()
+    feature_extractor = FrameFeatureExtractor()
+    selectors: dict[str, RealtimeTriggerSelector] = {}
+    selector_start_ts: dict[str, float] = {}
+
     buffer = DynamicBuffer()
     buffer_lock = threading.Lock()
 
@@ -46,8 +51,11 @@ def run() -> None:
                     count=1, block_ms=100,
                 )
                 for msg_id, fields in messages:
-                    _handle_message(msg_id, fields, flow_detector, buffer, buffer_lock)
-
+                    _handle_message(
+                        msg_id, fields,
+                        feature_extractor, selectors, selector_start_ts, trigger_config,
+                        buffer, buffer_lock,
+                    )
                 _flush_expired(buffer, buffer_lock, job_queue)
             except Exception as e:
                 logger.error("[dynamic] loop error: %s", e)
@@ -59,7 +67,10 @@ def run() -> None:
 def _handle_message(
     msg_id: str,
     fields: dict,
-    flow_detector: OpticalFlowDetector,
+    feature_extractor: FrameFeatureExtractor,
+    selectors: dict[str, RealtimeTriggerSelector],
+    selector_start_ts: dict[str, float],
+    trigger_config: TriggerConfig,
     buffer: DynamicBuffer,
     buffer_lock: threading.Lock,
 ) -> None:
@@ -73,8 +84,20 @@ def _handle_message(
         xack(config.FRAMES_STREAM, config.DYNAMIC_GROUP, msg_id)
         return
 
-    flow_score = flow_detector.compute(camera_id, frame)
-    if flow_score < config.FLOW_THRESHOLD:
+    try:
+        abs_ts = float(timestamp)
+    except (ValueError, TypeError):
+        abs_ts = 0.0
+
+    if camera_id not in selector_start_ts:
+        selector_start_ts[camera_id] = abs_ts
+        selectors[camera_id] = RealtimeTriggerSelector(trigger_config)
+    rel_ts = abs_ts - selector_start_ts[camera_id]
+
+    features = feature_extractor.extract(camera_id, frame, rel_ts)
+    result = selectors[camera_id].process(features)
+
+    if not result["admitted_trigger"]:
         xack(config.FRAMES_STREAM, config.DYNAMIC_GROUP, msg_id)
         return
 

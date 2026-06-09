@@ -1,8 +1,8 @@
 <template>
-  <div class="channel-card" :class="{ 'alert-state': isAlert }">
-    <div class="status-badge" :class="isAlert ? 'badge-alert' : 'badge-ok'">
+  <div class="channel-card" :class="cardStateClass">
+    <div class="status-badge" :class="badgeClass">
       <span class="status-dot"></span>
-      {{ isAlert ? channel.event_type : '정상' }}
+      {{ badgeText }}
     </div>
 
     <div class="video-area">
@@ -40,27 +40,71 @@
       </div>
     </div>
 
-    <div class="hover-actions">
+    <div v-if="isAdmin" class="hover-actions">
       <button class="hover-btn" @click.stop="$emit('edit', channel)">수정</button>
       <button class="hover-btn" @click.stop="$emit('remove', channel.slot)">삭제</button>
     </div>
 
-    <div class="name-strip">{{ channel.name }}</div>
+    <div class="name-strip">
+      <div>{{ channel.name }}</div>
+      <div v-if="lastEvent" class="text-[10px] mt-0.5" style="color: rgba(255,255,255,0.45);">
+        {{ lastEvent.event_type }} · {{ formatEventTime(lastEvent.timestamp) }}
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, onUnmounted, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useWebRTC } from '../../composables/useWebRTC.js'
 import { useWebRTCPublish } from '../../composables/useWebRTCPublish.js'
 import { useChannelStore } from '../../stores/channelStore.js'
+import { useEventStore } from '../../stores/eventStore.js'
+import { useAuthStore } from '../../stores/authStore.js'
 import { MEDIAMTX_URL } from '../../constants/mediamtx.js'
 
 const props = defineProps({ channel: Object })
+const { isAdmin } = useAuthStore()
 defineEmits(['edit', 'remove'])
 
 const channelStore = useChannelStore()
-const isAlert  = computed(() => props.channel.status === 'alert')
+const { notifHistory } = storeToRefs(useEventStore())
+
+const alertLevel = computed(() => props.channel.alertLevel ?? null)
+
+const cardStateClass = computed(() => {
+  if (alertLevel.value === 'emergency') return 'alert-state'
+  if (alertLevel.value === 'warning') return 'warning-state'
+  return ''
+})
+
+const badgeClass = computed(() => {
+  if (alertLevel.value === 'emergency') return 'badge-alert'
+  if (alertLevel.value === 'warning') return 'badge-warning'
+  return 'badge-ok'
+})
+
+const badgeText = computed(() => {
+  if (alertLevel.value === 'emergency') return '위험'
+  if (alertLevel.value === 'warning') return '경고'
+  return '정상'
+})
+
+// name-strip 마지막 이벤트 표시용
+const lastEvent = computed(() => {
+  const cameraId = String(props.channel.camera_id || props.channel.channelName || '')
+  return notifHistory.value.find(e =>
+    String(e.channel_id || e.camera_id || '') === cameraId
+  ) ?? null
+})
+
+function formatEventTime(ts) {
+  if (!ts) return ''
+  const n = Number(ts)
+  const d = isNaN(n) ? new Date(ts) : new Date(n * (String(ts).length <= 10 ? 1000 : 1))
+  return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+}
 const isWebcam = computed(() => props.channel.sourceType === 'webcam' || props.channel.url === 'webcam')
 
 function extractYoutubeId(url) {
