@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from passlib.context import CryptContext
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_admin
 from app.db.session import get_db
 from app.db.models import User, Site
 
@@ -158,7 +158,7 @@ async def update_user(
     user_id: uuid.UUID,
     body: UserUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     await _assert_site_access(site_id, current_user, db)
     user = await db.get(User, user_id)
@@ -191,7 +191,7 @@ async def delete_user(
     site_id: uuid.UUID,
     user_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     await _assert_site_access(site_id, current_user, db)
     user = await db.get(User, user_id)
