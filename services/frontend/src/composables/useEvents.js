@@ -26,7 +26,7 @@ export function useEvents() {
     }
   }
 
-  async function search(query, channelId = null, startDate = null, endDate = null, skipTimeParse = false) {
+  async function search(query, channelId = null, startDate = null, endDate = null, skipTimeParse = false, siteId = null) {
     if (DUMMY_MODE) {
       const q = (query || '').trim().toLowerCase()
       events.value = DUMMY_EVENTS.filter(ev => {
@@ -41,7 +41,7 @@ export function useEvents() {
     error.value         = null
     appliedFilter.value = null
     try {
-      const res           = await searchEvents(query, channelId, startDate, endDate, skipTimeParse)
+      const res           = await searchEvents(query, channelId, startDate, endDate, skipTimeParse, siteId)
       events.value        = Array.isArray(res) ? res : (res.events ?? [])
       appliedFilter.value = res.applied_filter ?? null
     } catch (e) {
