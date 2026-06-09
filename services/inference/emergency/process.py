@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import queue
 import threading
+import time
 from collections import deque
 
 import cv2
@@ -65,6 +66,7 @@ def run() -> None:
                         camera_id=fields.get("camera_id", ""),
                         frame_path=frame_path,
                         timestamp=fields.get("timestamp", ""),
+                        site_id=fields.get("site_id", ""),
                         frame=cv2.imread(frame_path),
                     )
                     aggregator.dispatch_frame(job, model_queues, pending)
@@ -73,6 +75,7 @@ def run() -> None:
                 aggregator.finalize_ready_frames(pending)
             except Exception as e:
                 logger.error("[emergency] loop error: %s", e)
+                time.sleep(1)   # 지속적 오류(Redis 끊김 등) 시 CPU 폭주 방지 백오프
     finally:
         for q in model_queues.values():
             q.put(None)

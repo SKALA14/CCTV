@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import queue
 import threading
+import time
 
 import cv2
 
@@ -51,6 +52,7 @@ def run() -> None:
                 _flush_expired(buffer, buffer_lock, job_queue)
             except Exception as e:
                 logger.error("[dynamic] loop error: %s", e)
+                time.sleep(1)   # 지속적 오류(Redis 끊김 등) 시 CPU 폭주 방지 백오프
     finally:
         job_queue.put(None)
         thread.join()

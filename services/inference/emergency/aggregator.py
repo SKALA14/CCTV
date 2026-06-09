@@ -156,15 +156,17 @@ def _handle_fire(
     현재는 YOLO confidence(FIRE_CONF=0.15)만으로 필터링하며,
     픽셀 차분은 참고용 로그만 남긴다.
     """
+    # 현장별 격리: 같은 cam_id를 쓰는 두 현장이 서로의 버퍼/dedup을 침범하지 않도록 site 포함
+    cam_key = f"{job.site_id}:{job.camera_id}"
     bbox = det.get("bbox")
     if job.frame is not None and bbox and config.FIRE_PIXEL_DIFF_THRESH > 0:
-        fire_frame_buffers.setdefault(job.camera_id, deque(maxlen=config.FIRE_PIXEL_HISTORY))
-        ok = _pixel_motion_ok(job.frame, bbox, fire_frame_buffers[job.camera_id])
+        fire_frame_buffers.setdefault(cam_key, deque(maxlen=config.FIRE_PIXEL_HISTORY))
+        ok = _pixel_motion_ok(job.frame, bbox, fire_frame_buffers[cam_key])
         if not ok:
-            logger.info("[emergency] 픽셀 차분 미달 (참고용, 탐지는 계속): camera=%s", job.camera_id)
+            logger.info("[emergency] 픽셀 차분 미달 (참고용, 탐지는 계속): camera=%s", cam_key)
             # FIRE_PIXEL_DIFF_THRESH=0 이면 이 블록 자체 진입 안 함 → 필터 완전 비활성
 
-    key = (job.camera_id, det.get("anomaly_type", ""))
+    key = (job.site_id, job.camera_id, det.get("anomaly_type", ""))
     now = time.time()
     if now - fire_last_published.get(key, 0.0) < config.FIRE_DEDUP_SEC:
         return
@@ -173,9 +175,11 @@ def _handle_fire(
 
 
 def _publish_emergency(job: FrameJob, det: dict) -> None:
-    logger.warning("[emergency] alerts 발행: camera=%s type=%s", job.camera_id, det.get("anomaly_type"))
+    logger.warning("[emergency] alerts 발행: site=%s camera=%s type=%s",
+                   job.site_id, job.camera_id, det.get("anomaly_type"))
     xadd(config.ALERTS_STREAM, {
         "camera_id": job.camera_id,
+        "site_id": job.site_id,   # 현장 격리 — ws.py 토스트 라우팅 + worker DB 저장에 사용
         "anomaly_type": det.get("anomaly_type", "unknown"),
         "danger_level": det.get("danger_level", "critical"),
         "description": det.get("description", "긴급 이상상황 감지"),
@@ -183,8 +187,7 @@ def _publish_emergency(job: FrameJob, det: dict) -> None:
         "timestamp": job.timestamp,
         "frame_path": job.frame_path,
     }, maxlen=config.ALERTS_MAXLEN)
-    # alerts 스트림 발행만 담당 (WebSocket toast + Slack 알림용).
-    # DB 저장은 VLM(events 스트림)이 담당하므로 dedup 키를 설정하지 않는다.
+    # alerts 스트림 발행만 담당 (WebSocket toast + Slack 알림 + worker DB 저장용).
 
 
 def _handle_fallen(
@@ -192,18 +195,20 @@ def _handle_fallen(
     job: FrameJob,
     det: dict,
 ) -> None:
-    """camera별 윈도우에서 FALL_MIN_FRAMES 이상 누적되면 alerts 발행."""
-    fallen_timestamps.setdefault(job.camera_id, deque())
+    """현장+camera별 윈도우에서 FALL_MIN_FRAMES 이상 누적되면 alerts 발행."""
+    # 현장별 격리: 같은 cam_id를 쓰는 두 현장의 낙상 카운트가 섞이지 않도록 site 포함
+    cam_key = f"{job.site_id}:{job.camera_id}"
+    fallen_timestamps.setdefault(cam_key, deque())
     now = time.time()
-    fallen_timestamps[job.camera_id].append(now)
+    fallen_timestamps[cam_key].append(now)
 
     cutoff = now - config.FALL_WINDOW_SEC
-    while fallen_timestamps[job.camera_id] and fallen_timestamps[job.camera_id][0] < cutoff:
-        fallen_timestamps[job.camera_id].popleft()
+    while fallen_timestamps[cam_key] and fallen_timestamps[cam_key][0] < cutoff:
+        fallen_timestamps[cam_key].popleft()
 
-    count = len(fallen_timestamps[job.camera_id])
+    count = len(fallen_timestamps[cam_key])
     logger.info("[emergency] 낙상 누적: camera=%s count=%d/%d",
-                job.camera_id, count, config.FALL_MIN_FRAMES)
+                cam_key, count, config.FALL_MIN_FRAMES)
     if count >= config.FALL_MIN_FRAMES:
         _publish_emergency(job, det)
-        fallen_timestamps[job.camera_id].clear()
+        fallen_timestamps[cam_key].clear()

@@ -153,19 +153,33 @@ def _get_template(filename: str) -> Template:
     return _template_cache[filename]
 
 
-def _load_checklist(track: str, camera_id: str = "") -> str:
-    """체크리스트 파일을 매번 디스크에서 읽어 반환.
-    camera_id가 있으면 구역별 파일 우선, 없으면 글로벌 fallback.
+def _split_cam_key(camera_id: str) -> tuple[str, str]:
+    """compound cam_key '{site_id}:{cam_id}'를 (site_id, cam_id)로 분리.
+    콜론 없으면 ('', camera_id) — 레거시 글로벌 경로 fallback.
     """
-    checklist_dir = Path(config.CHECKLIST_DIR)
+    if ":" in camera_id:
+        site_id, cam_id = camera_id.split(":", 1)
+        return site_id, cam_id
+    return "", camera_id
+
+
+def _load_checklist(track: str, camera_id: str = "") -> str:
+    """체크리스트 파일을 매번 디스크에서 읽어 반환 (현장별).
+    camera_id는 compound '{site_id}:{cam_id}'. site_id가 있으면 CHECKLIST_DIR/{site_id}/ 하위.
+    구역(zone) 있으면 구역별 파일 우선, 없으면 글로벌 체크리스트 fallback.
+    """
+    site_id, _ = _split_cam_key(camera_id)
+    base = Path(config.CHECKLIST_DIR)
+    if site_id:
+        base = base / site_id
     if camera_id:
         zone = get_client().get(f"camera:{camera_id}:zone") or ""
         if zone:
             safe = zone.replace(" ", "_")
-            zone_path = checklist_dir / f"zone_{safe}_{track}.md"
+            zone_path = base / f"zone_{safe}_{track}.md"
             if zone_path.exists():
                 return zone_path.read_text(encoding="utf-8")
-    path = checklist_dir / f"{track}_checklist.md"
+    path = base / f"{track}_checklist.md"
     if not path.exists():
         logger.warning("체크리스트 파일 없음: %s", path)
         return ""
@@ -173,16 +187,19 @@ def _load_checklist(track: str, camera_id: str = "") -> str:
 
 
 def _get_categories_key(track: str, camera_id: str) -> str:
-    """카메라의 구역을 조회해 적절한 Redis 카테고리 키 반환.
+    """카메라의 site/구역을 조회해 적절한 Redis 카테고리 키 반환.
 
-    구역 있으면: checklist:zone_{safe_name}:{track}:categories
-    구역 없으면: checklist:{track}:categories
+    site 있고 구역 있으면: checklist:{site_id}:zone_{safe}:{track}:categories
+    site 있고 구역 없으면: checklist:{site_id}:{track}:categories
+    site 없으면(레거시): checklist:{track}:categories
     """
+    site_id, _ = _split_cam_key(camera_id)
+    prefix = f"checklist:{site_id}:" if site_id else "checklist:"
     zone = get_client().get(f"camera:{camera_id}:zone") or ""
     if zone:
         safe = zone.replace(" ", "_")
-        return f"checklist:zone_{safe}:{track}:categories"
-    return f"checklist:{track}:categories"
+        return f"{prefix}zone_{safe}:{track}:categories"
+    return f"{prefix}{track}:categories"
 
 
 def render_prompt(filename: str, camera_id: str) -> tuple[str, dict[str, str]]:
