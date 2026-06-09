@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import config
 from app.db.session import get_db
 from app.api.deps import get_current_user
-from app.db.models import EventLog, CctvChannel, User
+from app.db.models import EventLog, CctvChannel, User, Site
 from app.api.schemas import EventLogRead, EventListResponse
 from app.api.time_parser import parse_time_expression
 from app.api.query_expander import expand_query
@@ -23,6 +23,7 @@ _openai = AsyncOpenAI()
 def _to_schema(
     event: EventLog,
     channel_name: str | None = None,
+    site_name: str | None = None,
     similarity: float | None = None,
     incident_count: int = 1,
     incident_last_at: datetime | None = None,
@@ -32,6 +33,7 @@ def _to_schema(
         channel_id=event.camera_id,
         # 우선순위: 이벤트 발생 시점 채널명(스냅샷) > 현재 채널명(lookup) > camera_id
         channel_name=event.camera_name or channel_name or event.camera_id,
+        site_name=site_name,
         pipeline=event.pipeline,
         event_type=event.event_type,
         danger_level=event.danger_level,
@@ -110,6 +112,15 @@ async def _fetch_channel_names(db: AsyncSession, camera_ids: list[str]) -> dict[
     return {ch.camera_id: ch.camera_name for ch in result.scalars().all()}
 
 
+async def _fetch_site_names(db: AsyncSession, site_ids: list[uuid.UUID | None]) -> dict[uuid.UUID, str]:
+    """site_id(UUID) 리스트 → {site_id: site_name} 딕셔너리. None은 제외."""
+    ids = [s for s in set(site_ids) if s is not None]
+    if not ids:
+        return {}
+    rows = (await db.execute(select(Site.id, Site.name).where(Site.id.in_(ids)))).all()
+    return {row[0]: row[1] for row in rows}
+
+
 @router.get("/events", response_model=EventListResponse)
 async def list_events(
     site_id:      Optional[str] = Query(None),
@@ -160,11 +171,15 @@ async def list_events(
     channel_names = await _fetch_channel_names(
         db, [inc["representative"].camera_id for inc in page]
     )
+    site_names = await _fetch_site_names(
+        db, [inc["representative"].site_id for inc in page]
+    )
     return EventListResponse(
         events=[
             _to_schema(
                 inc["representative"],
                 channel_names.get(inc["representative"].camera_id),
+                site_name=site_names.get(inc["representative"].site_id),
                 incident_count=inc["count"],
                 incident_last_at=_incident_last_at(inc["count"], inc["last_at"]),
             )
@@ -273,12 +288,16 @@ async def search_events(
     channel_names = await _fetch_channel_names(
         db, [inc["representative"].camera_id for inc, _ in top]
     )
+    site_names = await _fetch_site_names(
+        db, [inc["representative"].site_id for inc, _ in top]
+    )
 
     return EventListResponse(
         events=[
             _to_schema(
                 inc["representative"],
                 channel_names.get(inc["representative"].camera_id),
+                site_name=site_names.get(inc["representative"].site_id),
                 similarity=max(round(1 - dist, 4), 0.0),
                 incident_count=inc["count"],
                 incident_last_at=_incident_last_at(inc["count"], inc["last_at"]),
@@ -308,4 +327,9 @@ async def get_event(
             raise HTTPException(status_code=404, detail="이벤트를 찾을 수 없습니다")
 
     channel_names = await _fetch_channel_names(db, [event.camera_id])
-    return _to_schema(event, channel_names.get(event.camera_id))
+    site_names = await _fetch_site_names(db, [event.site_id])
+    return _to_schema(
+        event,
+        channel_names.get(event.camera_id),
+        site_name=site_names.get(event.site_id),
+    )

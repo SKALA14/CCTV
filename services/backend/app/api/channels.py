@@ -1,13 +1,14 @@
 import json
 import logging
+import uuid
 from pathlib import Path
 from typing import Any
 
 import httpx
 import redis.asyncio as aioredis
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import delete as sa_delete, update as sa_update
+from sqlalchemy import delete as sa_delete, update as sa_update, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.api.deps import get_current_user, require_admin
@@ -34,14 +35,32 @@ def _redis_cam_prefix(site_id: str, cam_id: str) -> str:
     return f"camera:{site_id}:{cam_id}"
 
 
+def _db_channel_to_dict(ch: CctvChannel) -> dict:
+    """DB CctvChannel을 프론트엔드 채널 객체 형태로 매핑 (superadmin 읽기 전용 뷰용)."""
+    cam_id = ch.camera_id
+    slot = int(cam_id[3:]) if cam_id.startswith("cam") and cam_id[3:].isdigit() else 0
+    return {
+        "slot":         slot,
+        "name":         ch.camera_name,
+        "channelName":  ch.camera_name,
+        "rtspUrl":      ch.source_url,
+        "url":          ch.source_url,
+        "sourceType":   ch.source_type,
+        "description":  ch.description or "",
+        "options":      [],
+        "zone":         "",
+        "ingestion_url": ch.source_url,
+    }
+
+
 def _mediamtx_channel_name(site_id: str, channel_name: str) -> str:
     """mediamtx path: 현장 간 충돌 방지를 위해 site_id 앞 8자를 prefix로 사용."""
     return f"{str(site_id)[:8]}_{channel_name}"
 
 
-def _get_zone_note(zone_name: str) -> str:
-    """zones.json에서 해당 구역의 비고 반환. 없으면 빈 문자열."""
-    zones_path = Path(config.PROMPTS_DIR) / "zones.json"
+def _get_zone_note(zone_name: str, site_id: str) -> str:
+    """현장별 zones.json에서 해당 구역의 비고 반환. 없으면 빈 문자열."""
+    zones_path = Path(config.PROMPTS_DIR) / str(site_id) / "zones.json"
     if not zones_path.exists():
         return ""
     try:
@@ -113,12 +132,30 @@ async def _mediamtx_delete(channel_name: str) -> None:
 
 @router.get("")
 async def list_channels(
+    site_id: str | None = Query(None),
     current_user: User = Depends(get_current_user),   # viewer 이상
 ) -> list[dict]:
+    # superadmin: 현장 지정해 DB에서 읽기 전용 조회
+    if current_user.role == "superadmin":
+        if not site_id:
+            return []
+        try:
+            sid = uuid.UUID(site_id)
+        except (ValueError, AttributeError):
+            raise HTTPException(status_code=400, detail="site_id 형식이 올바르지 않습니다.")
+        async with AsyncSessionLocal() as session:
+            rows = (await session.execute(
+                select(CctvChannel)
+                .where(CctvChannel.site_id == sid)
+                .order_by(CctvChannel.camera_id)
+            )).scalars().all()
+        return [_db_channel_to_dict(ch) for ch in rows]
+
+    # admin / viewer: 자기 현장 인메모리 _store
     if current_user.site_id is None:
         raise HTTPException(
             status_code=403,
-            detail="superadmin은 직접 채널을 관리할 수 없습니다. 현장 admin 계정을 사용하세요.",
+            detail="현장이 지정되지 않은 계정입니다.",
         )
     site_id_str = str(current_user.site_id)
     return [v for k, v in _store.items() if k.startswith(f"{site_id_str}:")]
@@ -172,7 +209,7 @@ async def create_channel(
     await _redis.set(f"{cam_prefix}:source_type", ingestion_type)
     if body.zone:
         await _redis.set(f"{cam_prefix}:zone", body.zone)
-        note = _get_zone_note(body.zone)
+        note = _get_zone_note(body.zone, site_id_str)
         if note:
             await _redis.set(f"camera_instruction:{site_id_str}:{cam_id}", note)
         else:
@@ -265,7 +302,7 @@ async def update_channel(
         if body.zone is not None:
             if body.zone:
                 await _redis.set(f"{cam_prefix}:zone", body.zone)
-                note = _get_zone_note(body.zone)
+                note = _get_zone_note(body.zone, site_id_str)
                 if note:
                     await _redis.set(f"camera_instruction:{site_id_str}:{cam_id}", note)
                 else:
@@ -346,7 +383,7 @@ async def analyze_channel_instruction(camera_id: str, body: InstructionAnalyzeRe
             detail="superadmin은 직접 채널을 관리할 수 없습니다. 현장 admin 계정을 사용하세요.",
         )
     try:
-        result = await analyze_instruction(body.text)
+        result = await analyze_instruction(body.text, str(current_user.site_id))
     except Exception as e:
         logger.error("채널 instruction 분석 실패 camera_id=%s: %s", camera_id, e)
         raise HTTPException(status_code=500, detail="분석에 실패했습니다. 다시 시도해주세요.")

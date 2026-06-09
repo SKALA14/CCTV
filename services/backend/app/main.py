@@ -23,7 +23,7 @@ from app.db.session import engine, Base, AsyncSessionLocal
 from passlib.context import CryptContext
 from app.db.models import CctvChannel, EventLog, Site, User
 from app.worker import run_worker
-from app.api import events, ws, channels, manuals, auth, sites, users
+from app.api import events, ws, channels, manuals, auth, sites, users, status as status_api
 from app.api.auth import _limiter as _auth_limiter
 from app.api.channels import _store
 
@@ -172,3 +172,4 @@ app.include_router(events.router)
 app.include_router(ws.router)
 app.include_router(channels.router)
 app.include_router(manuals.router)
+app.include_router(status_api.router)

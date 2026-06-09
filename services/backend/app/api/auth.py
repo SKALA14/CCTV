@@ -27,11 +27,33 @@ logger = logging.getLogger(__name__)
 _ALGORITHM  = "HS256"
 _BOOT_ID_KEY = "auth:boot_id"
 
-_limiter = Limiter(key_func=get_remote_address)
+
+def _client_ip(request: Request) -> str:
+    """rate-limit 키: nginx 프록시 뒤에서 실제 클라이언트 IP를 X-Forwarded-For로 식별.
+    헤더가 없으면 직접 피어 주소로 폴백.
+    """
+    xff = request.headers.get("X-Forwarded-For")
+    if xff:
+        return xff.split(",")[0].strip()
+    return get_remote_address(request)
+
+
+_limiter = Limiter(key_func=_client_ip)
 router   = APIRouter(tags=["auth"])
 
 _redis = aioredis.from_url(config.REDIS_URL, decode_responses=True)
 _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# 존재하지 않는 username 로그인 시 타이밍 일정화를 위한 더미 검증용 정상 bcrypt 해시.
+# 최초 사용 시 1회 생성(lazy) — 깨진 해시 상수를 쓰면 verify가 ValueError를 던져 500이 발생.
+_dummy_hash: str | None = None
+
+
+def _get_dummy_hash() -> str:
+    global _dummy_hash
+    if _dummy_hash is None:
+        _dummy_hash = _pwd_context.hash("dummy_password_for_timing_safety")
+    return _dummy_hash
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -72,7 +94,9 @@ def _decode_token(token: str) -> dict:
     try:
         return jwt.decode(token, config.AUTH_SECRET, algorithms=[_ALGORITHM])
     except JWTError as e:
-        raise HTTPException(status_code=401, detail=f"유효하지 않은 토큰입니다: {e}")
+        # 상세 사유는 서버 로그에만 — 클라이언트엔 일반 메시지(내부 정보 노출 방지)
+        logger.warning("[auth] 토큰 디코딩 실패: %s", e)
+        raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다")
 
 
 async def _verify_credentials_db(username: str, password: str) -> User | None:
@@ -88,8 +112,8 @@ async def _verify_credentials_db(username: str, password: str) -> User | None:
             select(User).where(User.username == username)
         )
     if user is None:
-        # timing 일정화: 사용자 없어도 dummy 검증 수행
-        _pwd_context.verify("dummy", "$2b$12$dummyhashfortimingsafetyxxxxxxxx")
+        # timing 일정화: 사용자 없어도 정상 해시로 dummy 검증 수행 (응답시간 차로 계정 열거 방지)
+        _pwd_context.verify("dummy", _get_dummy_hash())
         return None
     if not _pwd_context.verify(password, user.hashed_password):
         return None
@@ -182,6 +206,13 @@ async def login(request: Request, body: LoginRequest, response: Response):
         max_age=config.JWT_EXPIRE_HOURS * 3600,
     )
     logger.info("[auth] 로그인 성공: username=%s role=%s", user.username, user.role)
+    try:
+        await _redis.set(
+            f"user:last_login:{user.id}",
+            datetime.now(timezone.utc).isoformat(),
+        )
+    except Exception as e:
+        logger.warning("[auth] last_login 기록 실패: %s", e)
     return UserInfo(
         user_id=str(user.id),
         username=user.username,
