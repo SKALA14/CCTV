@@ -141,17 +141,22 @@ async def _generate_embedding(client: AsyncOpenAI, text: str) -> list[float] | N
 
 
 # camera_id가 cctv_channels 테이블에 없으면 자동으로 INSERT한다. (FK 제약 충족용)
-async def _ensure_channel(session, camera_id: str) -> None:
+async def _ensure_channel(session, camera_id: str, site_id: uuid.UUID | None) -> None:
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+    where_clauses = [CctvChannel.camera_id == camera_id]
+    if site_id:
+        where_clauses.append(CctvChannel.site_id == site_id)
     exists = await session.scalar(
-        select(CctvChannel).where(CctvChannel.camera_id == camera_id)
+        select(CctvChannel).where(*where_clauses)
     )
     if not exists:
-        stmt = insert(CctvChannel).values(
+        stmt = pg_insert(CctvChannel).values(
+            site_id=site_id,
             camera_id=camera_id,
             camera_name=camera_id,
             source_type="unknown",
             source_url="",
-        ).on_conflict_do_nothing()
+        ).on_conflict_do_nothing(index_elements=["camera_id", "site_id"])
         await session.execute(stmt)
 
 
@@ -190,17 +195,25 @@ async def _process_message(
     )
     embedding    = await _generate_embedding(openai_client, embed_text)
 
+    # site_id: 인제스트 컨테이너가 스트림에 포함시키면 사용, 없으면 None
+    site_id_str  = fields.get("site_id")
+    site_id_uuid: uuid.UUID | None = uuid.UUID(site_id_str) if site_id_str else None
+
     event_id = uuid.uuid4()
 
     async with AsyncSessionLocal() as session:
         async with session.begin():
-            await _ensure_channel(session, camera_id)
+            await _ensure_channel(session, camera_id, site_id_uuid)
+            where_clauses = [CctvChannel.camera_id == camera_id]
+            if site_id_uuid:
+                where_clauses.append(CctvChannel.site_id == site_id_uuid)
             camera_name = await session.scalar(
-                select(CctvChannel.camera_name).where(CctvChannel.camera_id == camera_id)
+                select(CctvChannel.camera_name).where(*where_clauses)
             )
 
             session.add(EventLog(
                 event_id=event_id,
+                site_id=site_id_uuid,
                 camera_id=camera_id,
                 camera_name=camera_name,
                 pipeline=track or pipeline,

@@ -28,5 +28,9 @@ export const useChannelStore = defineStore('channel', () => {
         updateChannel(slot, { status })
     }
 
-    return { slots, addChannel, removeChannel, updateChannel, setChannelStatus }
+    function resetSlots() {
+        slots.value = [null, null, null, null]
+    }
+
+    return { slots, addChannel, removeChannel, updateChannel, setChannelStatus, resetSlots }
 })

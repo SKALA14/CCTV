@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import config
 from app.db.session import get_db
 from app.api.deps import get_current_user
-from app.db.models import EventLog, CctvChannel
+from app.db.models import EventLog, CctvChannel, User
 from app.api.schemas import EventLogRead, EventListResponse
 from app.api.time_parser import parse_time_expression
 from app.api.query_expander import expand_query
@@ -112,6 +112,7 @@ async def _fetch_channel_names(db: AsyncSession, camera_ids: list[str]) -> dict[
 
 @router.get("/events", response_model=EventListResponse)
 async def list_events(
+    site_id:      Optional[str] = Query(None),
     channel_id:   Optional[str] = Query(None),
     pipeline:     Optional[str] = Query(None),
     event_type:   Optional[str] = Query(None),
@@ -119,9 +120,22 @@ async def list_events(
     skip:  int = Query(0,  ge=0),
     limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    _user: dict = Depends(get_current_user),   # 인증 필요
+    current_user: User = Depends(get_current_user),   # 인증 필요
 ):
     query = select(EventLog)
+
+    # 현장 격리: superadmin은 파라미터 우선, 나머지 role은 자기 현장으로 강제
+    if current_user.role == "superadmin":
+        if site_id:
+            from uuid import UUID as _UUID
+            try:
+                query = query.where(EventLog.site_id == _UUID(site_id))
+            except (ValueError, AttributeError):
+                pass
+        # site_id 없으면 전체 현장 — WHERE 없음
+    else:
+        if current_user.site_id:
+            query = query.where(EventLog.site_id == current_user.site_id)
 
     if channel_id:
         query = query.where(EventLog.camera_id == channel_id)
@@ -165,14 +179,27 @@ async def list_events(
 @router.get("/events/search", response_model=EventListResponse)
 async def search_events(
     q:               str  = Query(..., min_length=1),
+    site_id:         Optional[str]      = Query(None),
     channel_id:      Optional[str]      = Query(None),
     limit:           int  = Query(10, ge=1, le=50),
     start_date:      Optional[datetime] = Query(None),
     end_date:        Optional[datetime] = Query(None),
     skip_time_parse: bool = Query(False),
     db: AsyncSession = Depends(get_db),
-    _user: dict = Depends(get_current_user),   # 인증 필요
+    current_user: User = Depends(get_current_user),   # 인증 필요
 ):
+    # 현장 격리: effective_site_id 결정 (UUID 타입으로 통일)
+    if current_user.role == "superadmin":
+        if site_id:
+            try:
+                effective_site_id: uuid.UUID | None = uuid.UUID(site_id)
+            except (ValueError, AttributeError):
+                effective_site_id = None
+        else:
+            effective_site_id = None  # 전체 현장
+    else:
+        effective_site_id = current_user.site_id  # already UUID | None
+
     if skip_time_parse:
         cleaned_query, active_start, active_end, applied_filter = q, None, None, None
     else:
@@ -205,6 +232,8 @@ async def search_events(
         )
         if channel_id:
             stmt = stmt.where(EventLog.camera_id == channel_id)
+        if effective_site_id is not None:
+            stmt = stmt.where(EventLog.site_id == effective_site_id)
         if active_start:
             stmt = stmt.where(EventLog.occurred_at >= active_start)
         if active_end:
@@ -267,11 +296,16 @@ async def search_events(
 async def get_event(
     event_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _user: dict = Depends(get_current_user),   # 인증 필요
+    current_user: User = Depends(get_current_user),   # 인증 필요
 ):
     event = await db.get(EventLog, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="이벤트를 찾을 수 없습니다")
+
+    # 현장 격리: non-superadmin은 자기 현장 이벤트만 조회 가능
+    if current_user.role != "superadmin":
+        if event.site_id != current_user.site_id:
+            raise HTTPException(status_code=404, detail="이벤트를 찾을 수 없습니다")
 
     channel_names = await _fetch_channel_names(db, [event.camera_id])
     return _to_schema(event, channel_names.get(event.camera_id))
