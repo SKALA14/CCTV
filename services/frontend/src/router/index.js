@@ -12,6 +12,7 @@ import ProfileView        from '../views/ProfileView.vue'
 
 const routes = [
     { path: '/login',           name: 'login',           component: LoginView,          meta: { public: true } },
+    { path: '/wall',            name: 'wall',             component: DashboardView,      meta: { bare: true } },
     { path: '/',                name: 'dashboard',        component: DashboardView },
     { path: '/search',          name: 'search',           component: SearchView },
     { path: '/search/:id',      name: 'clip-detail',      component: ClipDetailView,    props: true },
@@ -44,6 +45,11 @@ router.beforeEach(async (to) => {
     // 비밀번호 변경 강제: /password-change 외 모든 페이지 차단
     if (auth.mustChangePwd && to.name !== 'password-change') {
         return { name: 'password-change' }
+    }
+
+    // user(작업자)는 월 화면 전용 — 콘솔 라우트 진입 차단
+    if (auth.user?.role === 'user' && !to.meta.bare && to.name !== 'password-change') {
+        return { name: 'wall' }
     }
 
     // admin 전용 페이지

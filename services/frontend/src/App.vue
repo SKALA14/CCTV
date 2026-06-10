@@ -1,8 +1,8 @@
 <template>
   <div class="flex h-full">
-    <!-- 좌측 사이드바 (로그인 등 공개 페이지에서는 숨김) -->
+    <!-- 좌측 사이드바 (로그인·월 등 크롬 없는 화면에서는 숨김) -->
     <aside
-      v-if="!route.meta.public"
+      v-if="!route.meta.public && !route.meta.bare"
       class="flex flex-col items-center w-16 border-r flex-shrink-0 py-3"
       style="background: var(--bg-card); border-color: var(--border);"
     >
@@ -37,11 +37,11 @@
     <div class="flex flex-col flex-1 min-w-0">
       <!-- 라우터 뷰 -->
       <main class="flex-1 overflow-auto" style="position: relative;">
-        <div :style="isDashboard ? 'height: 100%' : 'visibility: hidden; position: absolute; inset: 0; pointer-events: none'">
+        <div :style="isLiveView ? 'height: 100%' : 'visibility: hidden; position: absolute; inset: 0; pointer-events: none'">
           <DashboardView />
         </div>
         <keep-alive include="ManualView">
-          <router-view v-if="!isDashboard" />
+          <router-view v-if="!isLiveView" />
         </keep-alive>
       </main>
     </div>
@@ -68,7 +68,8 @@ useWebSocket()
 useTheme()   // 모듈 로드 시 전역 테마 적용 (토글은 프로필 페이지에서)
 
 const route = useRoute()
-const isDashboard = computed(() => route.path === '/')
+// 라이브 그리드(DashboardView)를 보여줄 경로 — 콘솔 대시보드('/')와 월('/wall')
+const isLiveView = computed(() => route.path === '/' || route.path === '/wall')
 
 const authStore = useAuthStore()
 
