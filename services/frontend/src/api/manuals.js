@@ -9,7 +9,12 @@ export async function fetchManuals(siteId = null) {
   return api.get(`/manuals${q}`).then(r => r.data)
 }
 
-export async function uploadManual(file) {
+// siteId: superadmin이 현장을 선택해 관리할 때 전달. admin은 null(백엔드가 자기 현장 사용).
+function _siteQuery(siteId) {
+  return siteId ? `?site_id=${encodeURIComponent(siteId)}` : ''
+}
+
+export async function uploadManual(file, siteId = null) {
   if (DUMMY_MODE) {
     const meta = {
       id: crypto.randomUUID(),
@@ -25,19 +30,19 @@ export async function uploadManual(file) {
   }
   const form = new FormData()
   form.append('file', file)
-  return api.post('/manuals', form).then(r => r.data)
+  return api.post(`/manuals${_siteQuery(siteId)}`, form).then(r => r.data)
 }
 
-export async function deleteManual(id) {
+export async function deleteManual(id, siteId = null) {
   if (DUMMY_MODE) {
     const list = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
     localStorage.setItem(STORAGE_KEY, JSON.stringify(list.filter(f => f.id !== id)))
     return
   }
-  return api.delete(`/manuals/${id}`)
+  return api.delete(`/manuals/${id}${_siteQuery(siteId)}`)
 }
 
-export async function analyzeManual(file) {
+export async function analyzeManual(file, siteId = null) {
   if (DUMMY_MODE) {
     return {
       session_id: crypto.randomUUID(),
@@ -48,10 +53,10 @@ export async function analyzeManual(file) {
   }
   const form = new FormData()
   form.append('file', file)
-  return api.post('/manuals/analyze', form, { timeout: 120000 }).then(r => r.data)
+  return api.post(`/manuals/analyze${_siteQuery(siteId)}`, form, { timeout: 120000 }).then(r => r.data)
 }
 
-export async function refineManual(sessionId, feedback) {
+export async function refineManual(sessionId, feedback, siteId = null) {
   if (DUMMY_MODE) {
     return {
       session_id: sessionId,
@@ -59,12 +64,12 @@ export async function refineManual(sessionId, feedback) {
       dynamic: ['피드백 반영된 dynamic 항목'],
     }
   }
-  return api.post('/manuals/refine', { session_id: sessionId, feedback }).then(r => r.data)
+  return api.post(`/manuals/refine${_siteQuery(siteId)}`, { session_id: sessionId, feedback }).then(r => r.data)
 }
 
-export async function confirmManual(sessionId, staticItems, dynamicItems, zones = [], staticCategories = [], dynamicCategories = []) {
+export async function confirmManual(sessionId, staticItems, dynamicItems, zones = [], staticCategories = [], dynamicCategories = [], siteId = null) {
   if (DUMMY_MODE) return { status: 'saved' }
-  return api.post('/manuals/confirm', {
+  return api.post(`/manuals/confirm${_siteQuery(siteId)}`, {
     session_id: sessionId,
     static: staticItems,
     dynamic: dynamicItems,
@@ -74,11 +79,11 @@ export async function confirmManual(sessionId, staticItems, dynamicItems, zones 
   }).then(r => r.data)
 }
 
-export async function registerZones(zonesFile) {
+export async function registerZones(zonesFile, siteId = null) {
   if (DUMMY_MODE) return { status: 'saved', zones: ['크레인 작업구역', '용접 작업구역'] }
   const form = new FormData()
   form.append('zones_file', zonesFile)
-  return api.post('/manuals/zones', form).then(r => r.data)
+  return api.post(`/manuals/zones${_siteQuery(siteId)}`, form).then(r => r.data)
 }
 
 export async function fetchZones(siteId = null) {

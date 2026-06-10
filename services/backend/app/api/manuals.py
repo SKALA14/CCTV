@@ -127,12 +127,13 @@ async def list_manuals(
 @router.post("")
 async def upload_manual(
     file: UploadFile = File(...),
+    site_id: str | None = Query(None),   # superadmin은 현장 지정 필수
     current_user: User = Depends(require_admin),
 ) -> dict:
     """매뉴얼 파일 메타데이터를 현장별 Redis에 저장."""
-    sid = _effective_site_id(current_user, None)
+    sid = _effective_site_id(current_user, site_id)
     if sid is None:
-        raise HTTPException(status_code=403, detail="현장 admin 계정으로 업로드하세요.")
+        raise HTTPException(status_code=403, detail="현장을 지정해야 합니다 (superadmin은 site_id 필요).")
     meta = {
         "id": str(uuid.uuid4()),
         "name": file.filename or "unknown",
@@ -154,11 +155,12 @@ async def upload_manual(
 @router.delete("/{file_id}")
 async def delete_manual(
     file_id: str,
+    site_id: str | None = Query(None),
     current_user: User = Depends(require_admin),
 ) -> dict:
-    sid = _effective_site_id(current_user, None)
+    sid = _effective_site_id(current_user, site_id)
     if sid is None:
-        raise HTTPException(status_code=403, detail="현장 admin 계정으로 삭제하세요.")
+        raise HTTPException(status_code=403, detail="현장을 지정해야 합니다 (superadmin은 site_id 필요).")
     r = _get_redis()
     key = f"{_MANUALS_KEY}:{sid}"
     raw = await r.get(key)
@@ -189,12 +191,13 @@ async def get_current_checklist(
 @router.post("/analyze")
 async def analyze_manual(
     file: UploadFile = File(...),
+    site_id: str | None = Query(None),
     current_user: User = Depends(require_admin),
 ) -> dict:
     """PDF 업로드 → 체크리스트 분석. zones.json이 있으면 구역별 subset도 반환."""
-    sid = _effective_site_id(current_user, None)
+    sid = _effective_site_id(current_user, site_id)
     if sid is None:
-        raise HTTPException(status_code=403, detail="현장 admin 계정으로 분석하세요.")
+        raise HTTPException(status_code=403, detail="현장을 지정해야 합니다 (superadmin은 site_id 필요).")
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="PDF 파일만 분석 가능합니다.")
 
@@ -260,13 +263,14 @@ async def analyze_manual(
 @router.post("/refine")
 async def refine_manual(
     body: RefineRequest,
+    site_id: str | None = Query(None),
     current_user: User = Depends(require_admin),
 ) -> dict:
     """피드백 반영해 체크리스트 재생성."""
-    # refine은 세션 기반이라 sid를 직접 쓰진 않지만, superadmin(현장 없음) 차단을 위한 권한 가드
-    sid = _effective_site_id(current_user, None)
+    # refine은 세션 기반이라 sid를 직접 쓰진 않지만, 현장 미지정(권한 가드) 차단용
+    sid = _effective_site_id(current_user, site_id)
     if sid is None:
-        raise HTTPException(status_code=403, detail="현장 admin 계정으로 재생성하세요.")
+        raise HTTPException(status_code=403, detail="현장을 지정해야 합니다 (superadmin은 site_id 필요).")
     try:
         result = await refine_checklist(body.session_id, body.feedback)
     except ValueError as e:
@@ -322,11 +326,12 @@ def _parse_zones(content: bytes, filename: str) -> list[dict]:
 @router.post("/zones")
 async def register_zones(
     zones_file: UploadFile = File(...),
+    site_id: str | None = Query(None),
     current_user: User = Depends(require_admin),
 ) -> dict:
-    sid = _effective_site_id(current_user, None)
+    sid = _effective_site_id(current_user, site_id)
     if sid is None:
-        raise HTTPException(status_code=403, detail="현장 admin 계정으로 등록하세요.")
+        raise HTTPException(status_code=403, detail="현장을 지정해야 합니다 (superadmin은 site_id 필요).")
     content = await zones_file.read()
     try:
         zones = _parse_zones(content, zones_file.filename or "")
@@ -360,12 +365,13 @@ async def list_zones(
 @router.post("/confirm")
 async def confirm_manual(
     body: ConfirmRequest,
+    site_id: str | None = Query(None),
     current_user: User = Depends(require_admin),
 ) -> dict:
     """확정된 체크리스트를 현장별 디렉토리/Redis에 저장."""
-    sid = _effective_site_id(current_user, None)
+    sid = _effective_site_id(current_user, site_id)
     if sid is None:
-        raise HTTPException(status_code=403, detail="현장 admin 계정으로 확정하세요.")
+        raise HTTPException(status_code=403, detail="현장을 지정해야 합니다 (superadmin은 site_id 필요).")
     site_dir = _site_dir(sid)
     redis = _get_redis()
 
