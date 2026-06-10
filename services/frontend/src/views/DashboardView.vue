@@ -64,7 +64,7 @@
 </template>
 
 <script setup>
-import { ref, computed, inject, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import ChannelGrid from '../components/dashboard/ChannelGrid.vue'
 import AddChannelModal from '../components/dashboard/AddChannelModal.vue'
@@ -104,21 +104,6 @@ const existingNames = computed(() =>
     .filter((s, i) => s !== null && i !== activeSlot.value)
     .map(s => s.name)
 )
-
-// App.vue 상단 바의 "+ 채널 추가" 버튼 신호 수신 — 빈 슬롯 중 첫 번째에 등록
-const addModalSignal = inject('addModalSignal', ref(false))
-watch(addModalSignal, (v) => {
-  if (v) {
-    if (!canEdit.value) { addModalSignal.value = false; return }
-    const firstEmpty = slots.value.findIndex(s => s === null)
-    if (firstEmpty === -1) {
-      alert('모든 슬롯이 사용 중입니다. 기존 채널을 삭제 후 추가해주세요.')
-    } else {
-      openAddModal(firstEmpty)
-    }
-    addModalSignal.value = false
-  }
-})
 
 function openAddModal(slot) {
   activeSlot.value = slot

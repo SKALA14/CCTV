@@ -18,25 +18,6 @@
       <!-- 네비게이션 -->
       <AppNav class="w-full" />
 
-      <!-- 채널 추가 버튼 (대시보드 + admin 역할만) -->
-      <div v-if="isDashboard && authStore.user?.role === 'admin'" class="mt-2 px-2 w-full">
-        <div class="mb-2" style="border-top: 1px solid var(--border);"></div>
-        <button
-          :disabled="isMaxChannels"
-          class="flex flex-col items-center gap-1 w-full py-2.5 rounded-xl transition-all"
-          :class="isMaxChannels
-            ? 'bg-[#2c2c2e] text-[#48484a] cursor-not-allowed'
-            : 'bg-blue-600 text-white hover:bg-blue-500'"
-          @click="triggerAddModal"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="12" y1="5" x2="12" y2="19" stroke-linecap="round"/>
-            <line x1="5" y1="12" x2="19" y2="12" stroke-linecap="round"/>
-          </svg>
-          <span class="text-[9px] font-semibold">채널추가</span>
-        </button>
-      </div>
-
       <div class="flex-1"></div>
 
       <!-- 프로필 진입 (모든 역할) — 계정·비밀번호·테마·로그아웃은 프로필 페이지에서 -->
@@ -71,9 +52,8 @@
 </template>
 
 <script setup>
-import { ref, computed, provide, watch } from 'vue'
+import { computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { storeToRefs } from 'pinia'
 import AppNav from './components/layout/AppNav.vue'
 import DashboardView from './views/DashboardView.vue'
 import NotificationToast from './components/dashboard/NotificationToast.vue'
@@ -106,8 +86,6 @@ const avatarStyle = computed(() =>
 )
 
 const channelStore = useChannelStore()
-const { slots } = storeToRefs(channelStore)
-const isMaxChannels = computed(() => slots.value.every(s => s !== null))
 
 // 로그인·로그아웃·계정 전환 시 채널 스토어를 리셋하고 새로 로드
 watch(() => authStore.user, async (newUser) => {
@@ -124,12 +102,4 @@ watch(() => authStore.user, async (newUser) => {
         console.warn('채널 복구 실패:', e.message)
     }
 }, { immediate: true })
-
-const addModalSignal = ref(false)
-provide('addModalSignal', addModalSignal)
-
-function triggerAddModal() {
-  if (isMaxChannels.value) return
-  addModalSignal.value = true
-}
 </script>
