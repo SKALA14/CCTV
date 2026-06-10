@@ -67,11 +67,7 @@ export async function refineManual(sessionId, feedback, siteId = null) {
   return api.post(`/manuals/refine${_siteQuery(siteId)}`, { session_id: sessionId, feedback }).then(r => r.data)
 }
 
-<<<<<<< HEAD
-export async function confirmManual(sessionId, staticItems, dynamicItems, zones = [], staticCategories = [], dynamicCategories = []) {
-=======
 export async function confirmManual(sessionId, staticItems, dynamicItems, zones = [], staticCategories = [], dynamicCategories = [], siteId = null) {
->>>>>>> dev1-woos
   if (DUMMY_MODE) return { status: 'saved' }
   return api.post(`/manuals/confirm${_siteQuery(siteId)}`, {
     session_id: sessionId,

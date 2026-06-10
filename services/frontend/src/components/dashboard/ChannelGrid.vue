@@ -11,13 +11,8 @@
       <div
         v-else
         class="add-slot"
-<<<<<<< HEAD
-        :style="!isAdmin ? 'cursor: default; opacity: 0.4;' : ''"
-        @click="isAdmin && $emit('add', i - 1)"
-=======
         :class="canEdit ? '' : 'opacity-40 cursor-not-allowed'"
         @click="canEdit && $emit('add', i - 1)"
->>>>>>> dev1-woos
       >
         <span class="text-5xl font-thin text-[#3a3a3c]">+</span>
         <span class="text-sm text-[#636366] mt-1">{{ canEdit ? '채널 추가' : '읽기 전용' }}</span>
@@ -29,14 +24,7 @@
 
 <script setup>
 import ChannelCard from './ChannelCard.vue'
-import { useAuthStore } from '../../stores/authStore.js'
 
 defineProps({ slots: Array, canEdit: { type: Boolean, default: false } })
 defineEmits(['add', 'edit', 'remove'])
-<<<<<<< HEAD
-
-const { isAdmin } = useAuthStore()
 </script>
-=======
-</script>
->>>>>>> dev1-woos

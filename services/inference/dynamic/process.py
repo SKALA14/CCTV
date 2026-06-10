@@ -91,8 +91,20 @@ def _handle_message(
         xack(config.FRAMES_STREAM, config.DYNAMIC_GROUP, msg_id)
         return
 
-    flow_score = flow_detector.compute(cam_key, frame)
-    if flow_score < config.FLOW_THRESHOLD:
+    # Dual-EMA Trigger: 카메라별 selector가 EMA 기반 신규성(novelty)으로 VLM 호출 후보를 선별.
+    # warmup(초기 N초)이 동작하도록 selector 첫 등록 시각 기준 '상대 timestamp'를 사용.
+    try:
+        ts_abs = float(timestamp)
+    except (TypeError, ValueError):
+        ts_abs = time.time()
+    if cam_key not in selectors:
+        selectors[cam_key] = RealtimeTriggerSelector(trigger_config)
+        selector_start_ts[cam_key] = ts_abs
+    rel_ts = max(0.0, ts_abs - selector_start_ts[cam_key])
+
+    row = feature_extractor.extract(cam_key, frame, rel_ts)
+    result = selectors[cam_key].process(row)
+    if not result.get("admitted_trigger"):
         xack(config.FRAMES_STREAM, config.DYNAMIC_GROUP, msg_id)
         return
 

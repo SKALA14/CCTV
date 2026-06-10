@@ -391,18 +391,6 @@ async def confirm_manual(
     if dynamic_map:
         await redis.hset(f"checklist:{sid}:dynamic:categories", mapping=dynamic_map)
 
-    # 글로벌 categories → Redis hash
-    # 빈 map이어도 무조건 delete — 이전 categories가 남지 않도록
-    static_map = _build_categories_map(body.static, body.static_categories)
-    dynamic_map = _build_categories_map(body.dynamic, body.dynamic_categories)
-    await redis.delete("checklist:static:categories")
-    if static_map:
-        await redis.hset("checklist:static:categories", mapping=static_map)
-    await redis.delete("checklist:dynamic:categories")
-    if dynamic_map:
-        await redis.hset("checklist:dynamic:categories", mapping=dynamic_map)
-
-    # 구역별 .md + Redis hash
     for z in body.zones:
         safe = z.zone.replace(" ", "_")
         static_cats = [c for c in body.static_categories if any(item in z.static for item in c.items)]

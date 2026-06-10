@@ -20,10 +20,7 @@ export function connectWS() {
     }
 
     socket.onclose = (event) => {
-<<<<<<< HEAD
-=======
         if (intentionalClose) return   // 로그아웃·언마운트 등 의도적 종료 — 재연결 안 함
->>>>>>> dev1-woos
         if (event.code === 4001) {
             // JWT 만료/무효 — 재연결 금지, 로그인 페이지로 이동
             console.warn('[WS] 인증 실패 (4001) — 로그인 페이지로 이동')

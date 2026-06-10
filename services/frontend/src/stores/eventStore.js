@@ -5,8 +5,8 @@ import { useChannelStore } from './channelStore.js'
 
 export const NOTIF_DURATION = 10000
 
-const INCIDENT_GAP_MS = 10_000
-const _lastSeenMap = new Map()
+const INCIDENT_GAP_MS = 10_000 // 10초 동안 탐지 없으면 사건 종료
+const _lastSeenMap = new Map() // key: `${camera_id}:${event_type}`
 
 function _normalizeEventType(type) {
     return type === 'smoke' ? 'fire' : type
@@ -24,41 +24,30 @@ export const useEventStore = defineStore('event', () => {
     const liveEvents        = ref([])
     const toastQueue        = ref([])
     const notifications     = ref([])
-<<<<<<< HEAD
-    const notifHistory      = ref([])   // 토스트로 발화된 알림 누적 히스토리
-=======
     const notifHistory      = ref([])   // 토스트로 발화된 알림 누적 히스토리 (최대 200)
->>>>>>> dev1-woos
     const lastSearchResults = ref([])
 
     function pushLiveEvent(event) {
         liveEvents.value.unshift(event)
 
+        // 상단 배너 (기존)
         toastQueue.value.push(event)
         setTimeout(() => { toastQueue.value.shift() }, TOAST_DURATION)
 
+        // 우하단 알림 (신규) — 정상 이벤트 및 쿨다운 중인 이벤트 제외
         const level = event.danger_level
         if (!level || level === 'none' || event.event_type === 'normal') return
 
-<<<<<<< HEAD
-        // 채널 alert 상태 갱신 — 이벤트가 올 때마다 타이머 리셋
-=======
         // 채널 카드 경고 점등 — 이벤트가 올 때마다 타이머 리셋(30초 후 자동 해제)
->>>>>>> dev1-woos
         const channelStore = useChannelStore()
         const cameraId = String(event.channel_id || event.camera_id || '')
         const slot = channelStore.slots.findIndex(
             s => s && String(s.camera_id || s.channelName || '') === cameraId
         )
         if (slot !== -1) {
-<<<<<<< HEAD
-            const alertLvl = event.pipeline === 'emergency' ? 'emergency'
-                : (level === 'high' || level === 'medium') ? 'warning' : null
-=======
             // 위험도 체계: emergency 파이프라인=위험(빨강), 일반 critical/high/medium=경고(주황)
             const alertLvl = event.pipeline === 'emergency' ? 'emergency'
                 : (level === 'critical' || level === 'high' || level === 'medium') ? 'warning' : null
->>>>>>> dev1-woos
             if (alertLvl) channelStore.setAlertLevel(slot, alertLvl)
         }
 

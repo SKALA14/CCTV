@@ -85,19 +85,10 @@ def main():
         source.close()
 
         if source_type == "file":
-<<<<<<< HEAD
-            # 재생 완료 후 Redis에 저장된 URL이 우리가 재생한 URL과 동일한 경우에만 삭제.
-            # 재생 도중 새 영상으로 교체된 경우(URL 변경)엔 새 URL을 지우지 않는다.
-            current_url = client.get(f"camera:{config.CAMERA_ID}:source_url")
-            if current_url == source_path:
-                client.delete(f"camera:{config.CAMERA_ID}:source_url")
-                client.delete(f"camera:{config.CAMERA_ID}:source_type")
-=======
             current_url = client.get(active_key)
             if current_url == source_path:
                 client.delete(active_key)
                 client.delete(active_key.replace(":source_url", ":source_type"))
->>>>>>> dev1-woos
                 logger.info("파일 재생 완료, 다음 소스 대기 (camera_id=%s)", config.CAMERA_ID)
             else:
                 logger.info(
