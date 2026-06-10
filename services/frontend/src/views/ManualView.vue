@@ -433,11 +433,7 @@ async function onConfirm({ sessionId, static: staticItems, dynamic: dynamicItems
   checklist.loading = true
   checklist.error = ''
   try {
-<<<<<<< HEAD
-    await confirmManual(sessionId, staticItems, dynamicItems, checklist.zones, checklist.staticCategories, checklist.dynamicCategories)
-=======
     await confirmManual(sessionId, staticItems, dynamicItems, checklist.zones, checklist.staticCategories, checklist.dynamicCategories, manageSiteId.value)
->>>>>>> dev1-woos
     checklist.saved = true
     loadConfirmedView()
   } catch {

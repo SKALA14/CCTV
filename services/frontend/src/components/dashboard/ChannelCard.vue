@@ -40,11 +40,7 @@
       </div>
     </div>
 
-<<<<<<< HEAD
-    <div v-if="isAdmin" class="hover-actions">
-=======
     <div v-if="canEdit" class="hover-actions">
->>>>>>> dev1-woos
       <button class="hover-btn" @click.stop="$emit('edit', channel)">수정</button>
       <button class="hover-btn" @click.stop="$emit('remove', channel.slot)">삭제</button>
     </div>
@@ -65,26 +61,15 @@ import { useWebRTC } from '../../composables/useWebRTC.js'
 import { useWebRTCPublish } from '../../composables/useWebRTCPublish.js'
 import { useChannelStore } from '../../stores/channelStore.js'
 import { useEventStore } from '../../stores/eventStore.js'
-<<<<<<< HEAD
-import { useAuthStore } from '../../stores/authStore.js'
-import { MEDIAMTX_URL } from '../../constants/mediamtx.js'
-
-const props = defineProps({ channel: Object })
-const { isAdmin } = useAuthStore()
-=======
 import { MEDIAMTX_URL } from '../../constants/mediamtx.js'
 
 const props = defineProps({ channel: Object, canEdit: { type: Boolean, default: false } })
->>>>>>> dev1-woos
 defineEmits(['edit', 'remove'])
 
 const channelStore = useChannelStore()
 const { notifHistory } = storeToRefs(useEventStore())
 
-<<<<<<< HEAD
-=======
 // 이벤트 점등 상태(emergency=위험 / warning=경고) — channelStore.setAlertLevel이 30초 타이머로 관리
->>>>>>> dev1-woos
 const alertLevel = computed(() => props.channel.alertLevel ?? null)
 
 const cardStateClass = computed(() => {
@@ -105,11 +90,7 @@ const badgeText = computed(() => {
   return '정상'
 })
 
-<<<<<<< HEAD
-// name-strip 마지막 이벤트 표시용
-=======
 // name-strip 마지막 이벤트 표시용 (이 카드의 camera_id와 일치하는 최신 알림)
->>>>>>> dev1-woos
 const lastEvent = computed(() => {
   const cameraId = String(props.channel.camera_id || props.channel.channelName || '')
   return notifHistory.value.find(e =>
@@ -123,10 +104,7 @@ function formatEventTime(ts) {
   const d = isNaN(n) ? new Date(ts) : new Date(n * (String(ts).length <= 10 ? 1000 : 1))
   return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
-<<<<<<< HEAD
-=======
 
->>>>>>> dev1-woos
 const isWebcam = computed(() => props.channel.sourceType === 'webcam' || props.channel.url === 'webcam')
 
 function extractYoutubeId(url) {

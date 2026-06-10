@@ -18,25 +18,6 @@
       <!-- 네비게이션 -->
       <AppNav class="w-full" />
 
-<<<<<<< HEAD
-      <div class="flex-1"></div>
-
-      <!-- 설정 버튼 -->
-      <div class="px-2 w-full mb-1">
-        <router-link
-          to="/settings"
-          class="nav-tab w-full"
-          active-class="active"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
-          </svg>
-          <span>설정</span>
-        </router-link>
-      </div>
-
-=======
       <!-- 채널 추가 버튼 (대시보드 + admin 역할만) -->
       <div v-if="isDashboard && authStore.user?.role === 'admin'" class="mt-2 px-2 w-full">
         <div class="mb-2" style="border-top: 1px solid var(--border);"></div>
@@ -82,7 +63,6 @@
       <!-- 사용자 정보 + 로그아웃 -->
       <div v-if="authStore.isLoggedIn" class="px-2 w-full mb-1">
         <div class="mb-2" style="border-top: 1px solid var(--border);"></div>
-        <!-- 사용자 역할 배지 -->
         <div class="flex justify-center mb-1">
           <span
             class="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider"
@@ -105,7 +85,6 @@
         </button>
       </div>
 
->>>>>>> dev1-woos
       <!-- 테마 토글 -->
       <div class="px-2 w-full">
         <div class="mb-2" style="border-top: 1px solid var(--border);"></div>
@@ -147,14 +126,8 @@
 </template>
 
 <script setup>
-<<<<<<< HEAD
-import { ref, computed, provide, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
-=======
 import { ref, computed, provide, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { storeToRefs } from 'pinia'
->>>>>>> dev1-woos
 import AppNav from './components/layout/AppNav.vue'
 import DashboardView from './views/DashboardView.vue'
 import NotificationToast from './components/dashboard/NotificationToast.vue'
@@ -174,19 +147,23 @@ const isDashboard = computed(() => route.path === '/')
 
 const authStore = useAuthStore()
 
-<<<<<<< HEAD
-=======
 async function handleLogout() {
   await authStore.logout()
   router.replace({ name: 'login' })
 }
 
->>>>>>> dev1-woos
 const channelStore = useChannelStore()
 
+const isMaxChannels = computed(() => channelStore.slots.filter(Boolean).length >= 4)
+
+const addModalSignal = ref(false)
+provide('addModalSignal', addModalSignal)
+
+function triggerAddModal() {
+  addModalSignal.value = true
+}
+
 // 로그인·로그아웃·계정 전환 시 채널 스토어를 리셋하고 새로 로드
-// - onMounted 대신 watch를 사용해야 "B로그아웃→A로그인" 시 B채널이 남는 문제를 방지
-// - superadmin은 GET /channels가 403이므로 로드 시도 안 함
 watch(() => authStore.user, async (newUser) => {
     channelStore.resetSlots()
     if (!newUser || newUser.role === 'superadmin') return
@@ -201,7 +178,4 @@ watch(() => authStore.user, async (newUser) => {
         console.warn('채널 복구 실패:', e.message)
     }
 }, { immediate: true })
-
-const addModalSignal = ref(false)
-provide('addModalSignal', addModalSignal)
 </script>

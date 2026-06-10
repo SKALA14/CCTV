@@ -1,9 +1,6 @@
 <template>
   <div class="h-full flex flex-col">
-<<<<<<< HEAD
 
-=======
->>>>>>> dev1-woos
     <!-- 헤더 바 -->
     <header
       class="flex items-center justify-between px-4 flex-shrink-0"
@@ -42,9 +39,6 @@
       </button>
     </header>
 
-<<<<<<< HEAD
-    <!-- 바디: 그리드 + 이벤트 패널 -->
-=======
     <!-- superadmin 현장 선택 (읽기 전용 뷰) -->
     <div v-if="isSuperadmin" class="px-4 pt-3">
       <select
@@ -58,15 +52,11 @@
     </div>
 
     <!-- 바디: 채널 그리드 + 알림 히스토리 패널 -->
->>>>>>> dev1-woos
     <div class="flex flex-1 min-h-0">
       <div class="flex-1 min-w-0">
         <ChannelGrid
           :slots="slots"
-<<<<<<< HEAD
-=======
           :can-edit="canEdit"
->>>>>>> dev1-woos
           @add="openAddModal"
           @edit="openEditModal"
           @remove="handleRemove"
@@ -94,15 +84,6 @@ import AddChannelModal from '../components/dashboard/AddChannelModal.vue'
 import EventPanel from '../components/dashboard/EventPanel.vue'
 import { useChannels } from '../composables/useChannels.js'
 import { useEventStore } from '../stores/eventStore.js'
-<<<<<<< HEAD
-import { postChannel, putChannel, deleteChannel } from '../api/channels.js'
-
-const { slots, addChannel, updateChannel, removeChannel } = useChannels()
-
-const eventStore = useEventStore()
-const { notifHistory } = storeToRefs(eventStore)
-
-=======
 import { getChannels, postChannel, putChannel, deleteChannel } from '../api/channels.js'
 import { useAuthStore } from '../stores/authStore.js'
 import { getSites } from '../api/sites.js'
@@ -117,9 +98,6 @@ const sites = ref([])
 const selectedSiteId = ref(null)
 const channelStore = useChannelStore()
 
-// 사용자 로드 이후 superadmin이면 현장 목록 적재
-// - DashboardView는 App.vue에 상시 마운트되어 setup 시점엔 user가 아직 null일 수 있음(새로고침)
-//   → user를 watch(immediate)해 로드 시점을 맞춘다
 watch(() => authStore.user, (u) => {
   if (u?.role === 'superadmin' && sites.value.length === 0) {
     getSites().then(s => { sites.value = s }).catch(e => console.warn('현장 로드 실패:', e.message))
@@ -134,7 +112,7 @@ watch(selectedSiteId, async (sid) => {
   if (!sid) return
   try {
     const res = await getChannels(sid)
-    if (seq !== loadSeq) return   // 더 최신 요청이 진행 중이면 폐기
+    if (seq !== loadSeq) return
     res.data.forEach(ch => {
       if (channelStore.slots[ch.slot] === null) channelStore.addChannel(ch.slot, ch)
     })
@@ -145,32 +123,20 @@ watch(selectedSiteId, async (sid) => {
 
 const { slots, addChannel, updateChannel, removeChannel } = useChannels()
 
-// 헤더 바: 활성 채널 수 · 알림 패널 토글 · 라이브 시계
 const eventStore = useEventStore()
 const { notifHistory } = storeToRefs(eventStore)
->>>>>>> dev1-woos
 const activeCount = computed(() => slots.value.filter(Boolean).length)
 const historyCount = computed(() => notifHistory.value.length)
 const panelOpen = ref(false)
 
-<<<<<<< HEAD
-// 라이브 시계
-=======
->>>>>>> dev1-woos
 const clock = ref('')
 let clockTimer = null
 function updateClock() {
   clock.value = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
 }
 onMounted(() => { updateClock(); clockTimer = setInterval(updateClock, 1000) })
-<<<<<<< HEAD
-onUnmounted(() => clearInterval(clockTimer))
-
-// 모달
-=======
 onUnmounted(() => { if (clockTimer) clearInterval(clockTimer) })
 
->>>>>>> dev1-woos
 const showModal = ref(false)
 const editingChannel = ref(null)
 const activeSlot = ref(0)
