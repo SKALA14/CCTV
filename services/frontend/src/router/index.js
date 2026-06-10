@@ -8,7 +8,7 @@ import LoginView          from '../views/LoginView.vue'
 import AdminView          from '../views/AdminView.vue'
 import PasswordChangeView from '../views/PasswordChangeView.vue'
 import StatusView         from '../views/StatusView.vue'
-import SettingsView       from '../views/SettingsView.vue'
+import ProfileView        from '../views/ProfileView.vue'
 
 const routes = [
     { path: '/login',           name: 'login',           component: LoginView,          meta: { public: true } },
@@ -18,8 +18,8 @@ const routes = [
     { path: '/manual',          name: 'manual',           component: ManualView },
     { path: '/admin',           name: 'admin',            component: AdminView,          meta: { superadminOnly: true } },
     { path: '/status',          name: 'status',           component: StatusView,         meta: { superadminOnly: true } },
+    { path: '/profile',         name: 'profile',          component: ProfileView },
     { path: '/password-change', name: 'password-change',  component: PasswordChangeView },
-    { path: '/settings',        name: 'settings',         component: SettingsView },
 ]
 
 const router = createRouter({

@@ -5,8 +5,8 @@ import { useChannelStore } from './channelStore.js'
 
 export const NOTIF_DURATION = 10000
 
-const INCIDENT_GAP_MS = 10_000
-const _lastSeenMap = new Map()
+const INCIDENT_GAP_MS = 10_000 // 10초 동안 탐지 없으면 사건 종료
+const _lastSeenMap = new Map() // key: `${camera_id}:${event_type}`
 
 function _normalizeEventType(type) {
     return type === 'smoke' ? 'fire' : type
@@ -30,9 +30,11 @@ export const useEventStore = defineStore('event', () => {
     function pushLiveEvent(event) {
         liveEvents.value.unshift(event)
 
+        // 상단 배너 (기존)
         toastQueue.value.push(event)
         setTimeout(() => { toastQueue.value.shift() }, TOAST_DURATION)
 
+        // 우하단 알림 (신규) — 정상 이벤트 및 쿨다운 중인 이벤트 제외
         const level = event.danger_level
         if (!level || level === 'none' || event.event_type === 'normal') return
 

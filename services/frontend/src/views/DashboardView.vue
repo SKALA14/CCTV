@@ -1,6 +1,5 @@
 <template>
   <div class="h-full flex flex-col">
-
     <!-- 헤더 바 -->
     <header
       class="flex items-center justify-between px-4 flex-shrink-0"
@@ -141,12 +140,14 @@ const showModal = ref(false)
 const editingChannel = ref(null)
 const activeSlot = ref(0)
 
+// 수정 중인 슬롯 제외한 등록된 채널명 목록 (중복 체크용)
 const existingNames = computed(() =>
   slots.value
     .filter((s, i) => s !== null && i !== activeSlot.value)
     .map(s => s.name)
 )
 
+// App.vue 상단 바의 "+ 채널 추가" 버튼 신호 수신 — 빈 슬롯 중 첫 번째에 등록
 const addModalSignal = inject('addModalSignal', ref(false))
 watch(addModalSignal, (v) => {
   if (v) {
