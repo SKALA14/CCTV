@@ -26,7 +26,7 @@
           class="flex flex-col items-center gap-1 w-full py-2.5 rounded-xl transition-all"
           :class="isMaxChannels
             ? 'bg-[#2c2c2e] text-[#48484a] cursor-not-allowed'
-            : 'bg-blue-600 text-white hover:bg-blue-500 shadow-lg shadow-blue-900/40'"
+            : 'bg-blue-600 text-white hover:bg-blue-500'"
           @click="triggerAddModal"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -39,72 +39,56 @@
 
       <div class="flex-1"></div>
 
-      <!-- superadmin 전용 관리 메뉴 -->
-      <div v-if="authStore.isSuperadmin" class="px-2 w-full mb-1">
-        <router-link :to="{ name: 'admin' }" custom v-slot="{ navigate, isActive }">
-          <button
-            @click="navigate"
-            class="flex flex-col items-center gap-1 w-full py-2.5 rounded-xl text-[9px] font-semibold transition-colors"
-            :style="isActive
-              ? 'background: var(--bg-elevated); color: #60a5fa;'
-              : 'background: var(--bg-elevated); color: var(--text-muted);'"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
-              <circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 00-3-3.87"/>
-              <path d="M16 3.13a4 4 0 010 7.75"/>
-            </svg>
-            <span>관리</span>
-          </button>
-        </router-link>
-      </div>
+      <!-- 계정 영역 (모든 역할) -->
+      <div v-if="authStore.isLoggedIn" class="w-full px-1.5 flex flex-col items-center gap-1.5">
+        <div class="nav-divider"></div>
 
-      <!-- 사용자 정보 + 로그아웃 -->
-      <div v-if="authStore.isLoggedIn" class="px-2 w-full mb-1">
-        <div class="mb-2" style="border-top: 1px solid var(--border);"></div>
-        <!-- 사용자 역할 배지 -->
-        <div class="flex justify-center mb-1">
+        <!-- 신원: 아바타 · 역할 · 사용자명 (전체는 hover 툴팁) -->
+        <div class="flex flex-col items-center gap-1 w-full" :title="accountTitle">
+          <div
+            class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold"
+            :style="avatarStyle"
+          >{{ userInitial }}</div>
           <span
-            class="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider"
-            :style="authStore.isSuperadmin
-              ? 'background: #1e3a8a; color: #93c5fd;'
-              : authStore.isAdmin
-                ? 'background: #7f1d1d; color: #fca5a5;'
-                : 'background: #1f2937; color: #9ca3af;'"
-          >{{ authStore.isSuperadmin ? 'SUPER' : authStore.isAdmin ? 'ADMIN' : 'VIEW' }}</span>
+            class="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+            :style="badgeStyle"
+          >{{ roleLabel }}</span>
+          <span class="text-[9px] w-full text-center truncate px-0.5" style="color: var(--text-muted);">
+            {{ authStore.user?.username }}
+          </span>
         </div>
-        <button
-          class="flex flex-col items-center gap-1 w-full py-2.5 rounded-xl text-[9px] font-semibold transition-colors"
-          style="background: var(--bg-elevated); color: var(--text-muted);"
-          @click="handleLogout"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+
+        <router-link to="/password-change" class="nav-tab" active-class="active">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+            <rect x="3" y="11" width="18" height="11" rx="2"/>
+            <path d="M7 11V7a5 5 0 0110 0v4"/>
+          </svg>
+          <span>비밀번호</span>
+        </router-link>
+
+        <button class="nav-tab" @click="handleLogout">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
             <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
           </svg>
           <span>로그아웃</span>
         </button>
       </div>
 
-      <!-- 테마 토글 -->
-      <div class="px-2 w-full">
-        <div class="mb-2" style="border-top: 1px solid var(--border);"></div>
-        <button
-          class="flex flex-col items-center gap-1 w-full py-2.5 rounded-xl text-[9px] font-semibold transition-colors"
-          style="background: var(--bg-elevated); color: var(--text-muted);"
-          @click="toggle()"
-        >
-          <svg v-if="isDark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <!-- 테마 -->
+      <div class="w-full px-1.5 flex flex-col items-center mt-1">
+        <div class="nav-divider"></div>
+        <button class="nav-tab" @click="toggle()">
+          <svg v-if="isDark" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
             <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
           </svg>
-          <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
             <circle cx="12" cy="12" r="5"/>
             <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
             <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
             <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
             <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
           </svg>
-          <span>{{ isDark ? 'Dark' : 'Light' }}</span>
+          <span>{{ isDark ? '다크' : '라이트' }}</span>
         </button>
       </div>
     </aside>
@@ -150,6 +134,28 @@ const router = useRouter()
 const isDashboard = computed(() => route.path === '/')
 
 const authStore = useAuthStore()
+
+// 사이드바 계정 영역 — 신원 표시
+const roleLabel = computed(() =>
+  authStore.isSuperadmin ? 'SUPER' : authStore.isAdmin ? 'ADMIN' : 'VIEW'
+)
+const userInitial = computed(() => (authStore.user?.username?.[0] ?? '?').toUpperCase())
+const accountTitle = computed(() => {
+  const u = authStore.user
+  if (!u) return ''
+  const site = u.site_name || (authStore.isSuperadmin ? '전체 현장' : '—')
+  return `${u.username} · ${site}`
+})
+const badgeStyle = computed(() =>
+  authStore.isSuperadmin ? 'background:#1e3a8a;color:#93c5fd;'
+    : authStore.isAdmin  ? 'background:#7f1d1d;color:#fca5a5;'
+    :                      'background:#1f2937;color:#9ca3af;'
+)
+const avatarStyle = computed(() =>
+  authStore.isSuperadmin ? 'background:rgba(30,58,138,0.3);color:#93c5fd;'
+    : authStore.isAdmin  ? 'background:rgba(127,29,29,0.3);color:#fca5a5;'
+    :                      'background:var(--bg-elevated);color:var(--text-muted);'
+)
 
 async function handleLogout() {
   await authStore.logout()

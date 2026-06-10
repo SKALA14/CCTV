@@ -215,6 +215,11 @@ body {
     font-weight: 500;
     text-decoration: none;
     transition: background 0.15s, color 0.15s;
+    /* button 요소로도 쓰이므로 기본 크롬 리셋 */
+    background: none;
+    border: 0;
+    cursor: pointer;
+    font-family: inherit;
 }
 
 .nav-tab:hover {
@@ -225,6 +230,13 @@ body {
 .nav-tab.active {
     background: var(--sidebar-hover);
     color: var(--text-primary);
+}
+
+.nav-divider {
+    width: 28px;
+    height: 1px;
+    background: var(--border);
+    margin: 6px 0;
 }
 
 /* ── 토스트 배너 ── */
