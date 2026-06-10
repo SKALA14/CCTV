@@ -24,7 +24,11 @@ export const useEventStore = defineStore('event', () => {
     const liveEvents        = ref([])
     const toastQueue        = ref([])
     const notifications     = ref([])
+<<<<<<< HEAD
     const notifHistory      = ref([])   // 토스트로 발화된 알림 누적 히스토리
+=======
+    const notifHistory      = ref([])   // 토스트로 발화된 알림 누적 히스토리 (최대 200)
+>>>>>>> dev1-woos
     const lastSearchResults = ref([])
 
     function pushLiveEvent(event) {
@@ -36,15 +40,25 @@ export const useEventStore = defineStore('event', () => {
         const level = event.danger_level
         if (!level || level === 'none' || event.event_type === 'normal') return
 
+<<<<<<< HEAD
         // 채널 alert 상태 갱신 — 이벤트가 올 때마다 타이머 리셋
+=======
+        // 채널 카드 경고 점등 — 이벤트가 올 때마다 타이머 리셋(30초 후 자동 해제)
+>>>>>>> dev1-woos
         const channelStore = useChannelStore()
         const cameraId = String(event.channel_id || event.camera_id || '')
         const slot = channelStore.slots.findIndex(
             s => s && String(s.camera_id || s.channelName || '') === cameraId
         )
         if (slot !== -1) {
+<<<<<<< HEAD
             const alertLvl = event.pipeline === 'emergency' ? 'emergency'
                 : (level === 'high' || level === 'medium') ? 'warning' : null
+=======
+            // 위험도 체계: emergency 파이프라인=위험(빨강), 일반 critical/high/medium=경고(주황)
+            const alertLvl = event.pipeline === 'emergency' ? 'emergency'
+                : (level === 'critical' || level === 'high' || level === 'medium') ? 'warning' : null
+>>>>>>> dev1-woos
             if (alertLvl) channelStore.setAlertLevel(slot, alertLvl)
         }
 

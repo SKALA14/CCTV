@@ -11,6 +11,7 @@ class Settings(BaseSettings):
 
     EVENTS_STREAM: str = "events"
     ALERTS_STREAM: str = "alerts"
+    FRAMES_STREAM: str = "frames"
 
     INCIDENT_GAP_SEC: float = 30.0  # 동일 (camera, event_type) 이벤트 간격이 이 시간 이내면 한 incident로 묶음
 
@@ -20,13 +21,13 @@ class Settings(BaseSettings):
     OPENAI_MODEL:   str = "gpt-4o"
 
     # 인증
-    AUTH_SECRET:      str = ""  # JWT 서명 키 — .env에서 반드시 설정 (운영 시 32자 이상 무작위 문자열)
-    ADMIN_USERNAME:   str = "admin"
-    ADMIN_PASSWORD:   str = ""  # .env에서 반드시 설정
-    VIEWER_USERNAME:  str = "viewer"
-    VIEWER_PASSWORD:  str = ""  # .env에서 반드시 설정
-    JWT_EXPIRE_HOURS: int  = 8      # 토큰 유효 시간 (근무 1교대 기준)
-    COOKIE_SECURE:    bool = False  # 운영 HTTPS 환경에서 True로 설정 (쿠키 평문 전송 방지)
+    AUTH_SECRET:           str  = ""     # JWT 서명 키 — .env에서 반드시 설정 (운영 시 32자 이상 무작위 문자열)
+    JWT_EXPIRE_HOURS:      int  = 8      # 토큰 유효 시간 (근무 1교대 기준)
+    COOKIE_SECURE:         bool = False  # 운영 HTTPS 환경에서 True로 설정 (쿠키 평문 전송 방지)
+
+    # 초기 superadmin 계정 — 최초 기동 시 DB에 없으면 자동 생성
+    SUPERADMIN_USERNAME:   str  = "superadmin"
+    SUPERADMIN_PASSWORD:   str  = ""  # .env에서 반드시 설정
 
     class Config:
         env_file = ".env"

@@ -31,6 +31,13 @@ export const useChannelStore = defineStore('channel', () => {
         updateChannel(slot, { status })
     }
 
+<<<<<<< HEAD
+=======
+    function resetSlots() {
+        slots.value = [null, null, null, null]
+    }
+
+>>>>>>> dev1-woos
     // 이벤트가 올 때마다 호출. 30초 동안 새 이벤트 없으면 자동 해제.
     function setAlertLevel(slot, level) {
         updateChannel(slot, { alertLevel: level })
@@ -41,5 +48,9 @@ export const useChannelStore = defineStore('channel', () => {
         }, ALERT_CLEAR_MS))
     }
 
+<<<<<<< HEAD
     return { slots, addChannel, removeChannel, updateChannel, setChannelStatus, setAlertLevel }
+=======
+    return { slots, addChannel, removeChannel, updateChannel, setChannelStatus, resetSlots, setAlertLevel }
+>>>>>>> dev1-woos
 })

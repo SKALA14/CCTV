@@ -7,10 +7,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import redis.asyncio as aioredis
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Query
 from pydantic import BaseModel
 
-from app.api.deps import require_admin
+from app.api.deps import require_admin, get_current_user
+from app.db.models import User
 from app.api.agent.checklist_agent import analyze_pdf, refine_checklist, subset_by_zones, normalize_categories
 from app.api.agent.pdf_parser import extract_text_from_pdf
 from app.config import config
@@ -30,6 +31,28 @@ def _get_redis() -> aioredis.Redis:
     if _redis is None:
         _redis = aioredis.from_url(config.REDIS_URL, decode_responses=True)
     return _redis
+
+
+def _site_dir(site_id) -> Path:
+    """현장별 체크리스트/구역 저장 디렉토리. 없으면 생성."""
+    d = Path(config.PROMPTS_DIR) / str(site_id)
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _effective_site_id(current_user, site_id_param: str | None):
+    """현장 결정: superadmin은 쿼리 파라미터, 그 외는 자기 현장.
+
+    superadmin이 파라미터 미지정/형식오류 시 None 반환(쓰기 차단 신호).
+    """
+    if current_user.role == "superadmin":
+        if not site_id_param:
+            return None
+        try:
+            return uuid.UUID(site_id_param)
+        except (ValueError, AttributeError, TypeError):
+            return None
+    return current_user.site_id
 
 
 class RefineRequest(BaseModel):
@@ -90,19 +113,27 @@ def _build_categories_map(items: list[str], categories: list) -> dict[str, str]:
 
 @router.get("")
 async def list_manuals(
-    _user: dict = Depends(require_admin),   # admin만 허용
+    site_id: str | None = Query(None),
+    current_user: User = Depends(require_admin),   # admin/superadmin
 ) -> list[dict]:
-    """업로드된 매뉴얼 파일 메타데이터 목록."""
-    raw = await _get_redis().get(_MANUALS_KEY)
+    """업로드된 매뉴얼 파일 메타데이터 목록 (현장별)."""
+    sid = _effective_site_id(current_user, site_id)
+    if sid is None:
+        return []
+    raw = await _get_redis().get(f"{_MANUALS_KEY}:{sid}")
     return json.loads(raw) if raw else []
 
 
 @router.post("")
 async def upload_manual(
     file: UploadFile = File(...),
-    _user: dict = Depends(require_admin),   # admin만 허용
+    site_id: str | None = Query(None),   # superadmin은 현장 지정 필수
+    current_user: User = Depends(require_admin),
 ) -> dict:
-    """매뉴얼 파일 메타데이터를 Redis에 저장."""
+    """매뉴얼 파일 메타데이터를 현장별 Redis에 저장."""
+    sid = _effective_site_id(current_user, site_id)
+    if sid is None:
+        raise HTTPException(status_code=403, detail="현장을 지정해야 합니다 (superadmin은 site_id 필요).")
     meta = {
         "id": str(uuid.uuid4()),
         "name": file.filename or "unknown",
@@ -112,37 +143,45 @@ async def upload_manual(
     }
     content = await file.read()
     meta["size"] = len(content)
-
     r = _get_redis()
-    raw = await r.get(_MANUALS_KEY)
+    key = f"{_MANUALS_KEY}:{sid}"
+    raw = await r.get(key)
     files: list[dict] = json.loads(raw) if raw else []
     files.insert(0, meta)
-    await r.set(_MANUALS_KEY, json.dumps(files, ensure_ascii=False))
+    await r.set(key, json.dumps(files, ensure_ascii=False))
     return meta
 
 
 @router.delete("/{file_id}")
 async def delete_manual(
     file_id: str,
-    _user: dict = Depends(require_admin),   # admin만 허용
+    site_id: str | None = Query(None),
+    current_user: User = Depends(require_admin),
 ) -> dict:
-    """매뉴얼 파일 메타데이터를 Redis에서 삭제."""
+    sid = _effective_site_id(current_user, site_id)
+    if sid is None:
+        raise HTTPException(status_code=403, detail="현장을 지정해야 합니다 (superadmin은 site_id 필요).")
     r = _get_redis()
-    raw = await r.get(_MANUALS_KEY)
+    key = f"{_MANUALS_KEY}:{sid}"
+    raw = await r.get(key)
     files: list[dict] = json.loads(raw) if raw else []
     files = [f for f in files if f["id"] != file_id]
-    await r.set(_MANUALS_KEY, json.dumps(files, ensure_ascii=False))
+    await r.set(key, json.dumps(files, ensure_ascii=False))
     return {"status": "deleted"}
 
 
 @router.get("/checklist")
 async def get_current_checklist(
-    _user: dict = Depends(require_admin),   # admin만 허용
+    site_id: str | None = Query(None),
+    current_user: User = Depends(get_current_user),   # viewer 이상
 ) -> dict:
-    """현재 적용 중인 글로벌 체크리스트 파일 내용 반환."""
-    prompts_dir = Path(config.PROMPTS_DIR)
-    static_path = prompts_dir / _STATIC_FILE
-    dynamic_path = prompts_dir / _DYNAMIC_FILE
+    """현재 적용 중인 현장 체크리스트 파일 내용 반환 (읽기 전용)."""
+    sid = _effective_site_id(current_user, site_id)
+    if sid is None:
+        return {"static": "", "dynamic": ""}
+    site_dir = _site_dir(sid)
+    static_path = site_dir / _STATIC_FILE
+    dynamic_path = site_dir / _DYNAMIC_FILE
     return {
         "static": static_path.read_text(encoding="utf-8") if static_path.exists() else "",
         "dynamic": dynamic_path.read_text(encoding="utf-8") if dynamic_path.exists() else "",
@@ -152,9 +191,13 @@ async def get_current_checklist(
 @router.post("/analyze")
 async def analyze_manual(
     file: UploadFile = File(...),
-    _user: dict = Depends(require_admin),   # admin만 허용
+    site_id: str | None = Query(None),
+    current_user: User = Depends(require_admin),
 ) -> dict:
     """PDF 업로드 → 체크리스트 분석. zones.json이 있으면 구역별 subset도 반환."""
+    sid = _effective_site_id(current_user, site_id)
+    if sid is None:
+        raise HTTPException(status_code=403, detail="현장을 지정해야 합니다 (superadmin은 site_id 필요).")
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="PDF 파일만 분석 가능합니다.")
 
@@ -193,7 +236,7 @@ async def analyze_manual(
         dynamic_categories = []
 
     zone_results = []
-    zones_path = Path(config.PROMPTS_DIR) / "zones.json"
+    zones_path = _site_dir(sid) / "zones.json"
     if zones_path.exists():
         try:
             raw_zones = json.loads(zones_path.read_text(encoding="utf-8"))
@@ -220,9 +263,14 @@ async def analyze_manual(
 @router.post("/refine")
 async def refine_manual(
     body: RefineRequest,
-    _user: dict = Depends(require_admin),   # admin만 허용
+    site_id: str | None = Query(None),
+    current_user: User = Depends(require_admin),
 ) -> dict:
     """피드백 반영해 체크리스트 재생성."""
+    # refine은 세션 기반이라 sid를 직접 쓰진 않지만, 현장 미지정(권한 가드) 차단용
+    sid = _effective_site_id(current_user, site_id)
+    if sid is None:
+        raise HTTPException(status_code=403, detail="현장을 지정해야 합니다 (superadmin은 site_id 필요).")
     try:
         result = await refine_checklist(body.session_id, body.feedback)
     except ValueError as e:
@@ -278,9 +326,12 @@ def _parse_zones(content: bytes, filename: str) -> list[dict]:
 @router.post("/zones")
 async def register_zones(
     zones_file: UploadFile = File(...),
-    _user: dict = Depends(require_admin),   # admin만 허용
+    site_id: str | None = Query(None),
+    current_user: User = Depends(require_admin),
 ) -> dict:
-    """구역 파일만 업로드해 zones.json 저장 + 비고를 Redis에 저장. LLM 호출 없음."""
+    sid = _effective_site_id(current_user, site_id)
+    if sid is None:
+        raise HTTPException(status_code=403, detail="현장을 지정해야 합니다 (superadmin은 site_id 필요).")
     content = await zones_file.read()
     try:
         zones = _parse_zones(content, zones_file.filename or "")
@@ -288,23 +339,23 @@ async def register_zones(
         raise HTTPException(status_code=422, detail=f"구역 파일 파싱 실패: {e}")
     if not zones:
         raise HTTPException(status_code=422, detail="구역 정보가 없습니다. zone, description 컬럼을 확인하세요.")
-
-    prompts_dir = Path(config.PROMPTS_DIR)
-    prompts_dir.mkdir(parents=True, exist_ok=True)
-    (prompts_dir / "zones.json").write_text(
+    site_dir = _site_dir(sid)
+    (site_dir / "zones.json").write_text(
         json.dumps(zones, ensure_ascii=False), encoding="utf-8"
     )
-
     return {"status": "saved", "zones": [z["zone"] for z in zones]}
 
 
 @router.get("/zones")
 async def list_zones(
-    _user: dict = Depends(require_admin),   # admin만 허용
+    site_id: str | None = Query(None),
+    current_user: User = Depends(get_current_user),   # viewer 이상
 ) -> list[str]:
-    """저장된 구역 이름 목록 반환."""
-    prompts_dir = Path(config.PROMPTS_DIR)
-    zones_file = prompts_dir / "zones.json"
+    """저장된 구역 이름 목록 반환 (현장별, 읽기 전용)."""
+    sid = _effective_site_id(current_user, site_id)
+    if sid is None:
+        return []
+    zones_file = _site_dir(sid) / "zones.json"
     if not zones_file.exists():
         return []
     data = json.loads(zones_file.read_text(encoding="utf-8"))
@@ -314,26 +365,31 @@ async def list_zones(
 @router.post("/confirm")
 async def confirm_manual(
     body: ConfirmRequest,
-    _user: dict = Depends(require_admin),   # admin만 허용
+    site_id: str | None = Query(None),
+    current_user: User = Depends(require_admin),
 ) -> dict:
-    """확정된 체크리스트를 backend/prompts/에 저장.
-
-    - 글로벌: {static,dynamic}_checklist.md — 번호 형식 저장
-    - 글로벌: Redis checklist:{track}:categories hash — 인덱스→코드 매핑
-    - 구역별: zone_{safe_name}_{static,dynamic}.md + Redis zone hash
-    inference의 _load_checklist()와 render_prompt()가 매 VLM 호출 시 읽음 — 즉시 반영.
-    """
-    prompts_dir = Path(config.PROMPTS_DIR)
-    prompts_dir.mkdir(parents=True, exist_ok=True)
+    """확정된 체크리스트를 현장별 디렉토리/Redis에 저장."""
+    sid = _effective_site_id(current_user, site_id)
+    if sid is None:
+        raise HTTPException(status_code=403, detail="현장을 지정해야 합니다 (superadmin은 site_id 필요).")
+    site_dir = _site_dir(sid)
     redis = _get_redis()
 
-    # 글로벌 .md 저장 (번호 형식)
-    (prompts_dir / _STATIC_FILE).write_text(
+    (site_dir / _STATIC_FILE).write_text(
         _format_checklist(body.static, body.static_categories), encoding="utf-8"
     )
-    (prompts_dir / _DYNAMIC_FILE).write_text(
+    (site_dir / _DYNAMIC_FILE).write_text(
         _format_checklist(body.dynamic, body.dynamic_categories), encoding="utf-8"
     )
+
+    static_map = _build_categories_map(body.static, body.static_categories)
+    dynamic_map = _build_categories_map(body.dynamic, body.dynamic_categories)
+    await redis.delete(f"checklist:{sid}:static:categories")
+    if static_map:
+        await redis.hset(f"checklist:{sid}:static:categories", mapping=static_map)
+    await redis.delete(f"checklist:{sid}:dynamic:categories")
+    if dynamic_map:
+        await redis.hset(f"checklist:{sid}:dynamic:categories", mapping=dynamic_map)
 
     # 글로벌 categories → Redis hash
     # 빈 map이어도 무조건 delete — 이전 categories가 남지 않도록
@@ -349,32 +405,25 @@ async def confirm_manual(
     # 구역별 .md + Redis hash
     for z in body.zones:
         safe = z.zone.replace(" ", "_")
-        static_cats = [
-            c for c in body.static_categories
-            if any(item in z.static for item in c.items)
-        ]
-        dynamic_cats = [
-            c for c in body.dynamic_categories
-            if any(item in z.dynamic for item in c.items)
-        ]
+        static_cats = [c for c in body.static_categories if any(item in z.static for item in c.items)]
+        dynamic_cats = [c for c in body.dynamic_categories if any(item in z.dynamic for item in c.items)]
 
-        (prompts_dir / f"zone_{safe}_static.md").write_text(
+        (site_dir / f"zone_{safe}_static.md").write_text(
             _format_checklist(z.static, static_cats), encoding="utf-8"
         )
-        (prompts_dir / f"zone_{safe}_dynamic.md").write_text(
+        (site_dir / f"zone_{safe}_dynamic.md").write_text(
             _format_checklist(z.dynamic, dynamic_cats), encoding="utf-8"
         )
 
-        zone_static_map  = _build_categories_map(z.static,  static_cats)
+        zone_static_map = _build_categories_map(z.static, static_cats)
         zone_dynamic_map = _build_categories_map(z.dynamic, dynamic_cats)
-        # 빈 map이어도 무조건 delete
-        await redis.delete(f"checklist:zone_{safe}:static:categories")
+        await redis.delete(f"checklist:{sid}:zone_{safe}:static:categories")
         if zone_static_map:
-            await redis.hset(f"checklist:zone_{safe}:static:categories", mapping=zone_static_map)
-        await redis.delete(f"checklist:zone_{safe}:dynamic:categories")
+            await redis.hset(f"checklist:{sid}:zone_{safe}:static:categories", mapping=zone_static_map)
+        await redis.delete(f"checklist:{sid}:zone_{safe}:dynamic:categories")
         if zone_dynamic_map:
-            await redis.hset(f"checklist:zone_{safe}:dynamic:categories", mapping=zone_dynamic_map)
+            await redis.hset(f"checklist:{sid}:zone_{safe}:dynamic:categories", mapping=zone_dynamic_map)
 
-    logger.info("체크리스트 저장 완료: static=%d, dynamic=%d, zones=%d",
-                len(body.static), len(body.dynamic), len(body.zones))
+    logger.info("체크리스트 저장 완료: site=%s static=%d dynamic=%d zones=%d",
+                sid, len(body.static), len(body.dynamic), len(body.zones))
     return {"status": "saved", "static_count": len(body.static), "dynamic_count": len(body.dynamic)}

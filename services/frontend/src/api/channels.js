@@ -1,9 +1,10 @@
 import api from './index.js'
 import { DUMMY_MODE } from '../constants/mode.js'
 
-export async function getChannels() {
+export async function getChannels(siteId = null) {
     if (DUMMY_MODE) return { data: [] }
-    return api.get('/channels')
+    const q = siteId ? `?site_id=${encodeURIComponent(siteId)}` : ''
+    return api.get(`/channels${q}`)
 }
 
 export async function postChannel({ slot, name, channelName, rtspUrl, sourceType, description, options, zone }) {

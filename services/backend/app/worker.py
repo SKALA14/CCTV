@@ -52,7 +52,8 @@ def _get_client() -> aioredis.Redis:
 
 
 async def _ensure_consumer_groups() -> None:
-    # DB 적재는 VLM(events) 결과만 수행. YOLO(alerts)는 notification/ws가 자체적으로 처리.
+    # DB 적재는 VLM(events) 결과만 수행. alerts(Emergency/YOLO)는 검색 페이지에 저장하지 않고
+    # ws.py 토스트 + notification Slack 알림으로만 처리한다.
     try:
         await _get_client().xgroup_create(config.EVENTS_STREAM, CONSUMER_GROUP, id="0", mkstream=True)
     except aioredis.ResponseError:
@@ -141,17 +142,22 @@ async def _generate_embedding(client: AsyncOpenAI, text: str) -> list[float] | N
 
 
 # camera_id가 cctv_channels 테이블에 없으면 자동으로 INSERT한다. (FK 제약 충족용)
-async def _ensure_channel(session, camera_id: str) -> None:
+async def _ensure_channel(session, camera_id: str, site_id: uuid.UUID | None) -> None:
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+    where_clauses = [CctvChannel.camera_id == camera_id]
+    if site_id:
+        where_clauses.append(CctvChannel.site_id == site_id)
     exists = await session.scalar(
-        select(CctvChannel).where(CctvChannel.camera_id == camera_id)
+        select(CctvChannel).where(*where_clauses)
     )
     if not exists:
-        stmt = insert(CctvChannel).values(
+        stmt = pg_insert(CctvChannel).values(
+            site_id=site_id,
             camera_id=camera_id,
             camera_name=camera_id,
             source_type="unknown",
             source_url="",
-        ).on_conflict_do_nothing()
+        ).on_conflict_do_nothing(index_elements=["camera_id", "site_id"])
         await session.execute(stmt)
 
 
@@ -182,6 +188,11 @@ async def _process_message(
     confidence   = fields.get("confidence")
     source_model = fields.get("source_model")
     track        = fields.get("track")
+
+    # site_id: 인제스트 컨테이너가 스트림에 포함시키면 사용, 없으면 None
+    site_id_str  = fields.get("site_id")
+    site_id_uuid: uuid.UUID | None = uuid.UUID(site_id_str) if site_id_str else None
+
     occurred_at  = await _parse_occurred_at(fields.get("timestamp", ""))
     embed_text   = await _describe_embed(
         event_type=fields.get("anomaly_type") or fields.get("event_type", ""),
@@ -194,13 +205,17 @@ async def _process_message(
 
     async with AsyncSessionLocal() as session:
         async with session.begin():
-            await _ensure_channel(session, camera_id)
+            await _ensure_channel(session, camera_id, site_id_uuid)
+            where_clauses = [CctvChannel.camera_id == camera_id]
+            if site_id_uuid:
+                where_clauses.append(CctvChannel.site_id == site_id_uuid)
             camera_name = await session.scalar(
-                select(CctvChannel.camera_name).where(CctvChannel.camera_id == camera_id)
+                select(CctvChannel.camera_name).where(*where_clauses)
             )
 
             session.add(EventLog(
                 event_id=event_id,
+                site_id=site_id_uuid,
                 camera_id=camera_id,
                 camera_name=camera_name,
                 pipeline=track or pipeline,
@@ -218,7 +233,8 @@ async def _process_message(
     logger.info("saved: pipeline=%s camera=%s event_type=%s", pipeline, camera_id, event_type)
 
     # incident 첫 이벤트(=GAP 밖)에만 snapshot 생성. 후속은 skip해서 디스크 절약.
-    dedup_key = (camera_id, event_type)
+    # 현장별 격리: 같은 cam_id를 쓰는 두 현장이 서로의 스냅샷을 억제하지 않도록 site 포함
+    dedup_key = (site_id_str or "", camera_id, event_type)
     now_mono  = time.monotonic()
     if now_mono - _snapshot_last.get(dedup_key, 0) >= config.INCIDENT_GAP_SEC:
         _snapshot_last[dedup_key] = now_mono
@@ -263,7 +279,7 @@ async def _consume_stream(
 
 
 # 워커 진입점. events 스트림(VLM 결과)만 구독해 DB에 적재한다.
-# alerts(YOLO)는 notification과 ws.py가 자체적으로 처리하므로 backend는 보지 않는다.
+# alerts(Emergency/YOLO)는 검색 페이지에 저장하지 않고 notification·ws.py가 알림만 처리한다.
 async def run_worker() -> None:
     openai_client = AsyncOpenAI()
 

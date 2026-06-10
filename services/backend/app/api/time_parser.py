@@ -1,9 +1,13 @@
 import re
 from datetime import datetime, timedelta, timezone
 
+# 한국 표준시(UTC+9). "오늘/어제/이번 주" 등 상대 시간의 날짜 경계를 KST 기준으로 계산한다.
+# 반환값은 tz-aware라 UTC로 저장된 occurred_at과 비교해도 동일 시각(instant)으로 정확히 매칭된다.
+KST = timezone(timedelta(hours=9))
+
 
 def _now() -> datetime:
-    return datetime.now(tz=timezone.utc)
+    return datetime.now(tz=KST)
 
 
 def _start_of_day(dt: datetime) -> datetime:

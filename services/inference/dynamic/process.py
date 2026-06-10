@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import queue
 import threading
+import time
 
 import cv2
 
@@ -59,6 +60,7 @@ def run() -> None:
                 _flush_expired(buffer, buffer_lock, job_queue)
             except Exception as e:
                 logger.error("[dynamic] loop error: %s", e)
+                time.sleep(1)   # 지속적 오류(Redis 끊김 등) 시 CPU 폭주 방지 백오프
     finally:
         job_queue.put(None)
         thread.join()
@@ -77,32 +79,25 @@ def _handle_message(
     raw_path = fields.get("frame_path", "")
     frame_path = raw_path.replace("/frames", config.FRAME_STORAGE_PATH, 1)
     camera_id = fields.get("camera_id", "")
+    site_id = fields.get("site_id", "")
     timestamp = fields.get("timestamp", "")
+
+    # compound cam_key: VLM worker가 site_id를 알 수 있도록 "{site_id}:{cam_id}" 형태 사용
+    # site_id 없는 레거시 메시지는 camera_id 그대로 사용
+    cam_key = f"{site_id}:{camera_id}" if site_id else camera_id
 
     frame = cv2.imread(frame_path) if frame_path else None
     if frame is None:
         xack(config.FRAMES_STREAM, config.DYNAMIC_GROUP, msg_id)
         return
 
-    try:
-        abs_ts = float(timestamp)
-    except (ValueError, TypeError):
-        abs_ts = 0.0
-
-    if camera_id not in selector_start_ts:
-        selector_start_ts[camera_id] = abs_ts
-        selectors[camera_id] = RealtimeTriggerSelector(trigger_config)
-    rel_ts = abs_ts - selector_start_ts[camera_id]
-
-    features = feature_extractor.extract(camera_id, frame, rel_ts)
-    result = selectors[camera_id].process(features)
-
-    if not result["admitted_trigger"]:
+    flow_score = flow_detector.compute(cam_key, frame)
+    if flow_score < config.FLOW_THRESHOLD:
         xack(config.FRAMES_STREAM, config.DYNAMIC_GROUP, msg_id)
         return
 
     with buffer_lock:
-        buffer.append(camera_id, msg_id, frame_path, timestamp)
+        buffer.append(cam_key, msg_id, frame_path, timestamp)
 
 
 def _flush_expired(

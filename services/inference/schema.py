@@ -16,6 +16,7 @@ class FrameJob:
     camera_id: str
     frame_path: str
     timestamp: str
+    site_id: str = ""   # 현장 격리용 — alerts 발행/현장별 dedup에 사용
     frame: Optional[np.ndarray] = field(default=None, compare=False, repr=False)
 
 

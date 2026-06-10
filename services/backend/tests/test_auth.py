@@ -1,65 +1,80 @@
 # services/backend/tests/test_auth.py
 import pytest
+import uuid
 from unittest.mock import MagicMock, patch
 
 
 def _make_settings(**kwargs):
     """테스트용 config 오버라이드."""
     m = MagicMock()
-    m.AUTH_SECRET      = "test-secret-key-32chars-for-tests!"
-    m.ADMIN_USERNAME   = "admin"
-    m.ADMIN_PASSWORD   = "admin1234!"
-    m.VIEWER_USERNAME  = "viewer"
-    m.VIEWER_PASSWORD  = "viewer1234!"
-    m.JWT_EXPIRE_HOURS = 1
-    m.REDIS_URL        = "redis://localhost:6379"
+    m.AUTH_SECRET            = "test-secret-key-32chars-for-tests!"
+    m.SUPERADMIN_USERNAME    = "superadmin"
+    m.SUPERADMIN_PASSWORD    = "superadmin1234!"
+    m.JWT_EXPIRE_HOURS       = 1
+    m.REDIS_URL              = "redis://localhost:6379"
+    m.COOKIE_SECURE          = False
     for k, v in kwargs.items():
         setattr(m, k, v)
     return m
 
 
 @pytest.mark.asyncio
-async def test_create_token_contains_role(monkeypatch):
+async def test_create_token_contains_site_id(monkeypatch):
     import app.api.auth as auth_module
 
     async def mock_get_boot_id():
         return "test-boot-id"
 
-    with patch("app.api.auth.config", _make_settings()):
-        monkeypatch.setattr(auth_module, "_get_boot_id", mock_get_boot_id)
-        token = await auth_module._create_token("admin", "admin")
-    assert isinstance(token, str)
-    assert len(token) > 0
-
-
-@pytest.mark.asyncio
-async def test_create_token_contains_bid(monkeypatch):
-    import app.api.auth as auth_module
-
-    async def mock_get_boot_id():
-        return "test-boot-id"
+    monkeypatch.setattr(auth_module, "_get_boot_id", mock_get_boot_id)
 
     with patch("app.api.auth.config", _make_settings()):
-        monkeypatch.setattr(auth_module, "_get_boot_id", mock_get_boot_id)
-        token = await auth_module._create_token("admin", "admin")
+        site_id = uuid.uuid4()
+        token = await auth_module._create_token(
+            user_id=uuid.uuid4(), username="admin_user", role="admin", site_id=site_id
+        )
         payload = auth_module._decode_token(token)
+
     assert payload["role"] == "admin"
+    assert payload["site_id"] == str(site_id)
     assert payload["bid"] == "test-boot-id"
 
 
 @pytest.mark.asyncio
-async def test_decode_token_returns_payload(monkeypatch):
+async def test_create_token_superadmin_no_site_id(monkeypatch):
     import app.api.auth as auth_module
 
     async def mock_get_boot_id():
         return "test-boot-id"
 
+    monkeypatch.setattr(auth_module, "_get_boot_id", mock_get_boot_id)
+
     with patch("app.api.auth.config", _make_settings()):
-        monkeypatch.setattr(auth_module, "_get_boot_id", mock_get_boot_id)
-        token = await auth_module._create_token("viewer", "viewer")
+        token = await auth_module._create_token(
+            user_id=uuid.uuid4(), username="superadmin", role="superadmin", site_id=None
+        )
         payload = auth_module._decode_token(token)
-    assert payload["sub"] == "viewer"
-    assert payload["role"] == "viewer"
+
+    assert payload["role"] == "superadmin"
+    assert payload.get("site_id") is None
+
+
+@pytest.mark.asyncio
+async def test_create_token_sub_is_user_id(monkeypatch):
+    import app.api.auth as auth_module
+
+    async def mock_get_boot_id():
+        return "test-boot-id"
+
+    monkeypatch.setattr(auth_module, "_get_boot_id", mock_get_boot_id)
+
+    with patch("app.api.auth.config", _make_settings()):
+        user_id = uuid.uuid4()
+        token = await auth_module._create_token(
+            user_id=user_id, username="viewer_user", role="viewer", site_id=uuid.uuid4()
+        )
+        payload = auth_module._decode_token(token)
+
+    assert payload["sub"] == str(user_id)
 
 
 def test_decode_token_invalid_raises():
@@ -69,31 +84,3 @@ def test_decode_token_invalid_raises():
         with pytest.raises(HTTPException) as exc_info:
             _decode_token("invalid.token.here")
     assert exc_info.value.status_code == 401
-
-
-def test_verify_credentials_admin():
-    with patch("app.api.auth.config", _make_settings()):
-        from app.api.auth import _verify_credentials
-        result = _verify_credentials("admin", "admin1234!")
-    assert result == "admin"
-
-
-def test_verify_credentials_viewer():
-    with patch("app.api.auth.config", _make_settings()):
-        from app.api.auth import _verify_credentials
-        result = _verify_credentials("viewer", "viewer1234!")
-    assert result == "viewer"
-
-
-def test_verify_credentials_wrong_password():
-    with patch("app.api.auth.config", _make_settings()):
-        from app.api.auth import _verify_credentials
-        result = _verify_credentials("admin", "wrong")
-    assert result is None
-
-
-def test_verify_credentials_unknown_user():
-    with patch("app.api.auth.config", _make_settings()):
-        from app.api.auth import _verify_credentials
-        result = _verify_credentials("unknown", "admin1234!")
-    assert result is None

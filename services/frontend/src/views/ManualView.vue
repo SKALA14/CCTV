@@ -1,8 +1,20 @@
 <template>
   <div class="p-4 max-w-3xl mx-auto">
 
+    <!-- superadmin 현장 선택 (읽기 전용) -->
+    <div v-if="isSuperadmin" class="mb-6">
+      <select
+        v-model="selectedSiteId"
+        class="w-full max-w-xs px-3 py-2 rounded-xl text-sm"
+        style="background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-primary);"
+      >
+        <option :value="null">현장을 선택하세요</option>
+        <option v-for="s in sites" :key="s.id" :value="s.id">{{ s.name }}</option>
+      </select>
+    </div>
+
     <!-- 구역 정보 섹션 -->
-    <div class="mb-8">
+    <div v-if="canManage" class="mb-8">
       <div class="mb-2 flex items-center justify-between">
         <div>
           <h2 class="font-semibold text-base" style="color: var(--text-primary);">구역 정보</h2>
@@ -69,7 +81,7 @@
     </div>
 
     <!-- 매뉴얼 분석 섹션 -->
-    <div class="mb-8">
+    <div v-if="canManage" class="mb-8">
       <h2 class="font-semibold text-base mb-4" style="color: var(--text-primary);">메뉴얼 파일 관리</h2>
 
       <div
@@ -159,50 +171,119 @@
     </div>
 
     <!-- 파일 목록 -->
-    <div v-if="store.loading" class="flex justify-center py-8">
-      <div class="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-    </div>
-    <div v-else-if="store.files.length === 0" class="text-center py-12 text-sm" style="color: var(--text-subtle);">
-      업로드된 메뉴얼이 없습니다
-    </div>
-    <div v-else class="rounded-xl" style="background: var(--bg-card); border: 1px solid var(--border);">
-      <div
-        v-for="(file, i) in store.files"
-        :key="file.id"
-        class="flex items-center gap-3 px-4 py-3"
-        :style="i < store.files.length - 1 ? 'border-bottom: 1px solid var(--border);' : ''"
-      >
-        <div class="w-8 h-8 rounded flex items-center justify-center flex-shrink-0"
-          style="background: var(--bg-elevated);">
-          <span class="text-[10px] font-mono uppercase" style="color: var(--text-muted);">{{ ext(file.name) }}</span>
+    <template v-if="canManage">
+      <div v-if="store.loading" class="flex justify-center py-8">
+        <div class="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+      <div v-else-if="store.files.length === 0" class="text-center py-12 text-sm" style="color: var(--text-subtle);">
+        업로드된 메뉴얼이 없습니다
+      </div>
+      <div v-else class="rounded-xl" style="background: var(--bg-card); border: 1px solid var(--border);">
+        <div
+          v-for="(file, i) in store.files"
+          :key="file.id"
+          class="flex items-center gap-3 px-4 py-3"
+          :style="i < store.files.length - 1 ? 'border-bottom: 1px solid var(--border);' : ''"
+        >
+          <div class="w-8 h-8 rounded flex items-center justify-center flex-shrink-0"
+            style="background: var(--bg-elevated);">
+            <span class="text-[10px] font-mono uppercase" style="color: var(--text-muted);">{{ ext(file.name) }}</span>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm truncate" style="color: var(--text-primary);">{{ file.name }}</p>
+            <p class="text-xs" style="color: var(--text-subtle);">{{ formatSize(file.size) }} · {{ formatDate(file.uploaded_at) }}</p>
+          </div>
+          <button
+            class="text-xs rounded px-2 py-1 transition-colors"
+            style="color: var(--red); border: 1px solid var(--border);"
+            @click="store.remove(file.id, manageSiteId)"
+          >삭제</button>
         </div>
-        <div class="flex-1 min-w-0">
-          <p class="text-sm truncate" style="color: var(--text-primary);">{{ file.name }}</p>
-          <p class="text-xs" style="color: var(--text-subtle);">{{ formatSize(file.size) }} · {{ formatDate(file.uploaded_at) }}</p>
+      </div>
+    </template>
+
+    <!-- 확정 체크리스트 (읽기 전용, 모든 역할) -->
+    <div class="mb-8">
+      <h2 class="font-semibold text-base mb-1" style="color: var(--text-primary);">현재 적용 중인 체크리스트</h2>
+      <p class="text-xs mb-3" style="color: var(--text-subtle);">VLM 분석에 실제 사용되는 확정 체크리스트입니다.</p>
+
+      <div v-if="registeredZones.length" class="flex flex-wrap gap-2 mb-4">
+        <span v-for="z in registeredZones" :key="z"
+          class="text-xs px-2.5 py-1 rounded-full"
+          style="background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border);"
+        >{{ z }}</span>
+      </div>
+
+      <div class="grid grid-cols-1 gap-4">
+        <div class="rounded-xl p-4" style="background: var(--bg-card); border: 1px solid var(--border);">
+          <p class="text-[11px] font-medium mb-2" style="color: var(--text-subtle);">STATIC</p>
+          <pre v-if="confirmedChecklist.static" class="text-xs whitespace-pre-wrap leading-relaxed" style="color: var(--text-muted);">{{ confirmedChecklist.static }}</pre>
+          <p v-else class="text-xs" style="color: var(--text-subtle);">확정된 STATIC 체크리스트 없음</p>
         </div>
-        <button
-          class="text-xs rounded px-2 py-1 transition-colors"
-          style="color: var(--red); border: 1px solid var(--border);"
-          @click="store.remove(file.id)"
-        >삭제</button>
+        <div class="rounded-xl p-4" style="background: var(--bg-card); border: 1px solid var(--border);">
+          <p class="text-[11px] font-medium mb-2" style="color: var(--text-subtle);">DYNAMIC</p>
+          <pre v-if="confirmedChecklist.dynamic" class="text-xs whitespace-pre-wrap leading-relaxed" style="color: var(--text-muted);">{{ confirmedChecklist.dynamic }}</pre>
+          <p v-else class="text-xs" style="color: var(--text-subtle);">확정된 DYNAMIC 체크리스트 없음</p>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useManualStore } from '../stores/manualStore.js'
-import { analyzeManual, refineManual, confirmManual, registerZones, fetchZones } from '../api/manuals.js'
+import { analyzeManual, refineManual, confirmManual, registerZones, fetchZones, fetchChecklist } from '../api/manuals.js'
+import { getSites } from '../api/sites.js'
+import { useAuthStore } from '../stores/authStore.js'
 import ChecklistReview from '../components/manual/ChecklistReview.vue'
 
 const store = useManualStore()
+const authStore = useAuthStore()
+const isSuperadmin = computed(() => authStore.isSuperadmin)
+
+const sites = ref([])
+const selectedSiteId = ref(null)
+const confirmedChecklist = reactive({ static: '', dynamic: '' })
 
 const registeredZones = ref([])
-async function loadRegisteredZones() {
-  try { registeredZones.value = await fetchZones() } catch { /* ignore */ }
+
+// 관리 권한: admin은 항상(자기 현장), superadmin은 현장을 선택했을 때. viewer는 읽기 전용.
+const canManage = computed(() => {
+  if (authStore.user?.role === 'admin') return true
+  if (isSuperadmin.value && selectedSiteId.value) return true
+  return false
+})
+
+// 쓰기 API에 전달할 현장 — admin은 null(백엔드가 자기 현장), superadmin은 선택 현장
+const manageSiteId = computed(() => (isSuperadmin.value ? selectedSiteId.value : null))
+
+async function loadConfirmedView() {
+  const sid = isSuperadmin.value ? selectedSiteId.value : null
+  if (isSuperadmin.value && !sid) {
+    confirmedChecklist.static = ''
+    confirmedChecklist.dynamic = ''
+    registeredZones.value = []
+    return
+  }
+  try {
+    const cl = await fetchChecklist(sid)
+    confirmedChecklist.static = cl.static || ''
+    confirmedChecklist.dynamic = cl.dynamic || ''
+  } catch { confirmedChecklist.static = ''; confirmedChecklist.dynamic = '' }
+  try { registeredZones.value = await fetchZones(sid) } catch { registeredZones.value = [] }
+  // 관리 가능하면 해당 현장의 업로드 파일 목록도 로드
+  if (canManage.value) store.load(sid)
 }
-onMounted(() => { store.load(); loadRegisteredZones() })
+
+watch(selectedSiteId, loadConfirmedView)
+
+onMounted(async () => {
+  if (isSuperadmin.value) {
+    try { sites.value = await getSites() } catch (e) { console.warn('현장 로드 실패:', e?.message ?? e) }
+  }
+  loadConfirmedView()
+})
 
 // 문서 업로드
 const fileInput = ref(null)
@@ -222,7 +303,7 @@ async function handleFile(file) {
   uploadError.value = ''
   const err = validate(file)
   if (err) { uploadError.value = err; return }
-  await store.upload(file)
+  await store.upload(file, manageSiteId.value)
   docFile.value = file
 }
 
@@ -283,8 +364,8 @@ async function onRegisterZones() {
   zoneRegister.loading = true
   zoneRegister.error = ''
   try {
-    await registerZones(zoneFile.value)
-    await loadRegisteredZones()
+    await registerZones(zoneFile.value, manageSiteId.value)
+    await loadConfirmedView()
   } catch (e) {
     const detail = e?.response?.data?.detail
     zoneRegister.error = typeof detail === 'string' ? detail : '등록에 실패했습니다.'
@@ -317,7 +398,7 @@ async function onAnalyze() {
   checklist.error = ''
   checklist.loading = true
   try {
-    const result = await analyzeManual(docFile.value)
+    const result = await analyzeManual(docFile.value, manageSiteId.value)
     checklist.sessionId = result.session_id
     checklist.static = result.static
     checklist.dynamic = result.dynamic
@@ -338,7 +419,7 @@ async function onRefine({ feedback }) {
   checklist.loading = true
   checklist.error = ''
   try {
-    const result = await refineManual(checklist.sessionId, feedback)
+    const result = await refineManual(checklist.sessionId, feedback, manageSiteId.value)
     checklist.static = result.static
     checklist.dynamic = result.dynamic
   } catch {
@@ -352,8 +433,13 @@ async function onConfirm({ sessionId, static: staticItems, dynamic: dynamicItems
   checklist.loading = true
   checklist.error = ''
   try {
+<<<<<<< HEAD
     await confirmManual(sessionId, staticItems, dynamicItems, checklist.zones, checklist.staticCategories, checklist.dynamicCategories)
+=======
+    await confirmManual(sessionId, staticItems, dynamicItems, checklist.zones, checklist.staticCategories, checklist.dynamicCategories, manageSiteId.value)
+>>>>>>> dev1-woos
     checklist.saved = true
+    loadConfirmedView()
   } catch {
     checklist.error = '저장에 실패했습니다. 다시 시도해주세요.'
   } finally {
