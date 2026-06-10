@@ -28,8 +28,8 @@
       <span>메뉴얼</span>
     </router-link>
 
-    <!-- superadmin 전용 -->
-    <template v-if="authStore.isSuperadmin">
+    <!-- admin 전용 -->
+    <template v-if="authStore.isAdmin">
       <div class="nav-divider"></div>
 
       <router-link to="/status" class="nav-tab" active-class="active">

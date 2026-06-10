@@ -1,16 +1,6 @@
 <template>
   <div class="p-4 max-w-3xl mx-auto">
     <div class="mb-4 space-y-3">
-      <!-- 현장 필터 — superadmin 전용 -->
-      <select
-        v-if="isSuperadmin"
-        v-model="selectedSiteId"
-        class="app-select w-full px-4 py-2.5 rounded-xl text-sm"
-      >
-        <option :value="null">전체 현장</option>
-        <option v-for="s in sites" :key="s.id" :value="s.id">{{ s.name }}</option>
-      </select>
-
       <SearchBar @search="handleSearch" />
 
       <!-- 빠른 날짜 필터 버튼 -->
@@ -68,8 +58,6 @@ import ResultList    from '../components/search/ResultList.vue'
 import { useEvents }    from '../composables/useEvents.js'
 import { useChannels }  from '../composables/useChannels.js'
 import { useEventStore } from '../stores/eventStore.js'
-import { getSites }      from '../api/sites.js'
-import { useAuthStore }  from '../stores/authStore.js'
 
 const { events, loading, error, appliedFilter, load, search } = useEvents()
 const { slots }   = useChannels()
@@ -77,23 +65,10 @@ const channels    = computed(() => slots.value.filter(Boolean))
 const eventStore  = useEventStore()
 
 const selectedChannelId   = ref(null)
-const selectedSiteId      = ref(null)
-const sites               = ref([])
-const authStore           = useAuthStore()
-const isSuperadmin        = computed(() => authStore.isSuperadmin)
 const lastQuery           = ref('')
 const selectedQuickFilter = ref(null)
 
-onMounted(async () => {
-  await load()
-  if (isSuperadmin.value) {
-    try {
-      sites.value = await getSites()
-    } catch (e) {
-      console.error('[SearchView] 현장 목록 로드 실패:', e)
-    }
-  }
-})
+onMounted(load)
 
 const QUICK_FILTERS = [
   { key: 'today',      label: '오늘' },
@@ -137,7 +112,6 @@ async function handleSearch(query, startDate = null, endDate = null, skipTimePar
     startDate,
     endDate,
     skipTimeParse,
-    selectedSiteId.value,
   )
   eventStore.setSearchResults(events.value)
 }
@@ -168,17 +142,6 @@ watch(selectedChannelId, async () => {
   } else {
     const params = selectedChannelId.value ? { channel_id: selectedChannelId.value } : {}
     await load(params)
-  }
-})
-
-watch(selectedSiteId, async () => {
-  if (lastQuery.value) {
-    const dates = selectedQuickFilter.value
-      ? getQuickFilterDates(selectedQuickFilter.value)
-      : { startDate: null, endDate: null }
-    await handleSearch(lastQuery.value, dates.startDate, dates.endDate)
-  } else {
-    await load({ site_id: selectedSiteId.value || undefined })
   }
 })
 </script>

@@ -1,5 +1,5 @@
 # services/backend/app/api/sites.py
-"""현장(Site) 관리 API. superadmin 전용."""
+"""현장(Site) 관리 API. admin 전용. 현장은 보통 설치 시 seed되며, 추가 현장이 필요할 때 admin이 관리한다."""
 import uuid
 import logging
 from fastapi import APIRouter, Depends, HTTPException
@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import require_superadmin
+from app.api.deps import require_admin
 from app.db.session import get_db
 from app.db.models import Site, User, CctvChannel
 
@@ -33,7 +33,7 @@ class SiteRead(BaseModel):
 async def create_site(
     body: SiteCreate,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_superadmin),
+    _user=Depends(require_admin),
 ):
     if await db.scalar(select(Site).where(Site.name == body.name)):
         raise HTTPException(status_code=409, detail="이미 존재하는 현장 이름입니다.")
@@ -47,7 +47,7 @@ async def create_site(
 @router.get("", response_model=list[SiteRead])
 async def list_sites(
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_superadmin),
+    _user=Depends(require_admin),
 ):
     sites = (await db.execute(select(Site).order_by(Site.name))).scalars().all()
     result = []
@@ -63,7 +63,7 @@ async def list_sites(
 async def get_site(
     site_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_superadmin),
+    _user=Depends(require_admin),
 ):
     site = await db.get(Site, site_id)
     if not site:
@@ -79,7 +79,7 @@ async def update_site(
     site_id: uuid.UUID,
     body: SiteUpdate,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_superadmin),
+    _user=Depends(require_admin),
 ):
     site = await db.get(Site, site_id)
     if not site:
@@ -99,7 +99,7 @@ async def update_site(
 async def delete_site(
     site_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_superadmin),
+    _user=Depends(require_admin),
 ):
     """현장 삭제. 연결된 채널·유저는 CASCADE 삭제됨."""
     site = await db.get(Site, site_id)

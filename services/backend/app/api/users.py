@@ -1,5 +1,5 @@
 # services/backend/app/api/users.py
-"""계정 관리 API. superadmin은 모든 현장, admin은 자기 현장 viewer만."""
+"""계정 관리 API. admin이 자기 현장의 user 계정을 관리한다."""
 import secrets
 import string
 import uuid
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["users"])
 
 _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-_VALID_ROLES = {"admin", "viewer"}
+_VALID_ROLES = {"user"}
 
 
 def _generate_initial_password() -> str:
@@ -78,11 +78,11 @@ async def _assert_site_access(
     current_user: User,
     db: AsyncSession,
 ) -> Site:
-    """현재 사용자가 해당 현장에 접근 가능한지 확인. superadmin은 모두 허용."""
+    """현재 사용자가 해당 현장에 접근 가능한지 확인."""
     site = await db.get(Site, site_id)
     if not site:
         raise HTTPException(status_code=404, detail="현장을 찾을 수 없습니다.")
-    if current_user.role != "superadmin" and current_user.site_id != site_id:
+    if current_user.site_id != site_id:
         raise HTTPException(status_code=403, detail="해당 현장에 접근 권한이 없습니다.")
     return site
 
@@ -92,14 +92,10 @@ async def create_user(
     site_id: uuid.UUID,
     body: UserCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
-    """계정 생성. superadmin은 admin/viewer 생성 가능. admin은 viewer만 생성 가능."""
+    """계정 생성. admin이 자기 현장의 user 계정을 생성한다."""
     await _assert_site_access(site_id, current_user, db)
-    if current_user.role not in ("admin", "superadmin"):
-        raise HTTPException(status_code=403, detail="관리자 권한이 필요합니다")
-    if current_user.role == "admin" and body.role == "admin":
-        raise HTTPException(status_code=403, detail="admin은 viewer 계정만 생성할 수 있습니다.")
 
     existing = await db.scalar(select(User).where(User.username == body.username))
     if existing:
@@ -164,8 +160,6 @@ async def update_user(
     user = await db.get(User, user_id)
     if not user or user.site_id != site_id:
         raise HTTPException(status_code=404, detail="계정을 찾을 수 없습니다.")
-    if body.role is not None and current_user.role != "superadmin":
-        raise HTTPException(status_code=403, detail="role 변경은 슈퍼어드민만 가능합니다.")
     if body.username is not None:
         dup = await db.scalar(
             select(User).where(User.username == body.username, User.id != user_id)
@@ -208,16 +202,14 @@ async def reset_user_password(
     site_id: uuid.UUID,
     user_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     await _assert_site_access(site_id, current_user, db)
-    if current_user.role not in ("admin", "superadmin"):
-        raise HTTPException(status_code=403, detail="관리자 권한이 필요합니다")
     user = await db.get(User, user_id)
     if not user or user.site_id != site_id:
         raise HTTPException(status_code=404, detail="계정을 찾을 수 없습니다.")
-    if current_user.role == "admin" and user.role == "admin":
-        raise HTTPException(status_code=403, detail="admin 계정의 비밀번호는 슈퍼어드민만 초기화할 수 있습니다.")
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="자기 자신의 비밀번호는 프로필에서 변경하세요.")
     new_password = _generate_initial_password()
     user.hashed_password      = _pwd_context.hash(new_password)
     user.must_change_password = True

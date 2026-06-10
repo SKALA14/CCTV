@@ -38,17 +38,6 @@
       </button>
     </header>
 
-    <!-- superadmin 현장 선택 (읽기 전용 뷰) -->
-    <div v-if="isSuperadmin" class="px-4 pt-3">
-      <select
-        v-model="selectedSiteId"
-        class="app-select w-full max-w-xs px-3 py-2 rounded-xl text-sm"
-      >
-        <option :value="null">현장을 선택하세요</option>
-        <option v-for="s in sites" :key="s.id" :value="s.id">{{ s.name }}</option>
-      </select>
-    </div>
-
     <!-- 바디: 채널 그리드 + 알림 히스토리 패널 -->
     <div class="flex flex-1 min-h-0">
       <div class="flex-1 min-w-0">
@@ -82,42 +71,12 @@ import AddChannelModal from '../components/dashboard/AddChannelModal.vue'
 import EventPanel from '../components/dashboard/EventPanel.vue'
 import { useChannels } from '../composables/useChannels.js'
 import { useEventStore } from '../stores/eventStore.js'
-import { getChannels, postChannel, putChannel, deleteChannel } from '../api/channels.js'
+import { postChannel, putChannel, deleteChannel } from '../api/channels.js'
 import { useAuthStore } from '../stores/authStore.js'
-import { getSites } from '../api/sites.js'
-import { useChannelStore } from '../stores/channelStore.js'
 
 const authStore = useAuthStore()
-// 채널 편집은 admin 전용 — superadmin은 읽기 전용(RBAC 스펙), viewer도 불가
+// 채널 편집은 admin 전용 — user는 불가
 const canEdit = computed(() => authStore.user?.role === 'admin')
-
-const isSuperadmin = computed(() => authStore.isSuperadmin)
-const sites = ref([])
-const selectedSiteId = ref(null)
-const channelStore = useChannelStore()
-
-watch(() => authStore.user, (u) => {
-  if (u?.role === 'superadmin' && sites.value.length === 0) {
-    getSites().then(s => { sites.value = s }).catch(e => console.warn('현장 로드 실패:', e.message))
-  }
-}, { immediate: true })
-
-// 현장 전환 — 늦게 도착한 이전 요청이 슬롯을 오염시키지 않도록 시퀀스 가드
-let loadSeq = 0
-watch(selectedSiteId, async (sid) => {
-  const seq = ++loadSeq
-  channelStore.resetSlots()
-  if (!sid) return
-  try {
-    const res = await getChannels(sid)
-    if (seq !== loadSeq) return
-    res.data.forEach(ch => {
-      if (channelStore.slots[ch.slot] === null) channelStore.addChannel(ch.slot, ch)
-    })
-  } catch (e) {
-    console.warn('superadmin 채널 로드 실패:', e.message)
-  }
-})
 
 const { slots, addChannel, updateChannel, removeChannel } = useChannels()
 

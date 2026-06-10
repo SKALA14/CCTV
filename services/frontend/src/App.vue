@@ -97,13 +97,12 @@ const userInitial = computed(() => (authStore.user?.username?.[0] ?? '?').toUppe
 const accountTitle = computed(() => {
   const u = authStore.user
   if (!u) return ''
-  const site = u.site_name || (authStore.isSuperadmin ? '전체 현장' : '—')
+  const site = u.site_name || '—'
   return `${u.username} · ${site}`
 })
 const avatarStyle = computed(() =>
-  authStore.isSuperadmin ? 'background:rgba(30,58,138,0.3);color:#93c5fd;'
-    : authStore.isAdmin  ? 'background:rgba(127,29,29,0.3);color:#fca5a5;'
-    :                      'background:var(--bg-elevated);color:var(--text-muted);'
+  authStore.isAdmin ? 'background:rgba(127,29,29,0.3);color:#fca5a5;'
+    :                 'background:var(--bg-elevated);color:var(--text-muted);'
 )
 
 const channelStore = useChannelStore()
@@ -113,7 +112,7 @@ const isMaxChannels = computed(() => slots.value.every(s => s !== null))
 // 로그인·로그아웃·계정 전환 시 채널 스토어를 리셋하고 새로 로드
 watch(() => authStore.user, async (newUser) => {
     channelStore.resetSlots()
-    if (!newUser || newUser.role === 'superadmin') return
+    if (!newUser) return
     try {
         const res = await getChannels()
         res.data.forEach(ch => {

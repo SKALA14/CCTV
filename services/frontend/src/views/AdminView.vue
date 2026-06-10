@@ -133,8 +133,7 @@
           v-model="newUser.role"
           class="app-select w-full px-4 py-2.5 rounded-xl text-sm mb-3"
         >
-          <option value="admin">admin</option>
-          <option value="viewer">viewer</option>
+          <option value="user">user</option>
         </select>
         <div v-if="userFormError" class="text-red-400 text-xs mb-3">{{ userFormError }}</div>
         <div class="flex gap-2">
@@ -172,7 +171,7 @@ const newSiteName   = ref('')
 const siteFormError = ref(null)
 
 const showUserForm  = ref(false)
-const newUser       = ref({ username: '', role: 'viewer' })
+const newUser       = ref({ username: '', role: 'user' })
 const userFormError = ref(null)
 
 const initialPassword = ref(null)
@@ -219,7 +218,7 @@ async function handleCreateSite() {
 }
 
 function openUserForm() {
-  newUser.value       = { username: '', role: 'viewer' }
+  newUser.value       = { username: '', role: 'user' }
   userFormError.value = null
   showUserForm.value  = true
 }

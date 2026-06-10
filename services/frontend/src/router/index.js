@@ -16,8 +16,8 @@ const routes = [
     { path: '/search',          name: 'search',           component: SearchView },
     { path: '/search/:id',      name: 'clip-detail',      component: ClipDetailView,    props: true },
     { path: '/manual',          name: 'manual',           component: ManualView },
-    { path: '/admin',           name: 'admin',            component: AdminView,          meta: { superadminOnly: true } },
-    { path: '/status',          name: 'status',           component: StatusView,         meta: { superadminOnly: true } },
+    { path: '/admin',           name: 'admin',            component: AdminView,          meta: { adminOnly: true } },
+    { path: '/status',          name: 'status',           component: StatusView,         meta: { adminOnly: true } },
     { path: '/profile',         name: 'profile',          component: ProfileView },
     { path: '/password-change', name: 'password-change',  component: PasswordChangeView },
 ]
@@ -46,8 +46,8 @@ router.beforeEach(async (to) => {
         return { name: 'password-change' }
     }
 
-    // superadmin 전용 페이지
-    if (to.meta.superadminOnly && !auth.isSuperadmin) {
+    // admin 전용 페이지
+    if (to.meta.adminOnly && !auth.isAdmin) {
         return { name: 'dashboard' }
     }
 

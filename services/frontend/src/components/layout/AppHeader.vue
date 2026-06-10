@@ -9,7 +9,7 @@
         class="px-2 py-0.5 rounded text-xs"
         :class="auth.isAdmin ? 'bg-red-800 text-red-200' : 'bg-gray-700 text-gray-300'"
       >
-        {{ auth.isAdmin ? 'admin' : 'viewer' }}
+        {{ auth.isAdmin ? 'admin' : 'user' }}
       </span>
       <button
         @click="handleLogout"

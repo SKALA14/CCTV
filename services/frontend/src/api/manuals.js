@@ -9,7 +9,7 @@ export async function fetchManuals(siteId = null) {
   return api.get(`/manuals${q}`).then(r => r.data)
 }
 
-// siteId: superadmin이 현장을 선택해 관리할 때 전달. admin은 null(백엔드가 자기 현장 사용).
+// siteId: 보통 null — 백엔드가 현재 사용자의 현장을 사용.
 function _siteQuery(siteId) {
   return siteId ? `?site_id=${encodeURIComponent(siteId)}` : ''
 }

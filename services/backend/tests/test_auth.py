@@ -8,8 +8,9 @@ def _make_settings(**kwargs):
     """테스트용 config 오버라이드."""
     m = MagicMock()
     m.AUTH_SECRET            = "test-secret-key-32chars-for-tests!"
-    m.SUPERADMIN_USERNAME    = "superadmin"
-    m.SUPERADMIN_PASSWORD    = "superadmin1234!"
+    m.SITE_NAME              = "default"
+    m.ADMIN_USERNAME         = "admin"
+    m.ADMIN_PASSWORD         = "admin1234!"
     m.JWT_EXPIRE_HOURS       = 1
     m.REDIS_URL              = "redis://localhost:6379"
     m.COOKIE_SECURE          = False
@@ -40,7 +41,7 @@ async def test_create_token_contains_site_id(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_create_token_superadmin_no_site_id(monkeypatch):
+async def test_create_token_omits_none_site_id(monkeypatch):
     import app.api.auth as auth_module
 
     async def mock_get_boot_id():
@@ -50,11 +51,11 @@ async def test_create_token_superadmin_no_site_id(monkeypatch):
 
     with patch("app.api.auth.config", _make_settings()):
         token = await auth_module._create_token(
-            user_id=uuid.uuid4(), username="superadmin", role="superadmin", site_id=None
+            user_id=uuid.uuid4(), username="admin", role="admin", site_id=None
         )
         payload = auth_module._decode_token(token)
 
-    assert payload["role"] == "superadmin"
+    assert payload["role"] == "admin"
     assert payload.get("site_id") is None
 
 
@@ -70,7 +71,7 @@ async def test_create_token_sub_is_user_id(monkeypatch):
     with patch("app.api.auth.config", _make_settings()):
         user_id = uuid.uuid4()
         token = await auth_module._create_token(
-            user_id=user_id, username="viewer_user", role="viewer", site_id=uuid.uuid4()
+            user_id=user_id, username="normal_user", role="user", site_id=uuid.uuid4()
         )
         payload = auth_module._decode_token(token)
 
