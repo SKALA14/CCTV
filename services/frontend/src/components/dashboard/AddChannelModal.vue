@@ -66,8 +66,8 @@
           <select
             v-model="form.zone"
             :disabled="!zones.length"
-            class="w-full h-10 px-3 rounded-lg text-sm focus:outline-none transition-colors"
-            :style="`background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-primary); opacity: ${zones.length ? 1 : 0.5};`"
+            class="app-select w-full h-10 px-3 rounded-lg text-sm"
+            :style="{ opacity: zones.length ? 1 : 0.5 }"
           >
             <option value="">없음</option>
             <option v-for="z in zones" :key="z" :value="z">{{ z }}</option>

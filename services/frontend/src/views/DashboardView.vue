@@ -42,8 +42,7 @@
     <div v-if="isSuperadmin" class="px-4 pt-3">
       <select
         v-model="selectedSiteId"
-        class="w-full max-w-xs px-3 py-2 rounded-xl text-sm"
-        style="background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-primary);"
+        class="app-select w-full max-w-xs px-3 py-2 rounded-xl text-sm"
       >
         <option :value="null">현장을 선택하세요</option>
         <option v-for="s in sites" :key="s.id" :value="s.id">{{ s.name }}</option>

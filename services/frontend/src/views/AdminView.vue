@@ -131,8 +131,7 @@
         />
         <select
           v-model="newUser.role"
-          class="w-full px-4 py-2.5 rounded-xl text-sm mb-3"
-          style="background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-primary);"
+          class="app-select w-full px-4 py-2.5 rounded-xl text-sm mb-3"
         >
           <option value="admin">admin</option>
           <option value="viewer">viewer</option>

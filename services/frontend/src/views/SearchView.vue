@@ -5,8 +5,7 @@
       <select
         v-if="isSuperadmin"
         v-model="selectedSiteId"
-        class="w-full px-4 py-2.5 rounded-xl text-sm"
-        style="background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-primary);"
+        class="app-select w-full px-4 py-2.5 rounded-xl text-sm"
       >
         <option :value="null">전체 현장</option>
         <option v-for="s in sites" :key="s.id" :value="s.id">{{ s.name }}</option>
