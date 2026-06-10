@@ -147,23 +147,37 @@
 
       <div v-if="checklist.zones.length" class="mb-6">
         <h3 class="font-semibold text-sm mb-3" style="color: var(--text-primary);">구역별 확인 항목</h3>
+        <p class="text-xs mb-3" style="color: var(--text-subtle);">항목에 마우스를 올려 연필 아이콘으로 수정하거나 삭제할 수 있습니다. 편집 후 위 "확정"으로 저장하세요.</p>
         <div class="flex flex-col gap-3">
           <div v-for="zone in checklist.zones" :key="zone.zone"
             class="rounded-xl p-4" style="background: var(--bg-card); border: 1px solid var(--border);">
-            <p class="text-sm font-semibold mb-2" style="color: var(--text-primary);">{{ zone.zone }}</p>
-            <div v-if="zone.static?.length" class="mb-2">
-              <p class="text-[11px] font-medium mb-1" style="color: var(--text-subtle);">STATIC</p>
-              <ul class="flex flex-col gap-1">
-                <li v-for="item in zone.static" :key="item" class="text-xs" style="color: var(--text-muted);">· {{ item }}</li>
-              </ul>
+            <p class="text-sm font-semibold mb-3" style="color: var(--text-primary);">{{ zone.zone }}</p>
+            <div class="mb-3">
+              <p class="text-[11px] font-medium mb-1.5" style="color: var(--text-subtle);">STATIC</p>
+              <div class="space-y-1.5">
+                <ChecklistItem
+                  v-for="(item, i) in zone.static"
+                  :key="'s' + i"
+                  :item="item"
+                  @update="zone.static[i] = $event"
+                  @remove="zone.static.splice(i, 1)"
+                />
+                <button class="text-xs" style="color: var(--blue);" @click="zone.static.push('')">+ 항목 추가</button>
+              </div>
             </div>
-            <div v-if="zone.dynamic?.length">
-              <p class="text-[11px] font-medium mb-1" style="color: var(--text-subtle);">DYNAMIC</p>
-              <ul class="flex flex-col gap-1">
-                <li v-for="item in zone.dynamic" :key="item" class="text-xs" style="color: var(--text-muted);">· {{ item }}</li>
-              </ul>
+            <div>
+              <p class="text-[11px] font-medium mb-1.5" style="color: var(--text-subtle);">DYNAMIC</p>
+              <div class="space-y-1.5">
+                <ChecklistItem
+                  v-for="(item, i) in zone.dynamic"
+                  :key="'d' + i"
+                  :item="item"
+                  @update="zone.dynamic[i] = $event"
+                  @remove="zone.dynamic.splice(i, 1)"
+                />
+                <button class="text-xs" style="color: var(--blue);" @click="zone.dynamic.push('')">+ 항목 추가</button>
+              </div>
             </div>
-            <p v-if="!zone.static?.length && !zone.dynamic?.length" class="text-xs" style="color: var(--text-subtle);">해당 구역에 적용할 항목 없음</p>
           </div>
         </div>
       </div>
@@ -201,19 +215,32 @@
       </div>
     </template>
 
-    <!-- 확정 체크리스트 (읽기 전용, 모든 역할) -->
+    <!-- 현재 적용 중인 체크리스트 (읽기 전용 참조) -->
     <div class="mb-8">
       <h2 class="font-semibold text-base mb-1" style="color: var(--text-primary);">현재 적용 중인 체크리스트</h2>
-      <p class="text-xs mb-3" style="color: var(--text-subtle);">VLM 분석에 실제 사용되는 확정 체크리스트입니다.</p>
+      <p class="text-xs mb-3" style="color: var(--text-subtle);">VLM 분석에 실제 사용되는 확정 체크리스트입니다. 수정하려면 위에서 메뉴얼을 분석해 다시 확정하세요.</p>
 
-      <div v-if="registeredZones.length" class="flex flex-wrap gap-2 mb-4">
-        <span v-for="z in registeredZones" :key="z"
-          class="text-xs px-2.5 py-1 rounded-full"
-          style="background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border);"
-        >{{ z }}</span>
+      <!-- 구역 선택: 전체(공통) + 구역별 -->
+      <div class="flex flex-wrap gap-2 mb-4">
+        <button
+          class="text-xs px-3 py-1.5 rounded-full transition-colors"
+          :style="selectedConfirmZone === null
+            ? 'background: var(--blue); color: #fff; border: 1px solid var(--blue);'
+            : 'background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border);'"
+          @click="selectedConfirmZone = null"
+        >전체</button>
+        <button
+          v-for="z in confirmedChecklist.zones" :key="z.zone"
+          class="text-xs px-3 py-1.5 rounded-full transition-colors"
+          :style="selectedConfirmZone === z.zone
+            ? 'background: var(--blue); color: #fff; border: 1px solid var(--blue);'
+            : 'background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border);'"
+          @click="selectedConfirmZone = z.zone"
+        >{{ z.zone }}</button>
       </div>
 
-      <div class="grid grid-cols-1 gap-4">
+      <!-- 전체(공통) 보기 -->
+      <div v-if="selectedConfirmZone === null" class="grid grid-cols-1 gap-4">
         <div class="rounded-xl p-4" style="background: var(--bg-card); border: 1px solid var(--border);">
           <p class="text-[11px] font-medium mb-2" style="color: var(--text-subtle);">STATIC</p>
           <pre v-if="confirmedChecklist.static" class="text-xs whitespace-pre-wrap leading-relaxed" style="color: var(--text-muted);">{{ confirmedChecklist.static }}</pre>
@@ -223,6 +250,24 @@
           <p class="text-[11px] font-medium mb-2" style="color: var(--text-subtle);">DYNAMIC</p>
           <pre v-if="confirmedChecklist.dynamic" class="text-xs whitespace-pre-wrap leading-relaxed" style="color: var(--text-muted);">{{ confirmedChecklist.dynamic }}</pre>
           <p v-else class="text-xs" style="color: var(--text-subtle);">확정된 DYNAMIC 체크리스트 없음</p>
+        </div>
+      </div>
+
+      <!-- 구역별 보기 -->
+      <div v-else-if="activeConfirmZone" class="grid grid-cols-1 gap-4">
+        <div class="rounded-xl p-4" style="background: var(--bg-card); border: 1px solid var(--border);">
+          <p class="text-[11px] font-medium mb-2" style="color: var(--text-subtle);">STATIC</p>
+          <ul v-if="activeConfirmZone.static.length" class="flex flex-col gap-1">
+            <li v-for="(item, i) in activeConfirmZone.static" :key="i" class="text-xs" style="color: var(--text-muted);">· {{ item }}</li>
+          </ul>
+          <p v-else class="text-xs" style="color: var(--text-subtle);">이 구역의 STATIC 항목 없음</p>
+        </div>
+        <div class="rounded-xl p-4" style="background: var(--bg-card); border: 1px solid var(--border);">
+          <p class="text-[11px] font-medium mb-2" style="color: var(--text-subtle);">DYNAMIC</p>
+          <ul v-if="activeConfirmZone.dynamic.length" class="flex flex-col gap-1">
+            <li v-for="(item, i) in activeConfirmZone.dynamic" :key="i" class="text-xs" style="color: var(--text-muted);">· {{ item }}</li>
+          </ul>
+          <p v-else class="text-xs" style="color: var(--text-subtle);">이 구역의 DYNAMIC 항목 없음</p>
         </div>
       </div>
     </div>
@@ -236,6 +281,7 @@ import { analyzeManual, refineManual, confirmManual, registerZones, fetchZones, 
 import { getSites } from '../api/sites.js'
 import { useAuthStore } from '../stores/authStore.js'
 import ChecklistReview from '../components/manual/ChecklistReview.vue'
+import ChecklistItem from '../components/manual/ChecklistItem.vue'
 
 const store = useManualStore()
 const authStore = useAuthStore()
@@ -243,7 +289,11 @@ const isSuperadmin = computed(() => authStore.isSuperadmin)
 
 const sites = ref([])
 const selectedSiteId = ref(null)
-const confirmedChecklist = reactive({ static: '', dynamic: '' })
+const confirmedChecklist = reactive({ static: '', dynamic: '', zones: [] })
+const selectedConfirmZone = ref(null)   // null = 전체(공통)
+const activeConfirmZone = computed(() =>
+  confirmedChecklist.zones.find(z => z.zone === selectedConfirmZone.value) || null
+)
 
 const registeredZones = ref([])
 
@@ -258,10 +308,12 @@ const canManage = computed(() => {
 const manageSiteId = computed(() => (isSuperadmin.value ? selectedSiteId.value : null))
 
 async function loadConfirmedView() {
+  selectedConfirmZone.value = null
   const sid = isSuperadmin.value ? selectedSiteId.value : null
   if (isSuperadmin.value && !sid) {
     confirmedChecklist.static = ''
     confirmedChecklist.dynamic = ''
+    confirmedChecklist.zones = []
     registeredZones.value = []
     return
   }
@@ -269,7 +321,8 @@ async function loadConfirmedView() {
     const cl = await fetchChecklist(sid)
     confirmedChecklist.static = cl.static || ''
     confirmedChecklist.dynamic = cl.dynamic || ''
-  } catch { confirmedChecklist.static = ''; confirmedChecklist.dynamic = '' }
+    confirmedChecklist.zones = cl.zones || []
+  } catch { confirmedChecklist.static = ''; confirmedChecklist.dynamic = ''; confirmedChecklist.zones = [] }
   try { registeredZones.value = await fetchZones(sid) } catch { registeredZones.value = [] }
   // 관리 가능하면 해당 현장의 업로드 파일 목록도 로드
   if (canManage.value) store.load(sid)
@@ -403,7 +456,11 @@ async function onAnalyze() {
     checklist.dynamic = result.dynamic
     checklist.staticCategories = result.static_categories || []
     checklist.dynamicCategories = result.dynamic_categories || []
-    checklist.zones = result.zones || []
+    checklist.zones = (result.zones || []).map(z => ({
+      zone: z.zone,
+      static: z.static || [],
+      dynamic: z.dynamic || [],
+    }))
   } catch (e) {
     const detail = e?.response?.data?.detail
     if (typeof detail === 'string') checklist.error = detail

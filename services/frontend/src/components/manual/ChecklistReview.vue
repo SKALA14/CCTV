@@ -19,13 +19,10 @@
             v-for="(item, i) in localStatic"
             :key="i"
             :item="item"
+            @update="localStatic[i] = $event"
             @remove="localStatic.splice(i, 1)"
           />
-          <p
-            v-if="localStatic.length === 0"
-            class="text-xs text-center py-3"
-            style="color: var(--text-subtle);"
-          >항목 없음</p>
+          <button class="text-xs mt-0.5" style="color: var(--blue);" @click="localStatic.push('')">+ 항목 추가</button>
         </div>
       </div>
       <div>
@@ -35,13 +32,10 @@
             v-for="(item, i) in localDynamic"
             :key="i"
             :item="item"
+            @update="localDynamic[i] = $event"
             @remove="localDynamic.splice(i, 1)"
           />
-          <p
-            v-if="localDynamic.length === 0"
-            class="text-xs text-center py-3"
-            style="color: var(--text-subtle);"
-          >항목 없음</p>
+          <button class="text-xs mt-0.5" style="color: var(--blue);" @click="localDynamic.push('')">+ 항목 추가</button>
         </div>
       </div>
     </div>
@@ -106,8 +100,8 @@ function onRefine() {
 function onConfirm() {
   emit('confirm', {
     sessionId: props.sessionId,
-    static: localStatic.value,
-    dynamic: localDynamic.value,
+    static: localStatic.value.map(s => s.trim()).filter(Boolean),
+    dynamic: localDynamic.value.map(s => s.trim()).filter(Boolean),
   })
 }
 </script>
