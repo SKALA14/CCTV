@@ -1,17 +1,5 @@
 <template>
   <nav class="flex flex-col items-center gap-1 px-2">
-    <!-- 관제(월) 홈으로 복귀 -->
-    <router-link to="/wall" class="nav-tab" active-class="active">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <rect x="2" y="3" width="20" height="14" rx="2"/>
-        <line x1="8" y1="21" x2="16" y2="21" stroke-linecap="round"/>
-        <line x1="12" y1="17" x2="12" y2="21" stroke-linecap="round"/>
-      </svg>
-      <span>관제</span>
-    </router-link>
-
-    <div class="nav-divider"></div>
-
     <router-link to="/search" class="nav-tab" active-class="active">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <circle cx="11" cy="11" r="7"/>
