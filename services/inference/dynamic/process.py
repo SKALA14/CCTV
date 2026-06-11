@@ -1,18 +1,20 @@
 # services/inference/dynamic/process.py
-"""Dynamic 프로세스: Optical Flow로 움직임 후보를 모아 VLM 호출."""
+"""Dynamic 프로세스: Dual-EMA Trigger로 VLM 호출 후보를 선별."""
 
 from __future__ import annotations
 
 import logging
 import queue
 import threading
+import time
 
 import cv2
 
 from config import config
 from dynamic import vlm_worker
 from dynamic.buffer import DynamicBuffer
-from dynamic.optical_flow import OpticalFlowDetector
+from dynamic.optical_flow import FrameFeatureExtractor
+from dynamic.trigger import RealtimeTriggerSelector, TriggerConfig
 from redis_client import xack, xreadgroup
 
 logger = logging.getLogger(__name__)
@@ -25,7 +27,11 @@ def run() -> None:
     """Dynamic 메인 루프."""
     logging.basicConfig(level=logging.INFO, format="%(processName)s [%(levelname)s] %(message)s")
 
-    flow_detector = OpticalFlowDetector()
+    trigger_config = TriggerConfig()
+    feature_extractor = FrameFeatureExtractor()
+    selectors: dict[str, RealtimeTriggerSelector] = {}
+    selector_start_ts: dict[str, float] = {}
+
     buffer = DynamicBuffer()
     buffer_lock = threading.Lock()
 
@@ -46,11 +52,15 @@ def run() -> None:
                     count=1, block_ms=100,
                 )
                 for msg_id, fields in messages:
-                    _handle_message(msg_id, fields, flow_detector, buffer, buffer_lock)
-
+                    _handle_message(
+                        msg_id, fields,
+                        feature_extractor, selectors, selector_start_ts, trigger_config,
+                        buffer, buffer_lock,
+                    )
                 _flush_expired(buffer, buffer_lock, job_queue)
             except Exception as e:
                 logger.error("[dynamic] loop error: %s", e)
+                time.sleep(1)   # 지속적 오류(Redis 끊김 등) 시 CPU 폭주 방지 백오프
     finally:
         job_queue.put(None)
         thread.join()
@@ -59,27 +69,47 @@ def run() -> None:
 def _handle_message(
     msg_id: str,
     fields: dict,
-    flow_detector: OpticalFlowDetector,
+    feature_extractor: FrameFeatureExtractor,
+    selectors: dict[str, RealtimeTriggerSelector],
+    selector_start_ts: dict[str, float],
+    trigger_config: TriggerConfig,
     buffer: DynamicBuffer,
     buffer_lock: threading.Lock,
 ) -> None:
     raw_path = fields.get("frame_path", "")
     frame_path = raw_path.replace("/frames", config.FRAME_STORAGE_PATH, 1)
     camera_id = fields.get("camera_id", "")
+    site_id = fields.get("site_id", "")
     timestamp = fields.get("timestamp", "")
+
+    # compound cam_key: VLM worker가 site_id를 알 수 있도록 "{site_id}:{cam_id}" 형태 사용
+    # site_id 없는 레거시 메시지는 camera_id 그대로 사용
+    cam_key = f"{site_id}:{camera_id}" if site_id else camera_id
 
     frame = cv2.imread(frame_path) if frame_path else None
     if frame is None:
         xack(config.FRAMES_STREAM, config.DYNAMIC_GROUP, msg_id)
         return
 
-    flow_score = flow_detector.compute(camera_id, frame)
-    if flow_score < config.FLOW_THRESHOLD:
+    # Dual-EMA Trigger: 카메라별 selector가 EMA 기반 신규성(novelty)으로 VLM 호출 후보를 선별.
+    # warmup(초기 N초)이 동작하도록 selector 첫 등록 시각 기준 '상대 timestamp'를 사용.
+    try:
+        ts_abs = float(timestamp)
+    except (TypeError, ValueError):
+        ts_abs = time.time()
+    if cam_key not in selectors:
+        selectors[cam_key] = RealtimeTriggerSelector(trigger_config)
+        selector_start_ts[cam_key] = ts_abs
+    rel_ts = max(0.0, ts_abs - selector_start_ts[cam_key])
+
+    row = feature_extractor.extract(cam_key, frame, rel_ts)
+    result = selectors[cam_key].process(row)
+    if not result.get("admitted_trigger"):
         xack(config.FRAMES_STREAM, config.DYNAMIC_GROUP, msg_id)
         return
 
     with buffer_lock:
-        buffer.append(camera_id, msg_id, frame_path, timestamp)
+        buffer.append(cam_key, msg_id, frame_path, timestamp)
 
 
 def _flush_expired(

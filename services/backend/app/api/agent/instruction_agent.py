@@ -19,11 +19,11 @@ def _get_openai() -> AsyncOpenAI:
     return _openai
 
 
-def _load_global_checklist() -> str:
-    """static/dynamic 글로벌 체크리스트를 읽어 단일 문자열로 반환. 파일이 없으면 빈 문자열."""
-    prompts_dir = Path(config.PROMPTS_DIR)
-    static_path = prompts_dir / "static_checklist.md"
-    dynamic_path = prompts_dir / "dynamic_checklist.md"
+def _load_site_checklist(site_id: str) -> str:
+    """현장별 static/dynamic 체크리스트를 읽어 단일 문자열로 반환. 파일이 없으면 빈 문자열."""
+    site_dir = Path(config.PROMPTS_DIR) / str(site_id)
+    static_path = site_dir / "static_checklist.md"
+    dynamic_path = site_dir / "dynamic_checklist.md"
 
     static_text = static_path.read_text(encoding="utf-8") if static_path.exists() else ""
     dynamic_text = dynamic_path.read_text(encoding="utf-8") if dynamic_path.exists() else ""
@@ -31,9 +31,9 @@ def _load_global_checklist() -> str:
     return f"[Static 체크리스트]\n{static_text}\n\n[Dynamic 체크리스트]\n{dynamic_text}".strip()
 
 
-async def analyze_instruction(user_input: str) -> dict:
-    """채널별 자유 텍스트를 글로벌 체크리스트와 비교해 static/dynamic 분류 후 VLM용 문장으로 변환."""
-    global_checklist = _load_global_checklist()
+async def analyze_instruction(user_input: str, site_id: str) -> dict:
+    """채널별 자유 텍스트를 현장 체크리스트와 비교해 static/dynamic 분류 후 VLM용 문장으로 변환."""
+    global_checklist = _load_site_checklist(site_id)
     messages = [
         {
             "role": "system",

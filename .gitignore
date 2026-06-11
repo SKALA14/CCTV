@@ -31,10 +31,39 @@ dist/
 infra/.env
 services/**/.env
 services/frontend/.env.local
+
+# 인증서 & 개인키
 *.key
 *.pem
 *.p12
+*.pfx
+*.crt
+*.cer
+*.der
+*.csr
 *.secret
+*_rsa
+*_rsa.pub
+*_ed25519
+*_ed25519.pub
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+
+# 클라우드 / 서비스 계정 크레덴셜
+service_account*.json
+*serviceaccount*.json
+credentials.json
+gcp-key*.json
+aws-credentials
+*.keystore
+*.jks
+
+# JWT / API 키 파일
+jwt_secret*
+api_key*
+auth_secret*
 
 # =====================
 # 런타임 생성 파일
@@ -44,6 +73,8 @@ services/frontend/.env.local
 
 services/backend/prompts/*.md
 services/backend/prompts/zones.json
+# 현장(site_id)별 런타임 프롬프트·체크리스트·zones (하위 디렉터리 전체)
+services/backend/prompts/*/
 sample/prompt/
 
 # =====================
@@ -75,6 +106,12 @@ Thumbs.db
 # =====================
 *.log
 
+# docker-compose override (로컬 포트·볼륨 커스텀, 시크릿 포함 가능)
+docker-compose.override.yml
+docker-compose.override.yaml
+docker-compose.local.yml
+docker-compose.local.yaml
+
 # =====================
 # 테스트 / 커버리지
 # =====================
@@ -95,3 +132,22 @@ CLAUDE.md
 *.tmp
 a.txt
 docs/
+
+# =====================
+# 데이터베이스 덤프 / 백업
+# =====================
+*.sql
+*.dump
+*.bak
+*.sqlite
+*.db
+
+# =====================
+# 추론 서비스 모델 가중치
+# =====================
+*.pt
+*.pth
+*.onnx
+*.bin
+*.safetensors
+*.gguf

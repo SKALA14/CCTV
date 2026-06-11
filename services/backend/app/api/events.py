@@ -10,7 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import config
 from app.db.session import get_db
-from app.db.models import EventLog, CctvChannel
+from app.api.deps import get_current_user
+from app.db.models import EventLog, CctvChannel, User, Site
 from app.api.schemas import EventLogRead, EventListResponse
 from app.api.time_parser import parse_time_expression
 from app.api.query_expander import expand_query
@@ -22,6 +23,7 @@ _openai = AsyncOpenAI()
 def _to_schema(
     event: EventLog,
     channel_name: str | None = None,
+    site_name: str | None = None,
     similarity: float | None = None,
     incident_count: int = 1,
     incident_last_at: datetime | None = None,
@@ -31,6 +33,7 @@ def _to_schema(
         channel_id=event.camera_id,
         # 우선순위: 이벤트 발생 시점 채널명(스냅샷) > 현재 채널명(lookup) > camera_id
         channel_name=event.camera_name or channel_name or event.camera_id,
+        site_name=site_name,
         pipeline=event.pipeline,
         event_type=event.event_type,
         danger_level=event.danger_level,
@@ -109,8 +112,18 @@ async def _fetch_channel_names(db: AsyncSession, camera_ids: list[str]) -> dict[
     return {ch.camera_id: ch.camera_name for ch in result.scalars().all()}
 
 
+async def _fetch_site_names(db: AsyncSession, site_ids: list[uuid.UUID | None]) -> dict[uuid.UUID, str]:
+    """site_id(UUID) 리스트 → {site_id: site_name} 딕셔너리. None은 제외."""
+    ids = [s for s in set(site_ids) if s is not None]
+    if not ids:
+        return {}
+    rows = (await db.execute(select(Site.id, Site.name).where(Site.id.in_(ids)))).all()
+    return {row[0]: row[1] for row in rows}
+
+
 @router.get("/events", response_model=EventListResponse)
 async def list_events(
+    site_id:      Optional[str] = Query(None),
     channel_id:   Optional[str] = Query(None),
     pipeline:     Optional[str] = Query(None),
     event_type:   Optional[str] = Query(None),
@@ -118,8 +131,22 @@ async def list_events(
     skip:  int = Query(0,  ge=0),
     limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),   # 인증 필요
 ):
     query = select(EventLog)
+
+    # 현장 격리: superadmin은 파라미터 우선, 나머지 role은 자기 현장으로 강제
+    if current_user.role == "superadmin":
+        if site_id:
+            from uuid import UUID as _UUID
+            try:
+                query = query.where(EventLog.site_id == _UUID(site_id))
+            except (ValueError, AttributeError):
+                pass
+        # site_id 없으면 전체 현장 — WHERE 없음
+    else:
+        if current_user.site_id:
+            query = query.where(EventLog.site_id == current_user.site_id)
 
     if channel_id:
         query = query.where(EventLog.camera_id == channel_id)
@@ -144,11 +171,15 @@ async def list_events(
     channel_names = await _fetch_channel_names(
         db, [inc["representative"].camera_id for inc in page]
     )
+    site_names = await _fetch_site_names(
+        db, [inc["representative"].site_id for inc in page]
+    )
     return EventListResponse(
         events=[
             _to_schema(
                 inc["representative"],
                 channel_names.get(inc["representative"].camera_id),
+                site_name=site_names.get(inc["representative"].site_id),
                 incident_count=inc["count"],
                 incident_last_at=_incident_last_at(inc["count"], inc["last_at"]),
             )
@@ -163,13 +194,27 @@ async def list_events(
 @router.get("/events/search", response_model=EventListResponse)
 async def search_events(
     q:               str  = Query(..., min_length=1),
+    site_id:         Optional[str]      = Query(None),
     channel_id:      Optional[str]      = Query(None),
     limit:           int  = Query(10, ge=1, le=50),
     start_date:      Optional[datetime] = Query(None),
     end_date:        Optional[datetime] = Query(None),
     skip_time_parse: bool = Query(False),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),   # 인증 필요
 ):
+    # 현장 격리: effective_site_id 결정 (UUID 타입으로 통일)
+    if current_user.role == "superadmin":
+        if site_id:
+            try:
+                effective_site_id: uuid.UUID | None = uuid.UUID(site_id)
+            except (ValueError, AttributeError):
+                effective_site_id = None
+        else:
+            effective_site_id = None  # 전체 현장
+    else:
+        effective_site_id = current_user.site_id  # already UUID | None
+
     if skip_time_parse:
         cleaned_query, active_start, active_end, applied_filter = q, None, None, None
     else:
@@ -202,6 +247,8 @@ async def search_events(
         )
         if channel_id:
             stmt = stmt.where(EventLog.camera_id == channel_id)
+        if effective_site_id is not None:
+            stmt = stmt.where(EventLog.site_id == effective_site_id)
         if active_start:
             stmt = stmt.where(EventLog.occurred_at >= active_start)
         if active_end:
@@ -241,12 +288,16 @@ async def search_events(
     channel_names = await _fetch_channel_names(
         db, [inc["representative"].camera_id for inc, _ in top]
     )
+    site_names = await _fetch_site_names(
+        db, [inc["representative"].site_id for inc, _ in top]
+    )
 
     return EventListResponse(
         events=[
             _to_schema(
                 inc["representative"],
                 channel_names.get(inc["representative"].camera_id),
+                site_name=site_names.get(inc["representative"].site_id),
                 similarity=max(round(1 - dist, 4), 0.0),
                 incident_count=inc["count"],
                 incident_last_at=_incident_last_at(inc["count"], inc["last_at"]),
@@ -264,10 +315,21 @@ async def search_events(
 async def get_event(
     event_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),   # 인증 필요
 ):
     event = await db.get(EventLog, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="이벤트를 찾을 수 없습니다")
 
+    # 현장 격리: non-superadmin은 자기 현장 이벤트만 조회 가능
+    if current_user.role != "superadmin":
+        if event.site_id != current_user.site_id:
+            raise HTTPException(status_code=404, detail="이벤트를 찾을 수 없습니다")
+
     channel_names = await _fetch_channel_names(db, [event.camera_id])
-    return _to_schema(event, channel_names.get(event.camera_id))
+    site_names = await _fetch_site_names(db, [event.site_id])
+    return _to_schema(
+        event,
+        channel_names.get(event.camera_id),
+        site_name=site_names.get(event.site_id),
+    )

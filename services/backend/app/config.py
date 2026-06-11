@@ -1,4 +1,4 @@
-# 환경변수 설정 파일. DB, Redis, CORS, Redis 스트림 이름 등 서비스 전반의 설정값을 관리한다.
+# 환경변수 설정 파일. DB, Redis, CORS, Redis 스트림 이름, 인증 등 서비스 전반의 설정값을 관리한다.
 
 from pydantic_settings import BaseSettings
 
@@ -6,18 +6,29 @@ from pydantic_settings import BaseSettings
 # alerts_stream : emergency pipeline 에서 yolo 분석 결과를 쓰는 stream
 class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://cctv:cctv@postgres:5432/cctv"
-    REDIS_URL: str = "redis://redis:6379"
+    REDIS_URL:    str = "redis://redis:6379"
     CORS_ORIGINS: list[str] = ["http://localhost:3000"]
 
     EVENTS_STREAM: str = "events"
     ALERTS_STREAM: str = "alerts"
+    FRAMES_STREAM: str = "frames"
 
     INCIDENT_GAP_SEC: float = 30.0  # 동일 (camera, event_type) 이벤트 간격이 이 시간 이내면 한 incident로 묶음
 
     PROMPTS_DIR: str = "/service/prompts"  # PDF 분석/instruction confirm 결과 글로벌 체크리스트 저장 위치
 
     OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-4o"
+    OPENAI_MODEL:   str = "gpt-4o"
+
+    # 인증
+    AUTH_SECRET:           str  = ""     # JWT 서명 키 — .env에서 반드시 설정 (운영 시 32자 이상 무작위 문자열)
+    JWT_EXPIRE_HOURS:      int  = 8      # 토큰 유효 시간 (근무 1교대 기준)
+    COOKIE_SECURE:         bool = False  # 운영 HTTPS 환경에서 True로 설정 (쿠키 평문 전송 방지)
+
+    # 초기 현장·admin 계정 — 최초 기동 시 DB에 없으면 자동 생성(설치 시 seed)
+    SITE_NAME:             str  = "default"
+    ADMIN_USERNAME:        str  = "admin"
+    ADMIN_PASSWORD:        str  = ""  # .env에서 반드시 설정
 
     class Config:
         env_file = ".env"

@@ -11,3 +11,7 @@ opencv-python-headless
 pdfplumber
 openpyxl
 python-multipart
+python-jose[cryptography]
+slowapi
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1

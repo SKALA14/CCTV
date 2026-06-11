@@ -15,6 +15,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import ClipDetail from '../components/search/ClipDetail.vue'
 import { fetchEventById } from '../api/events.js'
@@ -23,6 +24,7 @@ import { DUMMY_MODE } from '../constants/mode.js'
 import { DUMMY_EVENTS } from '../constants/dummyData.js'
 
 const props = defineProps({ id: String })
+const router = useRouter()
 
 const { lastSearchResults } = storeToRefs(useEventStore())
 const relatedEvents = lastSearchResults
@@ -42,7 +44,11 @@ watch(() => props.id, async (id) => {
   try {
     event.value = await fetchEventById(id)
   } catch (e) {
-    error.value = e.message
+    if (e.response?.status === 404) {
+      router.replace({ name: 'search' })
+      return
+    }
+    error.value = e.response?.data?.detail ?? e.message
   } finally {
     loading.value = false
   }

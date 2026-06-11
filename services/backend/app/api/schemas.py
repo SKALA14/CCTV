@@ -8,6 +8,7 @@ class EventLogRead(BaseModel):
     id:            uuid.UUID
     channel_id:    str
     channel_name:  str | None
+    site_name:     str | None = None
     pipeline:      str
     event_type:    str
     danger_level:  str

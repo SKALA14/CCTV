@@ -63,8 +63,7 @@ class Settings(BaseSettings):
     MODEL_QUEUE_SIZE: int = 10   # 적정 버퍼: 과부하 프레임 드롭 허용하되 카메라별 기회 보장
     RESULT_QUEUE_SIZE: int = 90
 
-    # Dynamic (Optical Flow + VLM)
-    FLOW_THRESHOLD: float = 500.0
+    # Dynamic (Dual-EMA Trigger + VLM)
     GENERAL_WINDOW_SEC: float = 10.0
     GENERAL_MIN_FRAMES: int = 3
     GENERAL_BUFFER_SIZE: int = 5

@@ -1,7 +1,8 @@
 <template>
   <div class="flex h-full">
-    <!-- 좌측 사이드바 -->
+    <!-- 좌측 사이드바 (로그인·월 등 크롬 없는 화면에서는 숨김) -->
     <aside
+      v-if="!route.meta.public && !route.meta.bare"
       class="flex flex-col items-center w-16 border-r flex-shrink-0 py-3"
       style="background: var(--bg-card); border-color: var(--border);"
     >
@@ -17,47 +18,18 @@
       <!-- 네비게이션 -->
       <AppNav class="w-full" />
 
-      <!-- 채널 추가 버튼 (대시보드에서만) -->
-      <div v-if="isDashboard" class="mt-2 px-2 w-full">
-        <div class="mb-2" style="border-top: 1px solid var(--border);"></div>
-        <button
-          :disabled="isMaxChannels"
-          class="flex flex-col items-center gap-1 w-full py-2.5 rounded-xl transition-all"
-          :class="isMaxChannels
-            ? 'bg-[#2c2c2e] text-[#48484a] cursor-not-allowed'
-            : 'bg-blue-600 text-white hover:bg-blue-500 shadow-lg shadow-blue-900/40'"
-          @click="triggerAddModal"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="12" y1="5" x2="12" y2="19" stroke-linecap="round"/>
-            <line x1="5" y1="12" x2="19" y2="12" stroke-linecap="round"/>
-          </svg>
-          <span class="text-[9px] font-semibold">채널추가</span>
-        </button>
-      </div>
-
       <div class="flex-1"></div>
 
-      <!-- 테마 토글 -->
-      <div class="px-2 w-full">
-        <div class="mb-2" style="border-top: 1px solid var(--border);"></div>
-        <button
-          class="flex flex-col items-center gap-1 w-full py-2.5 rounded-xl text-[9px] font-semibold transition-colors"
-          style="background: var(--bg-elevated); color: var(--text-muted);"
-          @click="toggle()"
-        >
-          <svg v-if="isDark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
-          </svg>
-          <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="5"/>
-            <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-            <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-          </svg>
-          <span>{{ isDark ? 'Dark' : 'Light' }}</span>
-        </button>
+      <!-- 프로필 진입 (모든 역할) — 계정·비밀번호·테마·로그아웃은 프로필 페이지에서 -->
+      <div v-if="authStore.isLoggedIn" class="w-full px-1.5 flex flex-col items-center">
+        <div class="nav-divider"></div>
+        <router-link to="/profile" class="nav-tab" active-class="active" :title="accountTitle">
+          <div
+            class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold"
+            :style="avatarStyle"
+          >{{ userInitial }}</div>
+          <span>프로필</span>
+        </router-link>
       </div>
     </aside>
 
@@ -65,11 +37,11 @@
     <div class="flex flex-col flex-1 min-w-0">
       <!-- 라우터 뷰 -->
       <main class="flex-1 overflow-auto" style="position: relative;">
-        <div :style="isDashboard ? 'height: 100%' : 'visibility: hidden; position: absolute; inset: 0; pointer-events: none'">
+        <div v-if="isLiveView" style="height: 100%">
           <DashboardView />
         </div>
         <keep-alive include="ManualView">
-          <router-view v-if="!isDashboard" />
+          <router-view v-if="!isLiveView" />
         </keep-alive>
       </main>
     </div>
@@ -80,47 +52,55 @@
 </template>
 
 <script setup>
-import { ref, computed, provide, onMounted } from 'vue'
+import { computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { storeToRefs } from 'pinia'
 import AppNav from './components/layout/AppNav.vue'
 import DashboardView from './views/DashboardView.vue'
 import NotificationToast from './components/dashboard/NotificationToast.vue'
 import { useWebSocket } from './composables/useWebSocket.js'
 import { useChannelStore } from './stores/channelStore.js'
-import { MAX_CHANNELS } from './constants/events.js'
 import { useTheme } from './composables/useTheme.js'
 import { getChannels } from './api/channels.js'
+import { useAuthStore } from './stores/authStore.js'
 
 useWebSocket()
 
-const { isDark, toggle } = useTheme()
+useTheme()   // 모듈 로드 시 전역 테마 적용 (토글은 프로필 페이지에서)
 
 const route = useRoute()
-const isDashboard = computed(() => route.path === '/')
+// 라이브 그리드(DashboardView)를 보여줄 경로 — 관제(월) 홈
+const isLiveView = computed(() => route.path === '/wall')
+
+const authStore = useAuthStore()
+
+// 사이드바 프로필 진입점 — 아바타(이니셜·역할색) + hover 툴팁
+const userInitial = computed(() => (authStore.user?.username?.[0] ?? '?').toUpperCase())
+const accountTitle = computed(() => {
+  const u = authStore.user
+  if (!u) return ''
+  const site = u.site_name || '—'
+  return `${u.username} · ${site}`
+})
+const avatarStyle = computed(() =>
+  authStore.isAdmin ? 'background:rgba(127,29,29,0.3);color:#fca5a5;'
+    :                 'background:var(--bg-elevated);color:var(--text-muted);'
+)
 
 const channelStore = useChannelStore()
-const { slots } = storeToRefs(channelStore)
-const isMaxChannels = computed(() => slots.value.every(s => s !== null))
 
-onMounted(async () => {
-  try {
-    const res = await getChannels()
-    res.data.forEach(ch => {
-      if (channelStore.slots[ch.slot] === null) {
-        channelStore.addChannel(ch.slot, ch)
-      }
-    })
-  } catch (e) {
-    console.warn('채널 복구 실패:', e.message)
-  }
-})
-
-const addModalSignal = ref(false)
-provide('addModalSignal', addModalSignal)
-
-function triggerAddModal() {
-  if (isMaxChannels.value) return
-  addModalSignal.value = true
-}
+// 로그인·로그아웃·계정 전환 시 채널 스토어를 리셋하고 새로 로드
+watch(() => authStore.user, async (newUser) => {
+    channelStore.resetSlots()
+    if (!newUser) return
+    try {
+        const res = await getChannels()
+        res.data.forEach(ch => {
+            if (channelStore.slots[ch.slot] === null) {
+                channelStore.addChannel(ch.slot, ch)
+            }
+        })
+    } catch (e) {
+        console.warn('채널 복구 실패:', e.message)
+    }
+}, { immediate: true })
 </script>

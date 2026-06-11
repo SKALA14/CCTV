@@ -68,7 +68,7 @@ const selectedChannelId   = ref(null)
 const lastQuery           = ref('')
 const selectedQuickFilter = ref(null)
 
-onMounted(() => { load() })
+onMounted(load)
 
 const QUICK_FILTERS = [
   { key: 'today',      label: '오늘' },
@@ -106,7 +106,13 @@ function getQuickFilterDates(key) {
 
 async function handleSearch(query, startDate = null, endDate = null, skipTimeParse = false) {
   lastQuery.value = query
-  await search(query, selectedChannelId.value, startDate, endDate, skipTimeParse)
+  await search(
+    query,
+    selectedChannelId.value,
+    startDate,
+    endDate,
+    skipTimeParse,
+  )
   eventStore.setSearchResults(events.value)
 }
 

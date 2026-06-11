@@ -6,10 +6,10 @@ export const useManualStore = defineStore('manual', () => {
   const files = ref([])
   const loading = ref(false)
 
-  async function load() {
+  async function load(siteId = null) {
     loading.value = true
     try {
-      files.value = await fetchManuals()
+      files.value = await fetchManuals(siteId)
     } catch {
       files.value = []
     } finally {
@@ -17,13 +17,13 @@ export const useManualStore = defineStore('manual', () => {
     }
   }
 
-  async function upload(file) {
-    const meta = await uploadManual(file)
+  async function upload(file, siteId = null) {
+    const meta = await uploadManual(file, siteId)
     files.value.unshift(meta)
   }
 
-  async function remove(id) {
-    await deleteManual(id)
+  async function remove(id, siteId = null) {
+    await deleteManual(id, siteId)
     files.value = files.value.filter(f => f.id !== id)
   }
 

@@ -1,14 +1,16 @@
 import api from './index.js'
 import { DUMMY_MODE } from '../constants/mode.js'
 
-export async function getChannels() {
+export async function getChannels(siteId = null) {
     if (DUMMY_MODE) return { data: [] }
-    return api.get('/channels')
+    const q = siteId ? `?site_id=${encodeURIComponent(siteId)}` : ''
+    return api.get(`/channels${q}`)
 }
 
 export async function postChannel({ slot, name, channelName, rtspUrl, sourceType, description, options, zone }) {
-    if (DUMMY_MODE) return
-    await api.post('/channels', { slot, name, channelName, rtspUrl, sourceType, description, options, zone })
+    if (DUMMY_MODE) return null
+    const res = await api.post('/channels', { slot, name, channelName, rtspUrl, sourceType, description, options, zone })
+    return res.data   // 백엔드가 mtxPath(접두사 포함 MediaMTX 경로)를 포함해 반환
 }
 
 export async function putChannel(channelName, patch) {

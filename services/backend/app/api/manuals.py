@@ -7,10 +7,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import redis.asyncio as aioredis
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Query
 from pydantic import BaseModel
 
-from app.api.agent.checklist_agent import analyze_pdf, refine_checklist, subset_by_zones, normalize_categories
+from app.api.deps import require_admin, get_current_user
+from app.api import checklist_store
+from app.db.models import User
+from app.api.agent.checklist_agent import analyze_pdf, refine_checklist, subset_by_zones, normalize_categories, diff_checklist
 from app.api.agent.pdf_parser import extract_text_from_pdf
 from app.config import config
 
@@ -29,6 +32,28 @@ def _get_redis() -> aioredis.Redis:
     if _redis is None:
         _redis = aioredis.from_url(config.REDIS_URL, decode_responses=True)
     return _redis
+
+
+def _site_dir(site_id) -> Path:
+    """현장별 체크리스트/구역 저장 디렉토리. 없으면 생성."""
+    d = Path(config.PROMPTS_DIR) / str(site_id)
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _effective_site_id(current_user, site_id_param: str | None):
+    """현장 결정: superadmin은 쿼리 파라미터, 그 외는 자기 현장.
+
+    superadmin이 파라미터 미지정/형식오류 시 None 반환(쓰기 차단 신호).
+    """
+    if current_user.role == "superadmin":
+        if not site_id_param:
+            return None
+        try:
+            return uuid.UUID(site_id_param)
+        except (ValueError, AttributeError, TypeError):
+            return None
+    return current_user.site_id
 
 
 class RefineRequest(BaseModel):
@@ -57,46 +82,56 @@ class ConfirmRequest(BaseModel):
     zones: list[ZoneChecklist] = []
 
 
-def _format_checklist(items: list[str], categories: list) -> str:
-    """번호 형식 체크리스트 텍스트 생성.
+class MergeRequest(BaseModel):
+    static_add: list[str] = []
+    static_remove: list[str] = []
+    dynamic_add: list[str] = []
+    dynamic_remove: list[str] = []
 
-    categories 여부와 무관하게 항상 번호 형식 반환.
-    코드 매핑은 _build_categories_map()이 별도 처리.
-    """
-    if not items:
-        return ""
-    return "\n".join(f"{i + 1}. {item}" for i, item in enumerate(items))
+
+def _cat_to_dict(cat) -> dict:
+    """pydantic CategoryItem 또는 dict → dict 정규화."""
+    if isinstance(cat, dict):
+        return {"code": cat.get("code", "GENERAL"), "label": cat.get("label", ""), "items": list(cat.get("items", []))}
+    return {"code": cat.code, "label": getattr(cat, "label", ""), "items": list(cat.items)}
+
+
+def _format_checklist(items: list[str], categories: list) -> str:
+    """번호 형식 체크리스트 텍스트. (store.format_numbered 위임, 기존 시그니처 유지)"""
+    return checklist_store.format_numbered(items)
 
 
 def _build_categories_map(items: list[str], categories: list) -> dict[str, str]:
-    """항목 인덱스(1-based 문자열) → 카테고리 코드 매핑 dict 생성.
-
-    Redis HSET mapping으로 바로 사용 가능.
-    categories 없으면 {} 반환.
-    categories에 없는 항목은 'GENERAL' 코드 부여.
-    """
+    """항목 인덱스(1-based str) → 카테고리 코드. (기존 시그니처 유지)"""
     if not items or not categories:
         return {}
-    item_to_code: dict[str, str] = {}
-    for cat in categories:
-        for item in cat.items:
-            item_to_code[item] = cat.code
-    return {
-        str(i + 1): item_to_code.get(item, "GENERAL")
-        for i, item in enumerate(items)
-    }
+    lookup = checklist_store.item_to_code([_cat_to_dict(c) for c in categories])
+    return {str(i + 1): lookup.get(item, "GENERAL") for i, item in enumerate(items)}
 
 
 @router.get("")
-async def list_manuals() -> list[dict]:
-    """업로드된 매뉴얼 파일 메타데이터 목록."""
-    raw = await _get_redis().get(_MANUALS_KEY)
+async def list_manuals(
+    site_id: str | None = Query(None),
+    current_user: User = Depends(require_admin),   # admin/superadmin
+) -> list[dict]:
+    """업로드된 매뉴얼 파일 메타데이터 목록 (현장별)."""
+    sid = _effective_site_id(current_user, site_id)
+    if sid is None:
+        return []
+    raw = await _get_redis().get(f"{_MANUALS_KEY}:{sid}")
     return json.loads(raw) if raw else []
 
 
 @router.post("")
-async def upload_manual(file: UploadFile = File(...)) -> dict:
-    """매뉴얼 파일 메타데이터를 Redis에 저장."""
+async def upload_manual(
+    file: UploadFile = File(...),
+    site_id: str | None = Query(None),   # superadmin은 현장 지정 필수
+    current_user: User = Depends(require_admin),
+) -> dict:
+    """매뉴얼 파일 메타데이터를 현장별 Redis에 저장."""
+    sid = _effective_site_id(current_user, site_id)
+    if sid is None:
+        raise HTTPException(status_code=403, detail="현장을 지정해야 합니다 (superadmin은 site_id 필요).")
     meta = {
         "id": str(uuid.uuid4()),
         "name": file.filename or "unknown",
@@ -106,41 +141,67 @@ async def upload_manual(file: UploadFile = File(...)) -> dict:
     }
     content = await file.read()
     meta["size"] = len(content)
-
     r = _get_redis()
-    raw = await r.get(_MANUALS_KEY)
+    key = f"{_MANUALS_KEY}:{sid}"
+    raw = await r.get(key)
     files: list[dict] = json.loads(raw) if raw else []
     files.insert(0, meta)
-    await r.set(_MANUALS_KEY, json.dumps(files, ensure_ascii=False))
+    await r.set(key, json.dumps(files, ensure_ascii=False))
     return meta
 
 
 @router.delete("/{file_id}")
-async def delete_manual(file_id: str) -> dict:
-    """매뉴얼 파일 메타데이터를 Redis에서 삭제."""
+async def delete_manual(
+    file_id: str,
+    site_id: str | None = Query(None),
+    current_user: User = Depends(require_admin),
+) -> dict:
+    sid = _effective_site_id(current_user, site_id)
+    if sid is None:
+        raise HTTPException(status_code=403, detail="현장을 지정해야 합니다 (superadmin은 site_id 필요).")
     r = _get_redis()
-    raw = await r.get(_MANUALS_KEY)
+    key = f"{_MANUALS_KEY}:{sid}"
+    raw = await r.get(key)
     files: list[dict] = json.loads(raw) if raw else []
     files = [f for f in files if f["id"] != file_id]
-    await r.set(_MANUALS_KEY, json.dumps(files, ensure_ascii=False))
+    await r.set(key, json.dumps(files, ensure_ascii=False))
     return {"status": "deleted"}
 
 
 @router.get("/checklist")
-async def get_current_checklist() -> dict:
-    """현재 적용 중인 글로벌 체크리스트 파일 내용 반환."""
-    prompts_dir = Path(config.PROMPTS_DIR)
-    static_path = prompts_dir / _STATIC_FILE
-    dynamic_path = prompts_dir / _DYNAMIC_FILE
+async def get_current_checklist(
+    site_id: str | None = Query(None),
+    current_user: User = Depends(get_current_user),   # viewer 이상
+) -> dict:
+    """현재 적용 중인 현장 체크리스트 반환 (읽기 전용). 공통 텍스트 + 구역별 항목."""
+    sid = _effective_site_id(current_user, site_id)
+    if sid is None:
+        return {"static": "", "dynamic": "", "zones": []}
+    site_dir = _site_dir(sid)
+    static_path = site_dir / _STATIC_FILE
+    dynamic_path = site_dir / _DYNAMIC_FILE
+    structured = await checklist_store.load_structured(site_dir, _get_redis(), str(sid))
+    zones = [
+        {"zone": z.get("zone", ""), "static": z.get("static", []), "dynamic": z.get("dynamic", [])}
+        for z in structured.get("zones", [])
+    ]
     return {
         "static": static_path.read_text(encoding="utf-8") if static_path.exists() else "",
         "dynamic": dynamic_path.read_text(encoding="utf-8") if dynamic_path.exists() else "",
+        "zones": zones,
     }
 
 
 @router.post("/analyze")
-async def analyze_manual(file: UploadFile = File(...)) -> dict:
+async def analyze_manual(
+    file: UploadFile = File(...),
+    site_id: str | None = Query(None),
+    current_user: User = Depends(require_admin),
+) -> dict:
     """PDF 업로드 → 체크리스트 분석. zones.json이 있으면 구역별 subset도 반환."""
+    sid = _effective_site_id(current_user, site_id)
+    if sid is None:
+        raise HTTPException(status_code=403, detail="현장을 지정해야 합니다 (superadmin은 site_id 필요).")
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="PDF 파일만 분석 가능합니다.")
 
@@ -179,7 +240,7 @@ async def analyze_manual(file: UploadFile = File(...)) -> dict:
         dynamic_categories = []
 
     zone_results = []
-    zones_path = Path(config.PROMPTS_DIR) / "zones.json"
+    zones_path = _site_dir(sid) / "zones.json"
     if zones_path.exists():
         try:
             raw_zones = json.loads(zones_path.read_text(encoding="utf-8"))
@@ -204,8 +265,16 @@ async def analyze_manual(file: UploadFile = File(...)) -> dict:
 
 
 @router.post("/refine")
-async def refine_manual(body: RefineRequest) -> dict:
+async def refine_manual(
+    body: RefineRequest,
+    site_id: str | None = Query(None),
+    current_user: User = Depends(require_admin),
+) -> dict:
     """피드백 반영해 체크리스트 재생성."""
+    # refine은 세션 기반이라 sid를 직접 쓰진 않지만, 현장 미지정(권한 가드) 차단용
+    sid = _effective_site_id(current_user, site_id)
+    if sid is None:
+        raise HTTPException(status_code=403, detail="현장을 지정해야 합니다 (superadmin은 site_id 필요).")
     try:
         result = await refine_checklist(body.session_id, body.feedback)
     except ValueError as e:
@@ -259,8 +328,14 @@ def _parse_zones(content: bytes, filename: str) -> list[dict]:
 
 
 @router.post("/zones")
-async def register_zones(zones_file: UploadFile = File(...)) -> dict:
-    """구역 파일만 업로드해 zones.json 저장 + 비고를 Redis에 저장. LLM 호출 없음."""
+async def register_zones(
+    zones_file: UploadFile = File(...),
+    site_id: str | None = Query(None),
+    current_user: User = Depends(require_admin),
+) -> dict:
+    sid = _effective_site_id(current_user, site_id)
+    if sid is None:
+        raise HTTPException(status_code=403, detail="현장을 지정해야 합니다 (superadmin은 site_id 필요).")
     content = await zones_file.read()
     try:
         zones = _parse_zones(content, zones_file.filename or "")
@@ -268,21 +343,23 @@ async def register_zones(zones_file: UploadFile = File(...)) -> dict:
         raise HTTPException(status_code=422, detail=f"구역 파일 파싱 실패: {e}")
     if not zones:
         raise HTTPException(status_code=422, detail="구역 정보가 없습니다. zone, description 컬럼을 확인하세요.")
-
-    prompts_dir = Path(config.PROMPTS_DIR)
-    prompts_dir.mkdir(parents=True, exist_ok=True)
-    (prompts_dir / "zones.json").write_text(
+    site_dir = _site_dir(sid)
+    (site_dir / "zones.json").write_text(
         json.dumps(zones, ensure_ascii=False), encoding="utf-8"
     )
-
     return {"status": "saved", "zones": [z["zone"] for z in zones]}
 
 
 @router.get("/zones")
-async def list_zones() -> list[str]:
-    """저장된 구역 이름 목록 반환."""
-    prompts_dir = Path(config.PROMPTS_DIR)
-    zones_file = prompts_dir / "zones.json"
+async def list_zones(
+    site_id: str | None = Query(None),
+    current_user: User = Depends(get_current_user),   # viewer 이상
+) -> list[str]:
+    """저장된 구역 이름 목록 반환 (현장별, 읽기 전용)."""
+    sid = _effective_site_id(current_user, site_id)
+    if sid is None:
+        return []
+    zones_file = _site_dir(sid) / "zones.json"
     if not zones_file.exists():
         return []
     data = json.loads(zones_file.read_text(encoding="utf-8"))
@@ -290,66 +367,120 @@ async def list_zones() -> list[str]:
 
 
 @router.post("/confirm")
-async def confirm_manual(body: ConfirmRequest) -> dict:
-    """확정된 체크리스트를 backend/prompts/에 저장.
+async def confirm_manual(
+    body: ConfirmRequest,
+    site_id: str | None = Query(None),
+    current_user: User = Depends(require_admin),
+) -> dict:
+    """확정된 체크리스트를 checklist.json(단일 원본) + 파생물로 저장."""
+    sid = _effective_site_id(current_user, site_id)
+    if sid is None:
+        raise HTTPException(status_code=403, detail="현장을 지정해야 합니다 (superadmin은 site_id 필요).")
 
-    - 글로벌: {static,dynamic}_checklist.md — 번호 형식 저장
-    - 글로벌: Redis checklist:{track}:categories hash — 인덱스→코드 매핑
-    - 구역별: zone_{safe_name}_{static,dynamic}.md + Redis zone hash
-    inference의 _load_checklist()와 render_prompt()가 매 VLM 호출 시 읽음 — 즉시 반영.
-    """
-    prompts_dir = Path(config.PROMPTS_DIR)
-    prompts_dir.mkdir(parents=True, exist_ok=True)
-    redis = _get_redis()
+    # 인라인 편집 결과(추가/수정/삭제)를 반영한 최종 항목 기준으로 카테고리 코드를 재산정.
+    # → 확정 시점에 카테고리 코드가 항상 현재 항목과 일치(편집된 항목도 올바른 코드 부여).
+    static_items = [i.strip() for i in body.static if i and i.strip()]
+    dynamic_items = [i.strip() for i in body.dynamic if i and i.strip()]
+    try:
+        static_cats = await normalize_categories(static_items)
+        dynamic_cats = await normalize_categories(dynamic_items)
+    except Exception as e:
+        logger.warning("카테고리 재산정 실패, GENERAL fallback: %s", e)
+        static_cats = [{"code": "GENERAL", "label": "일반", "items": static_items}] if static_items else []
+        dynamic_cats = [{"code": "GENERAL", "label": "일반", "items": dynamic_items}] if dynamic_items else []
 
-    # 글로벌 .md 저장 (번호 형식)
-    (prompts_dir / _STATIC_FILE).write_text(
-        _format_checklist(body.static, body.static_categories), encoding="utf-8"
-    )
-    (prompts_dir / _DYNAMIC_FILE).write_text(
-        _format_checklist(body.dynamic, body.dynamic_categories), encoding="utf-8"
-    )
+    data = {
+        "static": {"categories": static_cats},
+        "dynamic": {"categories": dynamic_cats},
+        "zones": [
+            {"zone": z.zone,
+             "static": [i.strip() for i in z.static if i and i.strip()],
+             "dynamic": [i.strip() for i in z.dynamic if i and i.strip()]}
+            for z in body.zones
+        ],
+    }
 
-    # 글로벌 categories → Redis hash
-    # 빈 map이어도 무조건 delete — 이전 categories가 남지 않도록
-    static_map = _build_categories_map(body.static, body.static_categories)
-    dynamic_map = _build_categories_map(body.dynamic, body.dynamic_categories)
-    await redis.delete("checklist:static:categories")
-    if static_map:
-        await redis.hset("checklist:static:categories", mapping=static_map)
-    await redis.delete("checklist:dynamic:categories")
-    if dynamic_map:
-        await redis.hset("checklist:dynamic:categories", mapping=dynamic_map)
+    await checklist_store.persist(_site_dir(sid), _get_redis(), str(sid), data)
 
-    # 구역별 .md + Redis hash
-    for z in body.zones:
-        safe = z.zone.replace(" ", "_")
-        static_cats = [
-            c for c in body.static_categories
-            if any(item in z.static for item in c.items)
-        ]
-        dynamic_cats = [
-            c for c in body.dynamic_categories
-            if any(item in z.dynamic for item in c.items)
-        ]
-
-        (prompts_dir / f"zone_{safe}_static.md").write_text(
-            _format_checklist(z.static, static_cats), encoding="utf-8"
-        )
-        (prompts_dir / f"zone_{safe}_dynamic.md").write_text(
-            _format_checklist(z.dynamic, dynamic_cats), encoding="utf-8"
-        )
-
-        zone_static_map  = _build_categories_map(z.static,  static_cats)
-        zone_dynamic_map = _build_categories_map(z.dynamic, dynamic_cats)
-        # 빈 map이어도 무조건 delete
-        await redis.delete(f"checklist:zone_{safe}:static:categories")
-        if zone_static_map:
-            await redis.hset(f"checklist:zone_{safe}:static:categories", mapping=zone_static_map)
-        await redis.delete(f"checklist:zone_{safe}:dynamic:categories")
-        if zone_dynamic_map:
-            await redis.hset(f"checklist:zone_{safe}:dynamic:categories", mapping=zone_dynamic_map)
-
-    logger.info("체크리스트 저장 완료: static=%d, dynamic=%d, zones=%d",
-                len(body.static), len(body.dynamic), len(body.zones))
+    logger.info("체크리스트 저장 완료: site=%s static=%d dynamic=%d zones=%d",
+                sid, len(body.static), len(body.dynamic), len(body.zones))
     return {"status": "saved", "static_count": len(body.static), "dynamic_count": len(body.dynamic)}
+
+
+@router.post("/analyze-diff")
+async def analyze_diff(
+    file: UploadFile = File(...),
+    site_id: str | None = Query(None),
+    current_user: User = Depends(require_admin),
+) -> dict:
+    """새 PDF를 분석해 기존 확정 체크리스트와 비교한 추가/삭제후보 반환."""
+    sid = _effective_site_id(current_user, site_id)
+    if sid is None:
+        raise HTTPException(status_code=403, detail="현장을 지정해야 합니다 (superadmin은 site_id 필요).")
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="PDF 파일만 분석 가능합니다.")
+
+    content = await file.read()
+    try:
+        pdf_text = extract_text_from_pdf(content)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    try:
+        result, _ = await analyze_pdf(pdf_text)
+    except Exception as e:
+        logger.error("증분 분석 실패: %s", e)
+        raise HTTPException(status_code=500, detail="분석에 실패했습니다. 다시 시도해주세요.")
+
+    def _flatten(section: list) -> list[str]:
+        out: list[str] = []
+        for entry in section:
+            if isinstance(entry, dict):
+                out.extend(entry.get("items", []))
+            elif isinstance(entry, str):
+                out.append(entry)
+        return out
+
+    new_static = _flatten(result.get("static", []))
+    new_dynamic = _flatten(result.get("dynamic", []))
+
+    existing = await checklist_store.load_structured(_site_dir(sid), _get_redis(), str(sid))
+    old_static = checklist_store.flatten_categories(existing.get("static", {}).get("categories", []))
+    old_dynamic = checklist_store.flatten_categories(existing.get("dynamic", {}).get("categories", []))
+
+    return {
+        "static": await diff_checklist(old_static, new_static),
+        "dynamic": await diff_checklist(old_dynamic, new_dynamic),
+    }
+
+
+@router.post("/merge")
+async def merge_checklist(
+    body: MergeRequest,
+    site_id: str | None = Query(None),
+    current_user: User = Depends(require_admin),
+) -> dict:
+    """수락된 추가/삭제를 기존 체크리스트에 병합. 추가 항목은 구역 자동 배치."""
+    sid = _effective_site_id(current_user, site_id)
+    if sid is None:
+        raise HTTPException(status_code=403, detail="현장을 지정해야 합니다 (superadmin은 site_id 필요).")
+
+    data = await checklist_store.load_structured(_site_dir(sid), _get_redis(), str(sid))
+    checklist_store.apply_removes(data, body.static_remove, body.dynamic_remove)
+    checklist_store.apply_adds(data, body.static_add, body.dynamic_add)
+
+    # 새 항목만 구역 자동 배치 (구역이 등록돼 있고 추가가 있을 때만 LLM 호출)
+    if data.get("zones") and (body.static_add or body.dynamic_add):
+        mini = {
+            "static": [{"items": body.static_add}],
+            "dynamic": [{"items": body.dynamic_add}],
+        }
+        zone_meta = [{"zone": z["zone"], "description": ""} for z in data["zones"]]
+        try:
+            subsets = await subset_by_zones(mini, zone_meta)
+            checklist_store.apply_zone_assignments(data, subsets)
+        except Exception as e:
+            logger.warning("구역 자동 배치 실패(공통만 병합): %s", e)
+
+    await checklist_store.persist(_site_dir(sid), _get_redis(), str(sid), data)
+    return {"status": "merged"}
