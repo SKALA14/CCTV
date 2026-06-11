@@ -1,37 +1,9 @@
 <template>
-  <div class="p-6 flex gap-6 h-full overflow-auto">
-    <!-- 현장 패널 -->
-    <div class="w-72 flex-shrink-0">
+  <div class="p-6 h-full overflow-auto">
+    <!-- 계정 패널 — admin 자기 현장의 user 계정 관리 -->
+    <div class="max-w-3xl">
       <div class="flex items-center justify-between mb-4">
-        <h2 class="font-bold" style="color: var(--text-primary);">현장 목록</h2>
-        <button
-          @click="openSiteForm"
-          class="text-xs px-3 py-1.5 rounded-lg font-semibold"
-          style="background: #2563eb; color: white;"
-        >+ 추가</button>
-      </div>
-
-      <div v-if="sitesLoading" class="text-sm" style="color: var(--text-muted);">불러오는 중...</div>
-      <div v-else-if="sites.length === 0" class="text-sm" style="color: var(--text-muted);">등록된 현장이 없습니다.</div>
-
-      <div
-        v-for="site in sites"
-        :key="site.id"
-        class="p-3 rounded-xl mb-2 cursor-pointer transition-colors"
-        :style="selectedSite?.id === site.id
-          ? 'background: rgba(37,99,235,0.2); border: 1px solid #2563eb;'
-          : 'background: var(--bg-card); border: 1px solid var(--border);'"
-        @click="selectSite(site)"
-      >
-        <div class="font-medium text-sm" style="color: var(--text-primary);">{{ site.name }}</div>
-        <div class="text-xs mt-0.5" style="color: var(--text-muted);">계정 {{ site.user_count }}명</div>
-      </div>
-    </div>
-
-    <!-- 계정 패널 -->
-    <div class="flex-1" v-if="selectedSite">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="font-bold" style="color: var(--text-primary);">{{ selectedSite.name }} — 계정</h2>
+        <h2 class="font-bold" style="color: var(--text-primary);">{{ siteName }} — 계정</h2>
         <button
           @click="openUserForm"
           class="text-xs px-3 py-1.5 rounded-lg font-semibold"
@@ -83,6 +55,7 @@
               </td>
               <td class="px-4 py-3 text-right">
                 <button
+                  v-if="u.role !== 'admin'"
                   @click="handleDeleteUser(u)"
                   class="text-xs hover:underline"
                   style="color: #ef4444;"
@@ -91,30 +64,6 @@
             </tr>
           </tbody>
         </table>
-      </div>
-    </div>
-
-    <div v-else-if="!sitesLoading" class="flex-1 flex items-center justify-center">
-      <p class="text-sm" style="color: var(--text-muted);">현장을 선택하면 계정 목록이 표시됩니다.</p>
-    </div>
-
-    <!-- 현장 추가 모달 -->
-    <div v-if="showSiteForm" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50" @click.self="showSiteForm = false">
-      <div class="p-6 rounded-2xl w-80" style="background: var(--bg-card); border: 1px solid var(--border);">
-        <h3 class="font-bold mb-4" style="color: var(--text-primary);">현장 추가</h3>
-        <input
-          v-model="newSiteName"
-          type="text"
-          placeholder="현장 이름"
-          class="w-full px-4 py-2.5 rounded-xl text-sm mb-3 outline-none"
-          style="background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-primary);"
-          @keyup.enter="handleCreateSite"
-        />
-        <div v-if="siteFormError" class="text-red-400 text-xs mb-3">{{ siteFormError }}</div>
-        <div class="flex gap-2">
-          <button @click="showSiteForm = false" class="flex-1 py-2 rounded-xl text-sm" style="background: var(--bg-elevated); color: var(--text-muted);">취소</button>
-          <button @click="handleCreateSite" :disabled="!newSiteName.trim()" class="flex-1 py-2 rounded-xl text-sm font-semibold" style="background: #2563eb; color: white;">추가</button>
-        </div>
       </div>
     </div>
 
@@ -129,12 +78,6 @@
           class="w-full px-4 py-2.5 rounded-xl text-sm mb-3 outline-none"
           style="background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-primary);"
         />
-        <select
-          v-model="newUser.role"
-          class="app-select w-full px-4 py-2.5 rounded-xl text-sm mb-3"
-        >
-          <option value="user">user</option>
-        </select>
         <div v-if="userFormError" class="text-red-400 text-xs mb-3">{{ userFormError }}</div>
         <div class="flex gap-2">
           <button @click="showUserForm = false" class="flex-1 py-2 rounded-xl text-sm" style="background: var(--bg-elevated); color: var(--text-muted);">취소</button>
@@ -156,19 +99,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { getSites, createSite } from '../api/sites.js'
+import { ref, computed, onMounted } from 'vue'
 import { getUsers, createUser, deleteUser, resetPassword } from '../api/users.js'
+import { useAuthStore } from '../stores/authStore.js'
 
-const sites        = ref([])
-const selectedSite = ref(null)
+const auth = useAuthStore()
+const siteId   = computed(() => auth.user?.site_id)
+const siteName = computed(() => auth.user?.site_name || '내 현장')
+
 const users        = ref([])
-const sitesLoading = ref(true)
-const usersLoading = ref(false)
-
-const showSiteForm  = ref(false)
-const newSiteName   = ref('')
-const siteFormError = ref(null)
+const usersLoading = ref(true)
 
 const showUserForm  = ref(false)
 const newUser       = ref({ username: '', role: 'user' })
@@ -176,44 +116,16 @@ const userFormError = ref(null)
 
 const initialPassword = ref(null)
 
-onMounted(async () => {
-  try {
-    sites.value = await getSites()
-  } catch (e) {
-    console.error('[AdminView] 현장 목록 로드 실패:', e)
-  } finally {
-    sitesLoading.value = false
-  }
-})
+onMounted(loadUsers)
 
-async function selectSite(site) {
-  selectedSite.value = site
+async function loadUsers() {
   usersLoading.value = true
   try {
-    users.value = await getUsers(site.id)
+    users.value = await getUsers(siteId.value)
   } catch (e) {
     console.error('[AdminView] 계정 목록 로드 실패:', e)
   } finally {
     usersLoading.value = false
-  }
-}
-
-function openSiteForm() {
-  newSiteName.value   = ''
-  siteFormError.value = null
-  showSiteForm.value  = true
-}
-
-async function handleCreateSite() {
-  if (!newSiteName.value.trim()) return
-  siteFormError.value = null
-  try {
-    const site = await createSite(newSiteName.value.trim())
-    sites.value.push({ ...site, user_count: 0 })
-    showSiteForm.value = false
-    newSiteName.value  = ''
-  } catch (e) {
-    siteFormError.value = e.response?.data?.detail ?? e.message
   }
 }
 
@@ -227,13 +139,10 @@ async function handleCreateUser() {
   if (!newUser.value.username.trim()) return
   userFormError.value = null
   try {
-    const res = await createUser(selectedSite.value.id, newUser.value)
+    const res = await createUser(siteId.value, newUser.value)
     initialPassword.value = res.initial_password
     users.value.push(res.user)
     showUserForm.value = false
-    // 현장 user_count 업데이트
-    const idx = sites.value.findIndex(s => s.id === selectedSite.value.id)
-    if (idx !== -1) sites.value[idx].user_count++
   } catch (e) {
     userFormError.value = e.response?.data?.detail ?? e.message
   }
@@ -242,10 +151,8 @@ async function handleCreateUser() {
 async function handleDeleteUser(u) {
   if (!confirm(`${u.username} 계정을 삭제하시겠습니까?`)) return
   try {
-    await deleteUser(selectedSite.value.id, u.id)
+    await deleteUser(siteId.value, u.id)
     users.value = users.value.filter(x => x.id !== u.id)
-    const idx = sites.value.findIndex(s => s.id === selectedSite.value.id)
-    if (idx !== -1) sites.value[idx].user_count = Math.max(0, sites.value[idx].user_count - 1)
   } catch (e) {
     alert(e.response?.data?.detail ?? e.message)
   }
@@ -254,7 +161,7 @@ async function handleDeleteUser(u) {
 async function handleResetPassword(u) {
   if (!confirm(`${u.username}의 비밀번호를 초기화하시겠습니까?`)) return
   try {
-    const res = await resetPassword(selectedSite.value.id, u.id)
+    const res = await resetPassword(siteId.value, u.id)
     initialPassword.value = res.new_password
   } catch (e) {
     alert(e.response?.data?.detail ?? e.message)
