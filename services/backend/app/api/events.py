@@ -135,18 +135,8 @@ async def list_events(
 ):
     query = select(EventLog)
 
-    # 현장 격리: superadmin은 파라미터 우선, 나머지 role은 자기 현장으로 강제
-    if current_user.role == "superadmin":
-        if site_id:
-            from uuid import UUID as _UUID
-            try:
-                query = query.where(EventLog.site_id == _UUID(site_id))
-            except (ValueError, AttributeError):
-                pass
-        # site_id 없으면 전체 현장 — WHERE 없음
-    else:
-        if current_user.site_id:
-            query = query.where(EventLog.site_id == current_user.site_id)
+    # 현장 격리: 모든 계정은 자기 현장으로 스코프 (admin/user 2단계 — 교차 현장 조회 없음)
+    query = query.where(EventLog.site_id == current_user.site_id)
 
     if channel_id:
         query = query.where(EventLog.camera_id == channel_id)
@@ -203,17 +193,8 @@ async def search_events(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),   # 인증 필요
 ):
-    # 현장 격리: effective_site_id 결정 (UUID 타입으로 통일)
-    if current_user.role == "superadmin":
-        if site_id:
-            try:
-                effective_site_id: uuid.UUID | None = uuid.UUID(site_id)
-            except (ValueError, AttributeError):
-                effective_site_id = None
-        else:
-            effective_site_id = None  # 전체 현장
-    else:
-        effective_site_id = current_user.site_id  # already UUID | None
+    # 현장 격리: 모든 계정은 자기 현장으로 스코프 (admin/user 2단계 — 교차 현장 조회 없음)
+    effective_site_id = current_user.site_id  # UUID
 
     if skip_time_parse:
         cleaned_query, active_start, active_end, applied_filter = q, None, None, None
@@ -321,10 +302,9 @@ async def get_event(
     if not event:
         raise HTTPException(status_code=404, detail="이벤트를 찾을 수 없습니다")
 
-    # 현장 격리: non-superadmin은 자기 현장 이벤트만 조회 가능
-    if current_user.role != "superadmin":
-        if event.site_id != current_user.site_id:
-            raise HTTPException(status_code=404, detail="이벤트를 찾을 수 없습니다")
+    # 현장 격리: 자기 현장 이벤트만 조회 가능
+    if event.site_id != current_user.site_id:
+        raise HTTPException(status_code=404, detail="이벤트를 찾을 수 없습니다")
 
     channel_names = await _fetch_channel_names(db, [event.camera_id])
     site_names = await _fetch_site_names(db, [event.site_id])

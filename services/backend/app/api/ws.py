@@ -45,8 +45,7 @@ async def ws_events(websocket: WebSocket):
         logger.warning("[ws] 존재하지 않는 사용자 — 연결 거부")
         return
 
-    ws_site_id    = user.site_id   # UUID | None
-    is_superadmin = user.role == "superadmin"
+    ws_site_id = user.site_id   # UUID
 
     await websocket.accept()
     r = aioredis.from_url(config.REDIS_URL, decode_responses=True)
@@ -67,16 +66,15 @@ async def ws_events(websocket: WebSocket):
                 for msg_id, fields in messages:
                     last_ids[stream] = msg_id
 
-                    # 현장 격리: non-superadmin은 자기 현장 메시지만 수신
-                    if not is_superadmin:
-                        msg_site_id_str = fields.get("site_id")
-                        if not msg_site_id_str:
-                            continue  # site_id 없는 메시지는 non-superadmin에게 skip
-                        try:
-                            if uuid.UUID(msg_site_id_str) != ws_site_id:
-                                continue
-                        except (ValueError, AttributeError):
+                    # 현장 격리: 자기 현장 메시지만 수신
+                    msg_site_id_str = fields.get("site_id")
+                    if not msg_site_id_str:
+                        continue  # site_id 없는 메시지는 skip
+                    try:
+                        if uuid.UUID(msg_site_id_str) != ws_site_id:
                             continue
+                    except (ValueError, AttributeError):
+                        continue
 
                     await websocket.send_text(json.dumps({
                         "type": "new_event",
