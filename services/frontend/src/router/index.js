@@ -47,11 +47,6 @@ router.beforeEach(async (to) => {
         return { name: 'password-change' }
     }
 
-    // user(작업자)는 월 화면 전용 — 콘솔 라우트 진입 차단
-    if (auth.user?.role === 'user' && !to.meta.bare && to.name !== 'password-change') {
-        return { name: 'wall' }
-    }
-
     // admin 전용 페이지
     if (to.meta.adminOnly && !auth.isAdmin) {
         return { name: 'dashboard' }

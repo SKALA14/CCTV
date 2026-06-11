@@ -47,6 +47,19 @@
     </div>
   </div>
 
+  <!-- 전체화면 관제(월)에서 콘솔로 복귀 — 우상단 은은한 진입점 -->
+  <router-link
+    v-if="route.meta.bare"
+    to="/"
+    class="wall-exit"
+    title="콘솔로 나가기"
+  >
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+      <path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span>콘솔</span>
+  </router-link>
+
   <!-- 우하단 알림 토스트 (어느 페이지에서나 표시) -->
   <NotificationToast />
 </template>
@@ -104,3 +117,30 @@ watch(() => authStore.user, async (newUser) => {
     }
 }, { immediate: true })
 </script>
+
+<style scoped>
+/* 전체화면 관제(월)에서 콘솔로 복귀하는 우상단 진입점 — 24시간 화면을 가리지 않게 은은하게 */
+.wall-exit {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--bg-card) 70%, transparent);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(8px);
+  opacity: 0.35;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+.wall-exit:hover {
+  opacity: 1;
+  color: var(--text-primary);
+}
+</style>

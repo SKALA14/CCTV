@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["users"])
 
 _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-_VALID_ROLES = {"user"}
+_VALID_ROLES = {"admin", "user"}
 
 
 def _generate_initial_password() -> str:
