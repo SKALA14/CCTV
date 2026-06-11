@@ -1,177 +1,203 @@
 # AI CCTV Frontend
 
-Vue 3 + Vite + Pinia + Tailwind CSS 기반 CCTV 모니터링 대시보드.
+Vue 3 + Vite + Pinia + Vue Router + Tailwind CSS 기반 CCTV 관제/관리 웹앱.
+
+백엔드(FastAPI) · MediaMTX(WebRTC) · Redis 파이프라인과 연동되는 **풀스택 클라이언트**입니다.
 
 ---
 
-## 실행 방법
+## 핵심 구조 — 관제(월) vs 콘솔
 
-```bash
-# 의존성 설치
-npm install
+화면을 두 면으로 분리했습니다. **관제(월)** 가 홈이고, 설정·관리는 톱니 뒤 **콘솔**에 모았습니다.
 
-# 개발 서버 (기본 포트 5173)
-npm run dev
-
-# 프로덕션 빌드
-npm run build
+```
+로그인 → 관제(월) = 홈                  ← 사이드바 없는 풀스크린 라이브 그리드 + 실시간 알림
+   └─ 헤더 우상단 [⚙ 콘솔] → 별도 창으로 콘솔 열기 (관제 화면은 그대로 유지)
+                                ├─ 검색      (이벤트 자연어 검색)
+                                ├─ 매뉴얼    (PDF 업로드 → 체크리스트)
+                                ├─ 현황      (admin 전용 — 현장/기기/계정 모니터링)
+                                ├─ 관리      (admin 전용 — 계정 관리)
+                                └─ 프로필    (비밀번호 변경·테마·로그아웃)
+   ← 콘솔 사이드바 최상위에서 관제로 복귀(또는 콘솔 창을 닫음)
 ```
 
+- **홈(`/`)은 `/wall`로 리다이렉트** — 로그인하면 바로 관제 화면이 단일로 뜸
+- 관제(`/wall`)는 `meta.bare` 라우트라 사이드바 등 크롬을 숨김
+- 라이브 그리드(`DashboardView`)는 관제에서만 마운트됨 (콘솔 창이 WebRTC를 이중 연결하지 않도록)
+
 ---
 
-## 환경변수
+## 역할(RBAC) — admin / user
+
+2단계 역할이며, 화면(월/콘솔)이 아니라 **권한(보기 vs 관리)** 으로 갈립니다.
+
+| 기능 | **user** | **admin** |
+|---|---|---|
+| 관제(월) · 검색 · 매뉴얼 보기 | ✅ | ✅ |
+| 채널 추가/수정/삭제 | ❌ | ✅ |
+| 매뉴얼·구역 등록, 체크리스트 편집 | ❌ | ✅ |
+| 현황 · 관리(계정) 탭 | ❌ | ✅ |
+| 계정 생성(admin·user 둘 다) | ❌ | ✅ |
+
+- 역할은 한 현장(site)에 소속됩니다. 현장과 초기 admin은 **설치 시 백엔드에서 seed** 되며, 추가 계정은 admin이 관리 탭에서 생성합니다.
+- 라우터 가드(`src/router/index.js`): `meta.public`(로그인) · `meta.bare`(월) · `meta.adminOnly`(현황·관리) + 최초 로그인 시 비밀번호 변경 강제(`/password-change`).
+
+---
+
+## 인증
+
+- 백엔드가 **httpOnly 쿠키(JWT)** 를 발급. axios는 `withCredentials: true`로 쿠키를 자동 전송합니다(`src/api/index.js`).
+- 응답이 `401`이면 자동으로 `/login`으로 이동.
+- 상태는 `src/stores/authStore.js`(`user`, `isLoggedIn`, `isAdmin`, `mustChangePwd`).
+
+---
+
+## 실시간 영상 — WebRTC(MediaMTX)
+
+영상은 MediaMTX를 통해 WebRTC로 재생/송출합니다. nginx가 `/webrtc/` → `mediamtx:8889`로 프록시합니다(`constants/mediamtx.js`의 `MEDIAMTX_URL = '/webrtc'`).
+
+| 소스 타입 | 재생/송출 | 비고 |
+|---|---|---|
+| `rtsp` | **WHEP**로 재생 (`useWebRTC`) | 백엔드가 RTSP를 MediaMTX 경로로 끌어옴 |
+| `webcam` | 브라우저가 **WHIP**로 송출 (`useWebRTCPublish`) 후 재생 | |
+| `file` | `<video src="/sample/...">` | 로컬 샘플 파일 |
+| `youtube` | iframe 임베드 | |
+
+> **경로(mtxPath) 주의**: MediaMTX 경로는 현장 격리를 위해 `{site_id 앞 8자}_{채널명}` 접두사가 붙습니다. 프론트는 채널명이 아니라 **백엔드가 내려주는 `channel.mtxPath`** 로 WHEP/WHIP URL을 구성해야 합니다(`ChannelCard.vue`). 채널 등록 응답·`GET /channels` 모두 `mtxPath`를 포함합니다.
+
+---
+
+## 실시간 알림
+
+- `useWebSocket` → `ws://<host>/ws` 연결(JWT 쿠키 인증). 끊기면 3초 간격 재연결, 인증 실패(4001) 시 로그인으로 이동.
+- 수신 이벤트는 `eventStore`로 들어가 **`NotificationToast`** (우하단, 전 페이지 표시)로 노출됩니다.
+
+---
+
+## 매뉴얼 · 체크리스트
+
+PDF 안전 매뉴얼을 업로드해 구역별 점검 체크리스트를 생성/편집합니다(admin).
+
+- 업로드 → 분석(`analyzeManual`) → 보정(`refineManual`) → 확정(`confirmManual`)
+- **구역별 보기 + 인라인 편집**: `ManualView` + `ChecklistReview` / `ChecklistItem`. 확정된 체크리스트를 STATIC/DYNAMIC·구역(zone)별로 보고 항목을 직접 추가/수정.
+- 구역은 CSV/XLSX(`registerZones`)로 등록.
+
+---
+
+## 실행
+
+```bash
+npm install
+npm run dev      # 개발 서버 (Vite, 기본 5173)
+npm run build    # 프로덕션 빌드 → dist/
+npm run preview  # 빌드 결과 미리보기
+```
+
+배포 시에는 `nginx.conf`가 `dist/`를 서빙하며 `/api`(백엔드)·`/ws`(웹소켓)·`/webrtc`(MediaMTX)를 프록시합니다. 컨테이너 빌드는 루트 `infra/docker-compose.yaml`의 `frontend` 서비스를 사용하세요.
+
+### 환경변수
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `VITE_USE_DUMMY` | `true` | `false`로 설정하면 실제 백엔드 API 사용 |
-| `VITE_API_BASE_URL` | `/api` | 백엔드 API 베이스 URL |
+| `VITE_USE_DUMMY` | (미설정 시 `true`) | `false`면 실제 백엔드 사용. 배포(`.env.example`)는 `false` |
 
-`.env` 파일 예시:
-```
-VITE_USE_DUMMY=false
-VITE_API_BASE_URL=/api
-```
+> **DUMMY_MODE는 레거시 부분 스텁**입니다. 인증·WebRTC·현황·관리에는 더미가 없으며, 일부 API(`channels`/`events`/`manuals`)에만 `if (DUMMY_MODE)` 분기가 남아 있습니다. 실제 운영은 항상 `VITE_USE_DUMMY=false`.
 
 ---
 
-## 프론트 단독 모드 (DUMMY_MODE, 기본값)
+## 라우트
 
-`VITE_USE_DUMMY`가 `false`가 아닌 모든 경우 더미 모드로 동작합니다.
-
-### 현재 동작
-
-- **대시보드**: 채널 추가/수정/삭제는 Pinia store에 in-memory로 저장. 새로고침 시 초기화됨
-- **검색**: `src/constants/dummyData.js`의 `DUMMY_EVENTS` 3건을 자동 로드. 텍스트 검색과 채널 필터가 클라이언트 사이드에서 동작
-- **클립 상세**: `DUMMY_EVENTS`에서 id로 조회. clip_url이 null이므로 영상은 빈 상태로 표시
-- **채널 필터**: `DUMMY_CHANNELS` 3개가 고정 표시됨
-- **메뉴얼**: 파일 메타데이터를 `localStorage("cctv_manuals")`에 저장. 새로고침 후에도 목록 유지. 실제 파일 내용은 저장되지 않음 (VLM RAG 연동 불가)
-
-### 더미 데이터 수정
-
-`src/constants/dummyData.js`에서 `DUMMY_CHANNELS`와 `DUMMY_EVENTS`를 직접 편집합니다.
-
-### 메뉴얼 파일 저장 위치
-
-브라우저 localStorage의 `cctv_manuals` 키. 파일 메타데이터(이름·크기·업로드 일시)만 저장되며 실제 바이너리는 저장되지 않습니다.
+| 경로 | 이름 | 메타 | 화면 |
+|---|---|---|---|
+| `/login` | login | `public` | 로그인 |
+| `/` | — | redirect | → `/wall` |
+| `/wall` | wall | `bare` | 관제(풀스크린 라이브 그리드) |
+| `/search` · `/search/:id` | search · clip-detail | — | 이벤트 검색 / 클립 상세 |
+| `/manual` | manual | — | 매뉴얼·체크리스트 |
+| `/admin` | admin | `adminOnly` | 계정 관리 |
+| `/status` | status | `adminOnly` | 현장/기기/계정 현황 |
+| `/profile` | profile | — | 프로필 |
+| `/password-change` | password-change | — | 비밀번호 변경(최초 로그인 강제) |
 
 ---
 
-## 풀스택 전환 가이드
+## API 연동 맵
 
-### 1. 환경변수 변경
+모든 호출은 axios 인스턴스(`src/api/index.js`, baseURL `/api`, 쿠키 인증)를 통합니다.
 
-```
-VITE_USE_DUMMY=false
-```
-
-### 2. 수정이 필요한 파일
-
-더미 모드 → 실제 모드 전환 시 **컴포넌트는 수정 불필요**. 아래 API 함수 내부의 `if (DUMMY_MODE)` 분기만 동작하지 않습니다.
-
-| 파일 | 역할 | 백엔드 연동 포인트 |
-|---|---|---|
-| `src/api/events.js` | 이벤트 목록 조회·검색·단건 조회 | `GET /api/events`, `GET /api/events/search`, `GET /api/events/:id` |
-| `src/api/manuals.js` | 메뉴얼 CRUD | `GET /api/manuals`, `POST /api/manuals`, `DELETE /api/manuals/:id` |
-| `src/api/websocket.js` | 실시간 이벤트 수신 | `ws://host/ws/events` |
-| `src/api/index.js` | axios 인스턴스 | baseURL 확인 |
-
-### 3. 백엔드 API 엔드포인트 목록
-
-| Method | Path | 설명 |
-|---|---|---|
-| `GET` | `/api/events` | 전체 이벤트 목록 |
-| `GET` | `/api/events/search?q=&channel_id=` | 자연어 검색 (VLM/Qdrant) |
-| `GET` | `/api/events/:id` | 단건 이벤트 조회 |
-| `GET` | `/api/manuals` | 메뉴얼 목록 |
-| `POST` | `/api/manuals` | 메뉴얼 업로드 (multipart/form-data) |
-| `DELETE` | `/api/manuals/:id` | 메뉴얼 삭제 |
-| `WS` | `/ws/events` | 실시간 이벤트 스트림 |
-
-### 4. 채널 데이터
-
-현재 채널은 프론트 Pinia store에서만 관리됩니다. 백엔드에 채널 CRUD API가 생기면:
-- `src/api/channels.js` 신규 작성
-- `src/stores/channelStore.js`에 persist 로직 추가
-- `src/composables/useChannels.js`의 더미 분기 제거
-
-### 5. Docker Compose 예시
-
-```yaml
-services:
-  frontend:
-    build: ./services/frontend
-    ports: ["80:80"]
-    environment:
-      - VITE_USE_DUMMY=false
-  backend:
-    build: ./services/backend
-    ports: ["8000:8000"]
-  qdrant:
-    image: qdrant/qdrant
-    ports: ["6333:6333"]
-```
+| 파일 | 백엔드 엔드포인트 |
+|---|---|
+| `api/auth.js` | `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` |
+| `api/channels.js` | `GET/POST /channels`, `PUT/DELETE /channels/{name}` |
+| `api/events.js` | `GET /events`, 자연어 검색, 단건 조회 |
+| `api/manuals.js` | 분석/보정/확정 · `zones` · `checklist` |
+| `api/sites.js` | `GET /sites` (현장은 seed 전용, 읽기만) |
+| `api/users.js` | `/sites/{id}/users` CRUD, `PATCH /users/me/password` |
+| `api/status.js` | `/status/overview · /devices · /accounts · /sites/{id}/today-events` |
+| `api/websocket.js` | `WS /ws` |
 
 ---
 
-## 컴포넌트 구조
+## 디렉터리 구조
 
 ```
 src/
+├── App.vue                      # 루트 셸: 월/콘솔 레이아웃 분기, WS·채널 부트스트랩
+├── main.js
+├── router/index.js              # 라우트 + 인증/역할 가드
 ├── views/
-│   ├── DashboardView.vue     # 2×2 채널 그리드
-│   ├── SearchView.vue        # 이벤트 검색
-│   ├── ClipDetailView.vue    # 클립 상세 (데이터 로딩)
-│   └── ManualView.vue        # 메뉴얼 업로드/관리
+│   ├── DashboardView.vue        # 관제(월) 라이브 그리드 + [⚙ 콘솔] 진입
+│   ├── SearchView.vue           # 이벤트 검색
+│   ├── ClipDetailView.vue       # 클립 상세
+│   ├── ManualView.vue           # 매뉴얼 업로드 + 구역별 체크리스트 편집
+│   ├── StatusView.vue           # 현황(admin)
+│   ├── AdminView.vue            # 계정 관리(admin, 자기 현장)
+│   ├── ProfileView.vue          # 프로필·비번·테마·로그아웃
+│   ├── LoginView.vue
+│   └── PasswordChangeView.vue
 ├── components/
 │   ├── layout/
-│   │   └── AppNav.vue        # 상단 네비게이션 탭
+│   │   ├── AppNav.vue           # 콘솔 사이드바 내비
+│   │   └── AppHeader.vue
 │   ├── dashboard/
-│   │   ├── ChannelGrid.vue   # 2×2 그리드 레이아웃
-│   │   ├── ChannelCard.vue   # 개별 채널 카드
+│   │   ├── ChannelGrid.vue      # 2×2 그리드(빈 슬롯 클릭으로 채널 추가)
+│   │   ├── ChannelCard.vue      # WebRTC(WHEP/WHIP) 재생/송출
 │   │   ├── AddChannelModal.vue
-│   │   └── EventToast.vue    # 전폭 이벤트 배너
+│   │   ├── EventPanel.vue       # 알림 히스토리 패널
+│   │   └── NotificationToast.vue
+│   ├── manual/
+│   │   ├── ChecklistReview.vue  # 확정 체크리스트 구역별 보기
+│   │   └── ChecklistItem.vue    # 항목 인라인 편집
 │   └── search/
-│       ├── SearchBar.vue
-│       ├── ChannelFilter.vue # 채널 칩 필터
-│       ├── ResultList.vue
-│       ├── ResultCard.vue
-│       └── ClipDetail.vue    # 비디오 플레이어 + 메타패널
-├── stores/
-│   ├── channelStore.js
-│   ├── eventStore.js         # lastSearchResults 포함
-│   └── manualStore.js
+│       ├── SearchBar.vue · ChannelFilter.vue
+│       ├── ResultList.vue · ResultCard.vue · ClipDetail.vue
+├── stores/                      # authStore · channelStore · eventStore · manualStore
 ├── composables/
-│   ├── useChannels.js        # DUMMY_MODE 분기
-│   ├── useEvents.js          # DUMMY_MODE 분기
-│   └── useWebSocket.js
-├── api/
-│   ├── index.js              # axios 인스턴스
-│   ├── events.js
-│   ├── manuals.js            # DUMMY_MODE 분기
-│   └── websocket.js
-└── constants/
-    ├── mode.js               # DUMMY_MODE 단일 소스
-    ├── dummyData.js          # 더미 채널·이벤트 데이터
-    └── events.js             # MAX_CHANNELS 등 상수
+│   ├── useWebRTC.js             # WHEP 재생 클라이언트
+│   ├── useWebRTCPublish.js      # WHIP 송출(webcam)
+│   ├── useWebSocket.js          # 실시간 알림
+│   └── useChannels.js · useEvents.js · useTheme.js
+├── api/                         # axios 래퍼 (위 연동 맵 참고)
+├── constants/
+│   ├── mode.js                  # DUMMY_MODE 플래그
+│   ├── mediamtx.js              # MEDIAMTX_URL
+│   └── events.js · dummyData.js
+└── utils/detectSourceType.js
 ```
 
 ---
 
-## 데이터 흐름
+## 데이터 흐름 요약
 
 ```
-[WebSocket] → useWebSocket → eventStore.addEvent → EventToast
+[부팅] App.vue → useWebSocket(/ws) + 로그인 사용자 채널 로드(GET /channels)
 
-[SearchView]
-  onMounted → useEvents.load() → DUMMY_EVENTS | fetchEvents()
-  handleSearch → useEvents.search() → events ref
-              → eventStore.setSearchResults()   (클립 목록 전달용)
+[관제(월)] /wall → DashboardView
+   ChannelGrid → ChannelCard → useWebRTC(`/webrtc/{mtxPath}/whep`)  # 영상
+   WS 알림 → eventStore → NotificationToast                          # 알림
 
-[ClipDetailView]
-  onMounted → DUMMY_EVENTS.find() | fetchEventById()
-  relatedEvents ← eventStore.lastSearchResults
+[콘솔] (별도 창) /search · /manual · /status · /admin · /profile
+   각 view → api/*.js → /api/...   (쿠키 인증)
 
-[ManualView]
-  onMounted → manualStore.load() → localStorage | GET /api/manuals
-  upload → manualStore.upload() → localStorage | POST /api/manuals
+[매뉴얼] ManualView → analyze/refine/confirm → 구역별 체크리스트(ChecklistReview/Item)
 ```
