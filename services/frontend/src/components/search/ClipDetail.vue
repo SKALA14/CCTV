@@ -11,15 +11,6 @@
       >← 검색 결과로 돌아가기</button>
       <span style="color: var(--border);">|</span>
       <span class="font-semibold" style="color: var(--text-primary);">클립 상세</span>
-      <div class="flex-1"></div>
-      <button
-        v-if="event"
-        class="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors"
-        :style="bookmarked
-          ? 'background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3);'
-          : 'background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border);'"
-        @click="bookmarks.toggle(event)"
-      >{{ bookmarked ? '★ 저장됨' : '☆ 저장' }}</button>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -195,7 +186,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useBookmarkStore } from '../../stores/bookmarkStore.js'
 
 const props = defineProps({
   event: Object,
@@ -203,8 +193,6 @@ const props = defineProps({
 })
 
 const router = useRouter()
-const bookmarks = useBookmarkStore()
-const bookmarked = computed(() => props.event && bookmarks.isBookmarked(props.event.id))
 const currentIndex = ref(0)
 
 const snapshots = computed(() => {
