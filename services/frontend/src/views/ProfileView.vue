@@ -1,6 +1,7 @@
 <template>
   <div class="p-6 max-w-2xl mx-auto">
-    <h1 class="text-lg font-bold mb-5" style="color: var(--text-primary);">프로필</h1>
+    <h1 class="text-lg font-bold" style="color: var(--text-primary);">프로필</h1>
+    <p class="text-sm mb-5 mt-0.5" style="color: var(--text-muted);">{{ greeting }}</p>
 
     <!-- 계정 정보 -->
     <section class="rounded-2xl p-5 mb-4" style="background: var(--bg-card); border: 1px solid var(--border);">
@@ -15,6 +16,7 @@
             <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded" :style="badgeStyle">{{ roleLabel }}</span>
             <span class="text-xs" style="color: var(--text-muted);">{{ siteLabel }}</span>
           </div>
+          <p class="text-xs mt-1.5" style="color: var(--text-subtle);">마지막 접속 · {{ lastLoginLabel }}</p>
         </div>
       </div>
     </section>
@@ -93,6 +95,24 @@ const { isDark, toggle } = useTheme()
 const roleLabel = computed(() => auth.isAdmin ? 'ADMIN' : 'USER')
 const userInitial = computed(() => (auth.user?.username?.[0] ?? '?').toUpperCase())
 const siteLabel = computed(() => auth.user?.site_name || '—')
+
+const greeting = computed(() => {
+  const h = new Date().getHours()
+  const part = h < 6 ? '늦은 밤이에요' : h < 12 ? '좋은 아침이에요' : h < 18 ? '오후 근무 중이시네요' : '야간 근무 중이시네요'
+  return `${auth.user?.username ?? ''}님, ${part} 👋`
+})
+const lastLoginLabel = computed(() => {
+  const iso = auth.user?.last_login
+  if (!iso) return '기록 없음'
+  const diff = Date.now() - new Date(iso).getTime()
+  if (Number.isNaN(diff)) return '기록 없음'
+  const m = Math.floor(diff / 60000)
+  if (m < 1) return '방금 전'
+  if (m < 60) return `${m}분 전`
+  const hh = Math.floor(m / 60)
+  if (hh < 24) return `${hh}시간 전`
+  return new Date(iso).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+})
 const badgeStyle = computed(() =>
   auth.isAdmin ? 'background:#7f1d1d;color:#fca5a5;'
     :            'background:#1f2937;color:#9ca3af;'

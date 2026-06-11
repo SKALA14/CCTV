@@ -1,11 +1,36 @@
 <template>
   <nav class="flex flex-col items-center gap-1 px-2">
+    <!-- 실시간 이벤트 (라이브 배지) -->
+    <router-link to="/events" class="nav-tab relative" active-class="active">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M22 12h-4l-3 9L9 3l-3 9H2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>이벤트</span>
+      <span v-if="badge > 0"
+        class="absolute top-1 right-2 min-w-[15px] h-[15px] px-1 rounded-full text-[9px] font-bold flex items-center justify-center"
+        style="background: var(--red); color: #fff;">{{ badge > 99 ? '99+' : badge }}</span>
+    </router-link>
+
     <router-link to="/search" class="nav-tab" active-class="active">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <circle cx="11" cy="11" r="7"/>
         <path d="m21 21-4.35-4.35" stroke-linecap="round"/>
       </svg>
       <span>검색</span>
+    </router-link>
+
+    <router-link to="/zones" class="nav-tab" active-class="active">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>구역</span>
+    </router-link>
+
+    <router-link to="/bookmarks" class="nav-tab" active-class="active">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>저장</span>
     </router-link>
 
     <router-link to="/manual" class="nav-tab" active-class="active">
@@ -21,6 +46,15 @@
     <!-- admin 전용 -->
     <template v-if="authStore.isAdmin">
       <div class="nav-divider"></div>
+
+      <router-link to="/reports" class="nav-tab" active-class="active">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <line x1="6" y1="20" x2="6" y2="13" stroke-linecap="round"/>
+          <line x1="12" y1="20" x2="12" y2="9" stroke-linecap="round"/>
+          <line x1="18" y1="20" x2="18" y2="5" stroke-linecap="round"/>
+        </svg>
+        <span>리포트</span>
+      </router-link>
 
       <router-link to="/status" class="nav-tab" active-class="active">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -44,6 +78,12 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useAuthStore } from '../../stores/authStore.js'
+import { useEventStore } from '../../stores/eventStore.js'
+
 const authStore = useAuthStore()
+const eventStore = useEventStore()
+// 라이브 배지: 이번 세션에 수신한 알림 수 (WS 누적)
+const badge = computed(() => eventStore.notifHistory.length)
 </script>

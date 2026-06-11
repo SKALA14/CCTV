@@ -9,14 +9,22 @@ import AdminView          from '../views/AdminView.vue'
 import PasswordChangeView from '../views/PasswordChangeView.vue'
 import StatusView         from '../views/StatusView.vue'
 import ProfileView        from '../views/ProfileView.vue'
+import EventsTimelineView from '../views/EventsTimelineView.vue'
+import ReportView         from '../views/ReportView.vue'
+import ZoneView           from '../views/ZoneView.vue'
+import BookmarksView      from '../views/BookmarksView.vue'
 
 const routes = [
     { path: '/login',           name: 'login',           component: LoginView,          meta: { public: true } },
     { path: '/',                redirect: '/wall' },
     { path: '/wall',            name: 'wall',             component: DashboardView,      meta: { bare: true } },
+    { path: '/events',          name: 'events',           component: EventsTimelineView },
     { path: '/search',          name: 'search',           component: SearchView },
     { path: '/search/:id',      name: 'clip-detail',      component: ClipDetailView,    props: true },
+    { path: '/zones',           name: 'zones',            component: ZoneView },
+    { path: '/bookmarks',       name: 'bookmarks',        component: BookmarksView },
     { path: '/manual',          name: 'manual',           component: ManualView },
+    { path: '/reports',         name: 'reports',          component: ReportView,         meta: { adminOnly: true } },
     { path: '/admin',           name: 'admin',            component: AdminView,          meta: { adminOnly: true } },
     { path: '/status',          name: 'status',           component: StatusView,         meta: { adminOnly: true } },
     { path: '/profile',         name: 'profile',          component: ProfileView },

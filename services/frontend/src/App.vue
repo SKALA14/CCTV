@@ -15,6 +15,13 @@
         <span class="text-[9px] font-semibold tracking-widest" style="color: var(--text-muted);">CCTV</span>
       </div>
 
+      <!-- 시스템 상태 점등 (채널 온라인 n/N) -->
+      <div v-if="authStore.isLoggedIn && health.total > 0"
+        class="mb-4 flex flex-col items-center gap-0.5" :title="healthTitle">
+        <span class="w-2 h-2 rounded-full" :style="`background: ${healthColor}`"></span>
+        <span class="text-[9px] font-mono" style="color: var(--text-muted);">{{ health.online }}/{{ health.total }}</span>
+      </div>
+
       <!-- 네비게이션 -->
       <AppNav class="w-full" />
 
@@ -52,7 +59,7 @@
 </template>
 
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, watch, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import AppNav from './components/layout/AppNav.vue'
 import DashboardView from './views/DashboardView.vue'
@@ -61,6 +68,7 @@ import { useWebSocket } from './composables/useWebSocket.js'
 import { useChannelStore } from './stores/channelStore.js'
 import { useTheme } from './composables/useTheme.js'
 import { getChannels } from './api/channels.js'
+import { getHealth } from './api/status.js'
 import { useAuthStore } from './stores/authStore.js'
 
 useWebSocket()
@@ -85,6 +93,25 @@ const avatarStyle = computed(() =>
   authStore.isAdmin ? 'background:rgba(127,29,29,0.3);color:#fca5a5;'
     :                 'background:var(--bg-elevated);color:var(--text-muted);'
 )
+
+// 시스템 상태 점등 — 자기 현장 채널 온라인 n/N (전 계정)
+const health = ref({ online: 0, total: 0 })
+const healthColor = computed(() =>
+  health.value.total === 0 ? '#48484a'
+    : health.value.online === health.value.total ? '#22c55e'
+    : health.value.online === 0 ? '#dc2626' : '#f59e0b'
+)
+const healthTitle = computed(() =>
+  health.value.online === health.value.total ? '전체 정상' : `${health.value.total - health.value.online}대 점검 필요`
+)
+let _healthTimer
+async function loadHealth() {
+  if (!authStore.isLoggedIn) return
+  try { health.value = await getHealth() } catch { /* 무시 */ }
+}
+onMounted(() => { loadHealth(); _healthTimer = setInterval(loadHealth, 30000) })
+onUnmounted(() => clearInterval(_healthTimer))
+watch(() => authStore.user, loadHealth)
 
 const channelStore = useChannelStore()
 
