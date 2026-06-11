@@ -9,8 +9,8 @@
       >새로고침</button>
     </div>
 
-    <!-- 현장별 요약 -->
-    <h2 class="font-semibold text-sm mb-2" style="color: var(--text-primary);">현장별 요약</h2>
+    <!-- 현장 요약 -->
+    <h2 class="font-semibold text-sm mb-2" style="color: var(--text-primary);">현장 요약</h2>
     <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-8">
       <div v-for="s in overview" :key="s.site_id"
         class="rounded-xl p-4" style="background: var(--bg-card); border: 1px solid var(--border);">

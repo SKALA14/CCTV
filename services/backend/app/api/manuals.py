@@ -41,17 +41,10 @@ def _site_dir(site_id) -> Path:
 
 
 def _effective_site_id(current_user, site_id_param: str | None):
-    """현장 결정: superadmin은 쿼리 파라미터, 그 외는 자기 현장.
+    """현장 결정: 모든 계정은 자기 현장 (admin/user 2단계).
 
-    superadmin이 파라미터 미지정/형식오류 시 None 반환(쓰기 차단 신호).
+    site_id_param은 하위호환을 위해 남기되 무시한다(교차 현장 관리 없음).
     """
-    if current_user.role == "superadmin":
-        if not site_id_param:
-            return None
-        try:
-            return uuid.UUID(site_id_param)
-        except (ValueError, AttributeError, TypeError):
-            return None
     return current_user.site_id
 
 
@@ -114,7 +107,7 @@ def _build_categories_map(items: list[str], categories: list) -> dict[str, str]:
 @router.get("")
 async def list_manuals(
     site_id: str | None = Query(None),
-    current_user: User = Depends(require_admin),   # admin/superadmin
+    current_user: User = Depends(require_admin),   # admin만
 ) -> list[dict]:
     """업로드된 매뉴얼 파일 메타데이터 목록 (현장별)."""
     sid = _effective_site_id(current_user, site_id)
@@ -127,13 +120,13 @@ async def list_manuals(
 @router.post("")
 async def upload_manual(
     file: UploadFile = File(...),
-    site_id: str | None = Query(None),   # superadmin은 현장 지정 필수
+    site_id: str | None = Query(None),   # 하위호환용 — 무시됨(자기 현장 사용)
     current_user: User = Depends(require_admin),
 ) -> dict:
     """매뉴얼 파일 메타데이터를 현장별 Redis에 저장."""
     sid = _effective_site_id(current_user, site_id)
     if sid is None:
-        raise HTTPException(status_code=403, detail="현장을 지정해야 합니다 (superadmin은 site_id 필요).")
+        raise HTTPException(status_code=403, detail="현장이 지정되지 않은 계정입니다.")
     meta = {
         "id": str(uuid.uuid4()),
         "name": file.filename or "unknown",
@@ -160,7 +153,7 @@ async def delete_manual(
 ) -> dict:
     sid = _effective_site_id(current_user, site_id)
     if sid is None:
-        raise HTTPException(status_code=403, detail="현장을 지정해야 합니다 (superadmin은 site_id 필요).")
+        raise HTTPException(status_code=403, detail="현장이 지정되지 않은 계정입니다.")
     r = _get_redis()
     key = f"{_MANUALS_KEY}:{sid}"
     raw = await r.get(key)
@@ -197,7 +190,7 @@ async def analyze_manual(
     """PDF 업로드 → 체크리스트 분석. zones.json이 있으면 구역별 subset도 반환."""
     sid = _effective_site_id(current_user, site_id)
     if sid is None:
-        raise HTTPException(status_code=403, detail="현장을 지정해야 합니다 (superadmin은 site_id 필요).")
+        raise HTTPException(status_code=403, detail="현장이 지정되지 않은 계정입니다.")
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="PDF 파일만 분석 가능합니다.")
 
@@ -270,7 +263,7 @@ async def refine_manual(
     # refine은 세션 기반이라 sid를 직접 쓰진 않지만, 현장 미지정(권한 가드) 차단용
     sid = _effective_site_id(current_user, site_id)
     if sid is None:
-        raise HTTPException(status_code=403, detail="현장을 지정해야 합니다 (superadmin은 site_id 필요).")
+        raise HTTPException(status_code=403, detail="현장이 지정되지 않은 계정입니다.")
     try:
         result = await refine_checklist(body.session_id, body.feedback)
     except ValueError as e:
@@ -331,7 +324,7 @@ async def register_zones(
 ) -> dict:
     sid = _effective_site_id(current_user, site_id)
     if sid is None:
-        raise HTTPException(status_code=403, detail="현장을 지정해야 합니다 (superadmin은 site_id 필요).")
+        raise HTTPException(status_code=403, detail="현장이 지정되지 않은 계정입니다.")
     content = await zones_file.read()
     try:
         zones = _parse_zones(content, zones_file.filename or "")
@@ -371,7 +364,7 @@ async def confirm_manual(
     """확정된 체크리스트를 현장별 디렉토리/Redis에 저장."""
     sid = _effective_site_id(current_user, site_id)
     if sid is None:
-        raise HTTPException(status_code=403, detail="현장을 지정해야 합니다 (superadmin은 site_id 필요).")
+        raise HTTPException(status_code=403, detail="현장이 지정되지 않은 계정입니다.")
     site_dir = _site_dir(sid)
     redis = _get_redis()
 

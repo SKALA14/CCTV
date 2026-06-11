@@ -13,19 +13,8 @@ def test_site_dir_creates_subdir(tmp_path, monkeypatch):
     assert d.parent == tmp_path
 
 
-def test_effective_site_id_superadmin_uses_param():
-    from app.api import manuals
-
-    class _U:
-        role = "superadmin"
-        site_id = None
-
-    sid = uuid.uuid4()
-    assert manuals._effective_site_id(_U(), str(sid)) == sid
-    assert manuals._effective_site_id(_U(), None) is None
-
-
-def test_effective_site_id_admin_uses_own_site():
+def test_effective_site_id_always_own_site():
+    """admin/user 2단계 — 모든 계정은 자기 현장. site_id 파라미터는 무시."""
     from app.api import manuals
 
     own = uuid.uuid4()
@@ -35,13 +24,10 @@ def test_effective_site_id_admin_uses_own_site():
         site_id = own
 
     assert manuals._effective_site_id(_U(), "ignored") == own
+    assert manuals._effective_site_id(_U(), None) == own
 
+    class _UserRole:
+        role = "user"
+        site_id = own
 
-def test_effective_site_id_superadmin_invalid_param_returns_none():
-    from app.api import manuals
-
-    class _U:
-        role = "superadmin"
-        site_id = None
-
-    assert manuals._effective_site_id(_U(), "not-a-uuid") is None
+    assert manuals._effective_site_id(_UserRole(), "ignored") == own

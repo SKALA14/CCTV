@@ -35,25 +35,6 @@ def _redis_cam_prefix(site_id: str, cam_id: str) -> str:
     return f"camera:{site_id}:{cam_id}"
 
 
-def _db_channel_to_dict(ch: CctvChannel) -> dict:
-    """DB CctvChannel을 프론트엔드 채널 객체 형태로 매핑 (superadmin 읽기 전용 뷰용)."""
-    cam_id = ch.camera_id
-    slot = int(cam_id[3:]) if cam_id.startswith("cam") and cam_id[3:].isdigit() else 0
-    return {
-        "slot":         slot,
-        "name":         ch.camera_name,
-        "channelName":  ch.camera_name,
-        "mtxPath":      _mediamtx_channel_name(str(ch.site_id), ch.camera_name),
-        "rtspUrl":      ch.source_url,
-        "url":          ch.source_url,
-        "sourceType":   ch.source_type,
-        "description":  ch.description or "",
-        "options":      [],
-        "zone":         "",
-        "ingestion_url": ch.source_url,
-    }
-
-
 def _mediamtx_channel_name(site_id: str, channel_name: str) -> str:
     """mediamtx path: 현장 간 충돌 방지를 위해 site_id 앞 8자를 prefix로 사용."""
     return f"{str(site_id)[:8]}_{channel_name}"
@@ -137,28 +118,9 @@ async def list_channels(
     site_id: str | None = Query(None),
     current_user: User = Depends(get_current_user),   # viewer 이상
 ) -> list[dict]:
-    # superadmin: 현장 지정해 DB에서 읽기 전용 조회
-    if current_user.role == "superadmin":
-        if not site_id:
-            return []
-        try:
-            sid = uuid.UUID(site_id)
-        except (ValueError, AttributeError):
-            raise HTTPException(status_code=400, detail="site_id 형식이 올바르지 않습니다.")
-        async with AsyncSessionLocal() as session:
-            rows = (await session.execute(
-                select(CctvChannel)
-                .where(CctvChannel.site_id == sid)
-                .order_by(CctvChannel.camera_id)
-            )).scalars().all()
-        return [_db_channel_to_dict(ch) for ch in rows]
-
-    # admin / viewer: 자기 현장 인메모리 _store
+    # 자기 현장 채널만 (admin/user 2단계 — 교차 현장 조회 없음)
     if current_user.site_id is None:
-        raise HTTPException(
-            status_code=403,
-            detail="현장이 지정되지 않은 계정입니다.",
-        )
+        raise HTTPException(status_code=403, detail="현장이 지정되지 않은 계정입니다.")
     site_id_str = str(current_user.site_id)
     return [v for k, v in _store.items() if k.startswith(f"{site_id_str}:")]
 
@@ -171,7 +133,7 @@ async def create_channel(
     if current_user.site_id is None:
         raise HTTPException(
             status_code=403,
-            detail="superadmin은 직접 채널을 관리할 수 없습니다. 현장 admin 계정을 사용하세요.",
+            detail="현장이 지정되지 않은 계정입니다.",
         )
 
     site_id_str = str(current_user.site_id)
@@ -259,7 +221,7 @@ async def update_channel(
     if current_user.site_id is None:
         raise HTTPException(
             status_code=403,
-            detail="superadmin은 직접 채널을 관리할 수 없습니다. 현장 admin 계정을 사용하세요.",
+            detail="현장이 지정되지 않은 계정입니다.",
         )
 
     site_id_str = str(current_user.site_id)
@@ -333,7 +295,7 @@ async def delete_channel(
     if current_user.site_id is None:
         raise HTTPException(
             status_code=403,
-            detail="superadmin은 직접 채널을 관리할 수 없습니다. 현장 admin 계정을 사용하세요.",
+            detail="현장이 지정되지 않은 계정입니다.",
         )
 
     site_id_str = str(current_user.site_id)
@@ -382,7 +344,7 @@ async def analyze_channel_instruction(camera_id: str, body: InstructionAnalyzeRe
     if current_user.site_id is None:
         raise HTTPException(
             status_code=403,
-            detail="superadmin은 직접 채널을 관리할 수 없습니다. 현장 admin 계정을 사용하세요.",
+            detail="현장이 지정되지 않은 계정입니다.",
         )
     try:
         result = await analyze_instruction(body.text, str(current_user.site_id))
@@ -405,7 +367,7 @@ async def confirm_channel_instruction(camera_id: str, body: InstructionConfirmRe
     if current_user.site_id is None:
         raise HTTPException(
             status_code=403,
-            detail="superadmin은 직접 채널을 관리할 수 없습니다. 현장 admin 계정을 사용하세요.",
+            detail="현장이 지정되지 않은 계정입니다.",
         )
 
     site_id_str = str(current_user.site_id)

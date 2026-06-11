@@ -6,7 +6,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 
 import redis.asyncio as aioredis
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -65,10 +65,12 @@ def _today_start() -> datetime:
 @router.get("/overview")
 async def overview(
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_admin),
+    current_user: User = Depends(require_admin),
 ) -> list[dict]:
-    """현장별 요약: 카메라 수, 오늘 이벤트 수·위험도 분포, 계정 수."""
-    sites = (await db.execute(select(Site).order_by(Site.name))).scalars().all()
+    """현장 요약: 카메라 수, 오늘 이벤트 수·위험도 분포, 계정 수. (자기 현장만)"""
+    sites = (await db.execute(
+        select(Site).where(Site.id == current_user.site_id).order_by(Site.name)
+    )).scalars().all()
     today = _today_start()
     result = []
     for site in sites:
@@ -99,12 +101,13 @@ async def overview(
 @router.get("/devices")
 async def devices(
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_admin),
+    current_user: User = Depends(require_admin),
 ) -> list[dict]:
-    """CCTV별 온라인 상태 — frames 스트림 최신 프레임 기준."""
+    """CCTV별 온라인 상태 — frames 스트림 최신 프레임 기준. (자기 현장만)"""
     channels = (await db.execute(
         select(CctvChannel, Site.name)
         .join(Site, Site.id == CctvChannel.site_id)
+        .where(CctvChannel.site_id == current_user.site_id)
         .order_by(Site.name, CctvChannel.camera_id)
     )).all()
 
@@ -131,13 +134,14 @@ async def devices(
 @router.get("/accounts")
 async def accounts(
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_admin),
+    current_user: User = Depends(require_admin),
 ) -> list[dict]:
-    """현장별 계정 현황 — role, 초기비번 여부, 마지막 로그인."""
+    """계정 현황 — role, 초기비번 여부, 마지막 로그인. (자기 현장만)"""
     rows = (await db.execute(
         select(User, Site.name)
-        .outerjoin(Site, Site.id == User.site_id)
-        .order_by(Site.name, User.username)
+        .join(Site, Site.id == User.site_id)
+        .where(User.site_id == current_user.site_id)
+        .order_by(User.username)
     )).all()
     redis = _get_redis()
     # 마지막 로그인은 MGET 한 번으로 일괄 조회 (계정 수만큼 라운드트립 방지)
@@ -159,9 +163,11 @@ async def accounts(
 async def site_today_events(
     site_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_admin),
+    current_user: User = Depends(require_admin),
 ) -> list[dict]:
-    """현장의 오늘(KST) 이벤트 목록 — 발생 시각 내림차순. '오늘 이벤트' 드릴다운용."""
+    """현장의 오늘(KST) 이벤트 목록 — 발생 시각 내림차순. '오늘 이벤트' 드릴다운용. (자기 현장만)"""
+    if site_id != current_user.site_id:
+        raise HTTPException(status_code=404, detail="현장을 찾을 수 없습니다.")
     today = _today_start()
     rows = (await db.execute(
         select(EventLog)
