@@ -12,8 +12,8 @@ import ProfileView        from '../views/ProfileView.vue'
 
 const routes = [
     { path: '/login',           name: 'login',           component: LoginView,          meta: { public: true } },
+    { path: '/',                redirect: '/wall' },
     { path: '/wall',            name: 'wall',             component: DashboardView,      meta: { bare: true } },
-    { path: '/',                name: 'dashboard',        component: DashboardView },
     { path: '/search',          name: 'search',           component: SearchView },
     { path: '/search/:id',      name: 'clip-detail',      component: ClipDetailView,    props: true },
     { path: '/manual',          name: 'manual',           component: ManualView },
@@ -47,9 +47,9 @@ router.beforeEach(async (to) => {
         return { name: 'password-change' }
     }
 
-    // admin 전용 페이지
+    // admin 전용 페이지 — 권한 없으면 관제(홈)로
     if (to.meta.adminOnly && !auth.isAdmin) {
-        return { name: 'dashboard' }
+        return { name: 'wall' }
     }
 
     return true

@@ -47,15 +47,16 @@
     </div>
   </div>
 
-  <!-- 전체화면 관제(월)에서 콘솔로 복귀 — 우상단 은은한 진입점 -->
+  <!-- 관제(월)에서 콘솔/설정으로 — 우상단 은은한 톱니 진입점 -->
   <router-link
     v-if="route.meta.bare"
-    to="/"
+    to="/search"
     class="wall-exit"
-    title="콘솔로 나가기"
+    title="콘솔 / 설정 열기"
   >
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-      <path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
     </svg>
     <span>콘솔</span>
   </router-link>
@@ -81,8 +82,8 @@ useWebSocket()
 useTheme()   // 모듈 로드 시 전역 테마 적용 (토글은 프로필 페이지에서)
 
 const route = useRoute()
-// 라이브 그리드(DashboardView)를 보여줄 경로 — 콘솔 대시보드('/')와 월('/wall')
-const isLiveView = computed(() => route.path === '/' || route.path === '/wall')
+// 라이브 그리드(DashboardView)를 보여줄 경로 — 관제(월) 홈
+const isLiveView = computed(() => route.path === '/wall')
 
 const authStore = useAuthStore()
 
