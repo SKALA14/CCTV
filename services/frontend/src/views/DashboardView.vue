@@ -142,13 +142,15 @@ function closeModal() {
   editingChannel.value = null
 }
 
-function handleSubmit(data) {
+async function handleSubmit(data) {
   if (editingChannel.value) {
     updateChannel(data.slot, data)
     putChannel(data.channelName, data).catch(console.error)
   } else {
-    addChannel(data.slot, data)
-    postChannel(data).catch(console.error)
+    // 백엔드 응답의 mtxPath(접두사 포함 MediaMTX 경로)를 합쳐 등록 직후에도 영상이 뜨게 함
+    let mtxPath = null
+    try { mtxPath = (await postChannel(data))?.mtxPath } catch (e) { console.error(e) }
+    addChannel(data.slot, { ...data, mtxPath })
   }
   closeModal()
 }
