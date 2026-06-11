@@ -73,6 +73,8 @@ auth_secret*
 
 services/backend/prompts/*.md
 services/backend/prompts/zones.json
+# 현장(site_id)별 런타임 프롬프트·체크리스트·zones (하위 디렉터리 전체)
+services/backend/prompts/*/
 sample/prompt/
 
 # =====================
