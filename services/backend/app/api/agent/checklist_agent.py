@@ -214,3 +214,55 @@ async def normalize_categories(items: list[str]) -> list[dict]:
     except Exception as e:
         logger.warning("카테고리 정규화 실패: %s", e)
         return [{"code": "GENERAL", "label": "일반", "items": items}]
+
+
+_DIFF_SYSTEM = (
+    "두 개의 CCTV 안전 체크리스트 항목 리스트가 주어진다: 'existing'(기존)과 'new'(새 문서에서 추출).\n"
+    "의미 기준으로 비교하라.\n\n"
+    "[규칙]\n"
+    "- added: new에만 있고 existing에는 의미상 없는 항목. 반드시 new의 원문 그대로 사용.\n"
+    "- removed_candidates: existing에만 있고 new에는 의미상 사라진 항목. 반드시 existing의 원문 그대로 사용.\n"
+    "- 문구만 다르고 의미가 같으면 동일 항목으로 보고 added/removed 어디에도 넣지 마라.\n"
+    "- 원문을 절대 수정하지 마라.\n\n"
+    '{"added": ["..."], "removed_candidates": ["..."]} 형태 JSON으로만 출력하라.'
+)
+
+
+async def diff_checklist(existing_items: list[str], new_items: list[str]) -> dict:
+    """기존 vs 새 항목 리스트를 의미 기반 비교해 {added, removed_candidates} 반환.
+
+    한쪽이 비면 LLM 호출 없이 즉시 반환. LLM 실패/빈 응답 시 단순 집합 차집합 fallback.
+    """
+    if not existing_items:
+        return {"added": list(new_items), "removed_candidates": []}
+    if not new_items:
+        return {"added": [], "removed_candidates": list(existing_items)}
+
+    def _set_fallback() -> dict:
+        ex = set(existing_items)
+        nw = set(new_items)
+        return {
+            "added": [i for i in new_items if i not in ex],
+            "removed_candidates": [i for i in existing_items if i not in nw],
+        }
+
+    messages = [
+        {"role": "system", "content": _DIFF_SYSTEM},
+        {"role": "user", "content": json.dumps(
+            {"existing": existing_items, "new": new_items}, ensure_ascii=False)},
+    ]
+    try:
+        resp = await _get_openai().chat.completions.create(
+            model=_MODEL, messages=messages, response_format={"type": "json_object"},
+        )
+        raw = resp.choices[0].message.content or ""
+        if not raw:
+            return _set_fallback()
+        data = json.loads(raw)
+        return {
+            "added": data.get("added", []),
+            "removed_candidates": data.get("removed_candidates", []),
+        }
+    except Exception as e:
+        logger.warning("diff_checklist 실패, 집합 차집합 fallback: %s", e)
+        return _set_fallback()

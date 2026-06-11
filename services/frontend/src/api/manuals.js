@@ -93,9 +93,26 @@ export async function fetchZones(siteId = null) {
 }
 
 export async function fetchChecklist(siteId = null) {
-  if (DUMMY_MODE) return { static: '', dynamic: '' }
+  if (DUMMY_MODE) return { static: '', dynamic: '', zones: [] }
   const q = siteId ? `?site_id=${encodeURIComponent(siteId)}` : ''
   return api.get(`/manuals/checklist${q}`).then(r => r.data)
+}
+
+export async function analyzeDiff(file, siteId = null) {
+  if (DUMMY_MODE) {
+    return {
+      static: { added: ['새로 추가된 static 항목?'], removed_candidates: [] },
+      dynamic: { added: [], removed_candidates: ['사라진 dynamic 항목?'] },
+    }
+  }
+  const form = new FormData()
+  form.append('file', file)
+  return api.post(`/manuals/analyze-diff${_siteQuery(siteId)}`, form, { timeout: 120000 }).then(r => r.data)
+}
+
+export async function mergeChecklist(payload, siteId = null) {
+  if (DUMMY_MODE) return { status: 'merged' }
+  return api.post(`/manuals/merge${_siteQuery(siteId)}`, payload).then(r => r.data)
 }
 
 
