@@ -25,7 +25,7 @@ from app.db.models import CctvChannel, EventLog, Site, User
 from app.worker import run_worker
 from app.api import events, ws, channels, manuals, auth, sites, users, status as status_api
 from app.api.auth import _limiter as _auth_limiter
-from app.api.channels import _store
+from app.api.channels import _store, _mediamtx_channel_name
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +120,7 @@ async def lifespan(app: FastAPI):
                     "slot":          slot,
                     "name":          ch.camera_name,
                     "channelName":   ch.camera_name,
+                    "mtxPath":       _mediamtx_channel_name(site_id_str, ch.camera_name),
                     "rtspUrl":       ch.source_url,
                     "sourceType":    ch.source_type,
                     "ingestion_url": ch.source_url,

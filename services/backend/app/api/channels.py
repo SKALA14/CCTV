@@ -43,6 +43,7 @@ def _db_channel_to_dict(ch: CctvChannel) -> dict:
         "slot":         slot,
         "name":         ch.camera_name,
         "channelName":  ch.camera_name,
+        "mtxPath":      _mediamtx_channel_name(str(ch.site_id), ch.camera_name),
         "rtspUrl":      ch.source_url,
         "url":          ch.source_url,
         "sourceType":   ch.source_type,
@@ -238,7 +239,7 @@ async def create_channel(
             )
             await session.execute(stmt)
 
-    channel = {**body.model_dump(), "ingestion_url": ingestion_url}
+    channel = {**body.model_dump(), "ingestion_url": ingestion_url, "mtxPath": mtx_name}
     _store[store_key] = channel
     logger.info("채널 등록: site_id=%s cam_id=%s ingestion_url=%s", site_id_str, cam_id, ingestion_url)
 
