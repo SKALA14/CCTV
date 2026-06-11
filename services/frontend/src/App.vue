@@ -37,7 +37,7 @@
     <div class="flex flex-col flex-1 min-w-0">
       <!-- 라우터 뷰 -->
       <main class="flex-1 overflow-auto" style="position: relative;">
-        <div :style="isLiveView ? 'height: 100%' : 'visibility: hidden; position: absolute; inset: 0; pointer-events: none'">
+        <div v-if="isLiveView" style="height: 100%">
           <DashboardView />
         </div>
         <keep-alive include="ManualView">
@@ -46,20 +46,6 @@
       </main>
     </div>
   </div>
-
-  <!-- 관제(월)에서 콘솔/설정으로 — 우상단 은은한 톱니 진입점 -->
-  <router-link
-    v-if="route.meta.bare"
-    to="/search"
-    class="wall-exit"
-    title="콘솔 / 설정 열기"
-  >
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-      <circle cx="12" cy="12" r="3"/>
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-    </svg>
-    <span>콘솔</span>
-  </router-link>
 
   <!-- 우하단 알림 토스트 (어느 페이지에서나 표시) -->
   <NotificationToast />
@@ -118,30 +104,3 @@ watch(() => authStore.user, async (newUser) => {
     }
 }, { immediate: true })
 </script>
-
-<style scoped>
-/* 전체화면 관제(월)에서 콘솔로 복귀하는 우상단 진입점 — 24시간 화면을 가리지 않게 은은하게 */
-.wall-exit {
-  position: fixed;
-  top: 14px;
-  right: 14px;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 9999px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted);
-  background: color-mix(in srgb, var(--bg-card) 70%, transparent);
-  border: 1px solid var(--border);
-  backdrop-filter: blur(8px);
-  opacity: 0.35;
-  transition: opacity 0.15s ease, color 0.15s ease;
-}
-.wall-exit:hover {
-  opacity: 1;
-  color: var(--text-primary);
-}
-</style>
