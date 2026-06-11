@@ -8,8 +8,9 @@ export async function getChannels(siteId = null) {
 }
 
 export async function postChannel({ slot, name, channelName, rtspUrl, sourceType, description, options, zone }) {
-    if (DUMMY_MODE) return
-    await api.post('/channels', { slot, name, channelName, rtspUrl, sourceType, description, options, zone })
+    if (DUMMY_MODE) return null
+    const res = await api.post('/channels', { slot, name, channelName, rtspUrl, sourceType, description, options, zone })
+    return res.data   // 백엔드가 mtxPath(접두사 포함 MediaMTX 경로)를 포함해 반환
 }
 
 export async function putChannel(channelName, patch) {

@@ -1,5 +1,5 @@
 # services/backend/app/api/status.py
-"""superadmin 전용 모니터링 API — 현장 요약/기기 상태/계정 현황."""
+"""admin 전용 모니터링 API — 현장 요약/기기 상태/계정 현황."""
 import time
 import uuid
 import logging
@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import require_superadmin
+from app.api.deps import require_admin
 from app.config import config
 from app.db.session import get_db
 from app.db.models import Site, User, CctvChannel, EventLog
@@ -65,7 +65,7 @@ def _today_start() -> datetime:
 @router.get("/overview")
 async def overview(
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_superadmin),
+    _user=Depends(require_admin),
 ) -> list[dict]:
     """현장별 요약: 카메라 수, 오늘 이벤트 수·위험도 분포, 계정 수."""
     sites = (await db.execute(select(Site).order_by(Site.name))).scalars().all()
@@ -99,7 +99,7 @@ async def overview(
 @router.get("/devices")
 async def devices(
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_superadmin),
+    _user=Depends(require_admin),
 ) -> list[dict]:
     """CCTV별 온라인 상태 — frames 스트림 최신 프레임 기준."""
     channels = (await db.execute(
@@ -131,7 +131,7 @@ async def devices(
 @router.get("/accounts")
 async def accounts(
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_superadmin),
+    _user=Depends(require_admin),
 ) -> list[dict]:
     """현장별 계정 현황 — role, 초기비번 여부, 마지막 로그인."""
     rows = (await db.execute(
@@ -159,7 +159,7 @@ async def accounts(
 async def site_today_events(
     site_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_superadmin),
+    _user=Depends(require_admin),
 ) -> list[dict]:
     """현장의 오늘(KST) 이벤트 목록 — 발생 시각 내림차순. '오늘 이벤트' 드릴다운용."""
     today = _today_start()

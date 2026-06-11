@@ -1,17 +1,6 @@
 <template>
   <div class="p-4 max-w-3xl mx-auto">
 
-    <!-- superadmin 현장 선택 (읽기 전용) -->
-    <div v-if="isSuperadmin" class="mb-6">
-      <select
-        v-model="selectedSiteId"
-        class="app-select w-full max-w-xs px-3 py-2 rounded-xl text-sm"
-      >
-        <option :value="null">현장을 선택하세요</option>
-        <option v-for="s in sites" :key="s.id" :value="s.id">{{ s.name }}</option>
-      </select>
-    </div>
-
     <!-- 구역 정보 섹션 -->
     <div v-if="canManage" class="mb-8">
       <div class="mb-2 flex items-center justify-between">
@@ -195,7 +184,7 @@
           <button
             class="text-xs rounded px-2 py-1 transition-colors"
             style="color: var(--red); border: 1px solid var(--border);"
-            @click="store.remove(file.id, manageSiteId)"
+            @click="store.remove(file.id, null)"
           >삭제</button>
         </div>
       </div>
@@ -230,59 +219,34 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed, watch } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useManualStore } from '../stores/manualStore.js'
 import { analyzeManual, refineManual, confirmManual, registerZones, fetchZones, fetchChecklist } from '../api/manuals.js'
-import { getSites } from '../api/sites.js'
 import { useAuthStore } from '../stores/authStore.js'
 import ChecklistReview from '../components/manual/ChecklistReview.vue'
 
 const store = useManualStore()
 const authStore = useAuthStore()
-const isSuperadmin = computed(() => authStore.isSuperadmin)
 
-const sites = ref([])
-const selectedSiteId = ref(null)
 const confirmedChecklist = reactive({ static: '', dynamic: '' })
 
 const registeredZones = ref([])
 
-// 관리 권한: admin은 항상(자기 현장), superadmin은 현장을 선택했을 때. viewer는 읽기 전용.
-const canManage = computed(() => {
-  if (authStore.user?.role === 'admin') return true
-  if (isSuperadmin.value && selectedSiteId.value) return true
-  return false
-})
-
-// 쓰기 API에 전달할 현장 — admin은 null(백엔드가 자기 현장), superadmin은 선택 현장
-const manageSiteId = computed(() => (isSuperadmin.value ? selectedSiteId.value : null))
+// 관리 권한: admin만 매뉴얼·구역을 관리. user는 읽기 전용.
+const canManage = computed(() => authStore.user?.role === 'admin')
 
 async function loadConfirmedView() {
-  const sid = isSuperadmin.value ? selectedSiteId.value : null
-  if (isSuperadmin.value && !sid) {
-    confirmedChecklist.static = ''
-    confirmedChecklist.dynamic = ''
-    registeredZones.value = []
-    return
-  }
   try {
-    const cl = await fetchChecklist(sid)
+    const cl = await fetchChecklist(null)
     confirmedChecklist.static = cl.static || ''
     confirmedChecklist.dynamic = cl.dynamic || ''
   } catch { confirmedChecklist.static = ''; confirmedChecklist.dynamic = '' }
-  try { registeredZones.value = await fetchZones(sid) } catch { registeredZones.value = [] }
-  // 관리 가능하면 해당 현장의 업로드 파일 목록도 로드
-  if (canManage.value) store.load(sid)
+  try { registeredZones.value = await fetchZones(null) } catch { registeredZones.value = [] }
+  // 관리 가능하면 업로드 파일 목록도 로드
+  if (canManage.value) store.load(null)
 }
 
-watch(selectedSiteId, loadConfirmedView)
-
-onMounted(async () => {
-  if (isSuperadmin.value) {
-    try { sites.value = await getSites() } catch (e) { console.warn('현장 로드 실패:', e?.message ?? e) }
-  }
-  loadConfirmedView()
-})
+onMounted(loadConfirmedView)
 
 // 문서 업로드
 const fileInput = ref(null)
@@ -302,7 +266,7 @@ async function handleFile(file) {
   uploadError.value = ''
   const err = validate(file)
   if (err) { uploadError.value = err; return }
-  await store.upload(file, manageSiteId.value)
+  await store.upload(file, null)
   docFile.value = file
 }
 
@@ -363,7 +327,7 @@ async function onRegisterZones() {
   zoneRegister.loading = true
   zoneRegister.error = ''
   try {
-    await registerZones(zoneFile.value, manageSiteId.value)
+    await registerZones(zoneFile.value, null)
     await loadConfirmedView()
   } catch (e) {
     const detail = e?.response?.data?.detail
@@ -397,7 +361,7 @@ async function onAnalyze() {
   checklist.error = ''
   checklist.loading = true
   try {
-    const result = await analyzeManual(docFile.value, manageSiteId.value)
+    const result = await analyzeManual(docFile.value, null)
     checklist.sessionId = result.session_id
     checklist.static = result.static
     checklist.dynamic = result.dynamic
@@ -418,7 +382,7 @@ async function onRefine({ feedback }) {
   checklist.loading = true
   checklist.error = ''
   try {
-    const result = await refineManual(checklist.sessionId, feedback, manageSiteId.value)
+    const result = await refineManual(checklist.sessionId, feedback, null)
     checklist.static = result.static
     checklist.dynamic = result.dynamic
   } catch {
@@ -432,7 +396,7 @@ async function onConfirm({ sessionId, static: staticItems, dynamic: dynamicItems
   checklist.loading = true
   checklist.error = ''
   try {
-    await confirmManual(sessionId, staticItems, dynamicItems, checklist.zones, checklist.staticCategories, checklist.dynamicCategories, manageSiteId.value)
+    await confirmManual(sessionId, staticItems, dynamicItems, checklist.zones, checklist.staticCategories, checklist.dynamicCategories, null)
     checklist.saved = true
     loadConfirmedView()
   } catch {

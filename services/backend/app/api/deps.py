@@ -12,14 +12,7 @@ async def get_current_user(request: Request) -> User:
 
 
 async def require_admin(user: User = Depends(get_current_user)) -> User:
-    """admin 이상(admin / superadmin) 허용. viewer 접근 시 403."""
-    if user.role not in ("admin", "superadmin"):
+    """admin만 허용. user 접근 시 403."""
+    if user.role != "admin":
         raise HTTPException(status_code=403, detail="관리자 권한이 필요합니다")
-    return user
-
-
-async def require_superadmin(user: User = Depends(get_current_user)) -> User:
-    """superadmin만 허용."""
-    if user.role != "superadmin":
-        raise HTTPException(status_code=403, detail="슈퍼어드민 권한이 필요합니다")
     return user

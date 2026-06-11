@@ -122,15 +122,17 @@ const youtubeEmbedUrl = computed(() => {
   return id ? `https://www.youtube.com/embed/${id}?autoplay=1&mute=1` : null
 })
 
+// MediaMTX 경로는 현장 격리를 위해 site 접두사가 붙음(mtxPath). 구버전 데이터 대비 channelName 폴백.
+const mtxPath = props.channel.mtxPath || props.channel.channelName
 const { videoRef, status, error, connect, disconnect } = useWebRTC(
-  `${MEDIAMTX_URL}/${props.channel.channelName}/whep`
+  `${MEDIAMTX_URL}/${mtxPath}/whep`
 )
 const { startPublish, stopPublish } = useWebRTCPublish()
 
 function startStream() {
-  const { url, sourceType, channelName } = props.channel
+  const { url, sourceType } = props.channel
   if (isWebcam.value) {
-    startPublish(`/webrtc/${channelName}/whip`, videoRef.value).catch(() => {})
+    startPublish(`/webrtc/${mtxPath}/whip`, videoRef.value).catch(() => {})
   } else if (sourceType === 'rtsp') {
     connect()
   } else if (sourceType === 'file') {

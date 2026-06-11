@@ -1,8 +1,8 @@
 <template>
   <div class="flex h-full">
-    <!-- 좌측 사이드바 (로그인 등 공개 페이지에서는 숨김) -->
+    <!-- 좌측 사이드바 (로그인·월 등 크롬 없는 화면에서는 숨김) -->
     <aside
-      v-if="!route.meta.public"
+      v-if="!route.meta.public && !route.meta.bare"
       class="flex flex-col items-center w-16 border-r flex-shrink-0 py-3"
       style="background: var(--bg-card); border-color: var(--border);"
     >
@@ -17,25 +17,6 @@
 
       <!-- 네비게이션 -->
       <AppNav class="w-full" />
-
-      <!-- 채널 추가 버튼 (대시보드 + admin 역할만) -->
-      <div v-if="isDashboard && authStore.user?.role === 'admin'" class="mt-2 px-2 w-full">
-        <div class="mb-2" style="border-top: 1px solid var(--border);"></div>
-        <button
-          :disabled="isMaxChannels"
-          class="flex flex-col items-center gap-1 w-full py-2.5 rounded-xl transition-all"
-          :class="isMaxChannels
-            ? 'bg-[#2c2c2e] text-[#48484a] cursor-not-allowed'
-            : 'bg-blue-600 text-white hover:bg-blue-500'"
-          @click="triggerAddModal"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="12" y1="5" x2="12" y2="19" stroke-linecap="round"/>
-            <line x1="5" y1="12" x2="19" y2="12" stroke-linecap="round"/>
-          </svg>
-          <span class="text-[9px] font-semibold">채널추가</span>
-        </button>
-      </div>
 
       <div class="flex-1"></div>
 
@@ -56,11 +37,11 @@
     <div class="flex flex-col flex-1 min-w-0">
       <!-- 라우터 뷰 -->
       <main class="flex-1 overflow-auto" style="position: relative;">
-        <div :style="isDashboard ? 'height: 100%' : 'visibility: hidden; position: absolute; inset: 0; pointer-events: none'">
+        <div v-if="isLiveView" style="height: 100%">
           <DashboardView />
         </div>
         <keep-alive include="ManualView">
-          <router-view v-if="!isDashboard" />
+          <router-view v-if="!isLiveView" />
         </keep-alive>
       </main>
     </div>
@@ -71,9 +52,8 @@
 </template>
 
 <script setup>
-import { ref, computed, provide, watch } from 'vue'
+import { computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { storeToRefs } from 'pinia'
 import AppNav from './components/layout/AppNav.vue'
 import DashboardView from './views/DashboardView.vue'
 import NotificationToast from './components/dashboard/NotificationToast.vue'
@@ -88,7 +68,8 @@ useWebSocket()
 useTheme()   // 모듈 로드 시 전역 테마 적용 (토글은 프로필 페이지에서)
 
 const route = useRoute()
-const isDashboard = computed(() => route.path === '/')
+// 라이브 그리드(DashboardView)를 보여줄 경로 — 관제(월) 홈
+const isLiveView = computed(() => route.path === '/wall')
 
 const authStore = useAuthStore()
 
@@ -97,23 +78,20 @@ const userInitial = computed(() => (authStore.user?.username?.[0] ?? '?').toUppe
 const accountTitle = computed(() => {
   const u = authStore.user
   if (!u) return ''
-  const site = u.site_name || (authStore.isSuperadmin ? '전체 현장' : '—')
+  const site = u.site_name || '—'
   return `${u.username} · ${site}`
 })
 const avatarStyle = computed(() =>
-  authStore.isSuperadmin ? 'background:rgba(30,58,138,0.3);color:#93c5fd;'
-    : authStore.isAdmin  ? 'background:rgba(127,29,29,0.3);color:#fca5a5;'
-    :                      'background:var(--bg-elevated);color:var(--text-muted);'
+  authStore.isAdmin ? 'background:rgba(127,29,29,0.3);color:#fca5a5;'
+    :                 'background:var(--bg-elevated);color:var(--text-muted);'
 )
 
 const channelStore = useChannelStore()
-const { slots } = storeToRefs(channelStore)
-const isMaxChannels = computed(() => slots.value.every(s => s !== null))
 
 // 로그인·로그아웃·계정 전환 시 채널 스토어를 리셋하고 새로 로드
 watch(() => authStore.user, async (newUser) => {
     channelStore.resetSlots()
-    if (!newUser || newUser.role === 'superadmin') return
+    if (!newUser) return
     try {
         const res = await getChannels()
         res.data.forEach(ch => {
@@ -125,12 +103,4 @@ watch(() => authStore.user, async (newUser) => {
         console.warn('채널 복구 실패:', e.message)
     }
 }, { immediate: true })
-
-const addModalSignal = ref(false)
-provide('addModalSignal', addModalSignal)
-
-function triggerAddModal() {
-  if (isMaxChannels.value) return
-  addModalSignal.value = true
-}
 </script>

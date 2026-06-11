@@ -43,6 +43,7 @@ def _db_channel_to_dict(ch: CctvChannel) -> dict:
         "slot":         slot,
         "name":         ch.camera_name,
         "channelName":  ch.camera_name,
+        "mtxPath":      _mediamtx_channel_name(str(ch.site_id), ch.camera_name),
         "rtspUrl":      ch.source_url,
         "url":          ch.source_url,
         "sourceType":   ch.source_type,
@@ -122,9 +123,10 @@ async def _mediamtx_add_empty(channel_name: str) -> None:
 
 
 async def _mediamtx_delete(channel_name: str) -> None:
+    # MediaMTX v3 경로 삭제는 /v3/config/paths/delete/{name} (구 /remove/ 아님)
     async with httpx.AsyncClient() as client:
         res = await client.delete(
-            f"{MEDIAMTX_API}/v3/config/paths/remove/{channel_name}",
+            f"{MEDIAMTX_API}/v3/config/paths/delete/{channel_name}",
         )
     if res.status_code not in (200, 204, 404):
         raise HTTPException(status_code=502, detail=f"mediamtx 삭제 실패: {res.text}")
@@ -238,7 +240,7 @@ async def create_channel(
             )
             await session.execute(stmt)
 
-    channel = {**body.model_dump(), "ingestion_url": ingestion_url}
+    channel = {**body.model_dump(), "ingestion_url": ingestion_url, "mtxPath": mtx_name}
     _store[store_key] = channel
     logger.info("채널 등록: site_id=%s cam_id=%s ingestion_url=%s", site_id_str, cam_id, ingestion_url)
 

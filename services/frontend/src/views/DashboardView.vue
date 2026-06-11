@@ -18,36 +18,40 @@
 
       <div class="text-sm font-mono" style="color: var(--text-primary);">{{ clock }}</div>
 
-      <button
-        class="flex items-center gap-2 px-2.5 py-1 rounded-lg transition-colors"
-        :style="panelOpen
-          ? 'background: var(--bg-elevated); color: var(--text-primary);'
-          : 'color: var(--text-muted);'"
-        @click="panelOpen = !panelOpen"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-        </svg>
-        <span class="text-xs">알림</span>
-        <span
-          v-if="historyCount > 0"
-          class="text-[10px] font-semibold px-1.5 py-px rounded"
-          style="background: rgba(220,38,38,0.15); color: #dc2626;"
-        >{{ historyCount }}</span>
-      </button>
-    </header>
+      <div class="flex items-center gap-1">
+        <button
+          class="flex items-center gap-2 px-2.5 py-1 rounded-lg transition-colors"
+          style="color: var(--text-muted);"
+          title="콘솔(검색·설정)을 새 창으로 열기"
+          @click="openConsole"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          <span class="text-xs">콘솔</span>
+        </button>
 
-    <!-- superadmin 현장 선택 (읽기 전용 뷰) -->
-    <div v-if="isSuperadmin" class="px-4 pt-3">
-      <select
-        v-model="selectedSiteId"
-        class="app-select w-full max-w-xs px-3 py-2 rounded-xl text-sm"
-      >
-        <option :value="null">현장을 선택하세요</option>
-        <option v-for="s in sites" :key="s.id" :value="s.id">{{ s.name }}</option>
-      </select>
-    </div>
+        <button
+          class="flex items-center gap-2 px-2.5 py-1 rounded-lg transition-colors"
+          :style="panelOpen
+            ? 'background: var(--bg-elevated); color: var(--text-primary);'
+            : 'color: var(--text-muted);'"
+          @click="panelOpen = !panelOpen"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+          <span class="text-xs">알림</span>
+          <span
+            v-if="historyCount > 0"
+            class="text-[10px] font-semibold px-1.5 py-px rounded"
+            style="background: rgba(220,38,38,0.15); color: #dc2626;"
+          >{{ historyCount }}</span>
+        </button>
+      </div>
+    </header>
 
     <!-- 바디: 채널 그리드 + 알림 히스토리 패널 -->
     <div class="flex flex-1 min-h-0">
@@ -75,49 +79,24 @@
 </template>
 
 <script setup>
-import { ref, computed, inject, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import ChannelGrid from '../components/dashboard/ChannelGrid.vue'
 import AddChannelModal from '../components/dashboard/AddChannelModal.vue'
 import EventPanel from '../components/dashboard/EventPanel.vue'
 import { useChannels } from '../composables/useChannels.js'
 import { useEventStore } from '../stores/eventStore.js'
-import { getChannels, postChannel, putChannel, deleteChannel } from '../api/channels.js'
+import { postChannel, putChannel, deleteChannel } from '../api/channels.js'
 import { useAuthStore } from '../stores/authStore.js'
-import { getSites } from '../api/sites.js'
-import { useChannelStore } from '../stores/channelStore.js'
 
 const authStore = useAuthStore()
-// 채널 편집은 admin 전용 — superadmin은 읽기 전용(RBAC 스펙), viewer도 불가
+// 채널 편집은 admin 전용 — user는 불가
 const canEdit = computed(() => authStore.user?.role === 'admin')
 
-const isSuperadmin = computed(() => authStore.isSuperadmin)
-const sites = ref([])
-const selectedSiteId = ref(null)
-const channelStore = useChannelStore()
-
-watch(() => authStore.user, (u) => {
-  if (u?.role === 'superadmin' && sites.value.length === 0) {
-    getSites().then(s => { sites.value = s }).catch(e => console.warn('현장 로드 실패:', e.message))
-  }
-}, { immediate: true })
-
-// 현장 전환 — 늦게 도착한 이전 요청이 슬롯을 오염시키지 않도록 시퀀스 가드
-let loadSeq = 0
-watch(selectedSiteId, async (sid) => {
-  const seq = ++loadSeq
-  channelStore.resetSlots()
-  if (!sid) return
-  try {
-    const res = await getChannels(sid)
-    if (seq !== loadSeq) return
-    res.data.forEach(ch => {
-      if (channelStore.slots[ch.slot] === null) channelStore.addChannel(ch.slot, ch)
-    })
-  } catch (e) {
-    console.warn('superadmin 채널 로드 실패:', e.message)
-  }
-})
+// 콘솔(검색·설정)을 별도 창으로 — 관제 화면은 그대로 유지. 같은 창 이름이라 재클릭 시 기존 창 재사용.
+function openConsole() {
+  window.open('/search', 'cctv-console', 'width=1440,height=900,left=120,top=80')
+}
 
 const { slots, addChannel, updateChannel, removeChannel } = useChannels()
 
@@ -146,21 +125,6 @@ const existingNames = computed(() =>
     .map(s => s.name)
 )
 
-// App.vue 상단 바의 "+ 채널 추가" 버튼 신호 수신 — 빈 슬롯 중 첫 번째에 등록
-const addModalSignal = inject('addModalSignal', ref(false))
-watch(addModalSignal, (v) => {
-  if (v) {
-    if (!canEdit.value) { addModalSignal.value = false; return }
-    const firstEmpty = slots.value.findIndex(s => s === null)
-    if (firstEmpty === -1) {
-      alert('모든 슬롯이 사용 중입니다. 기존 채널을 삭제 후 추가해주세요.')
-    } else {
-      openAddModal(firstEmpty)
-    }
-    addModalSignal.value = false
-  }
-})
-
 function openAddModal(slot) {
   activeSlot.value = slot
   editingChannel.value = null
@@ -178,13 +142,15 @@ function closeModal() {
   editingChannel.value = null
 }
 
-function handleSubmit(data) {
+async function handleSubmit(data) {
   if (editingChannel.value) {
     updateChannel(data.slot, data)
     putChannel(data.channelName, data).catch(console.error)
   } else {
-    addChannel(data.slot, data)
-    postChannel(data).catch(console.error)
+    // 백엔드 응답의 mtxPath(접두사 포함 MediaMTX 경로)를 합쳐 등록 직후에도 영상이 뜨게 함
+    let mtxPath = null
+    try { mtxPath = (await postChannel(data))?.mtxPath } catch (e) { console.error(e) }
+    addChannel(data.slot, { ...data, mtxPath })
   }
   closeModal()
 }

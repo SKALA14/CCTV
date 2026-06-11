@@ -25,7 +25,7 @@ from app.db.models import CctvChannel, EventLog, Site, User
 from app.worker import run_worker
 from app.api import events, ws, channels, manuals, auth, sites, users, status as status_api
 from app.api.auth import _limiter as _auth_limiter
-from app.api.channels import _store
+from app.api.channels import _store, _mediamtx_channel_name
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +34,8 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # 인증 필수 설정 검증 — .env에서 설정되지 않으면 기동 거부
     missing = [k for k, v in {
-        "AUTH_SECRET":         config.AUTH_SECRET,
-        "SUPERADMIN_PASSWORD": config.SUPERADMIN_PASSWORD,
+        "AUTH_SECRET":    config.AUTH_SECRET,
+        "ADMIN_PASSWORD": config.ADMIN_PASSWORD,
     }.items() if not v]
     if missing:
         raise RuntimeError(f"인증 설정이 누락됐습니다. .env에서 설정하세요: {', '.join(missing)}")
@@ -52,21 +52,28 @@ async def lifespan(app: FastAPI):
 
     _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-    # superadmin 계정 시드 — DB에 없으면 자동 생성
+    # 현장·admin 계정 시드 — 설치 시 1회. DB에 없으면 자동 생성.
     async with AsyncSessionLocal() as session:
         async with session.begin():
-            existing_superadmin = await session.scalar(
-                select(User).where(User.role == "superadmin")
+            site = await session.scalar(select(Site).where(Site.name == config.SITE_NAME))
+            if not site:
+                site = Site(name=config.SITE_NAME)
+                session.add(site)
+                await session.flush()
+                logger.info("현장 자동 생성: name=%s id=%s", site.name, site.id)
+
+            existing_admin = await session.scalar(
+                select(User).where(User.role == "admin")
             )
-            if not existing_superadmin:
+            if not existing_admin:
                 session.add(User(
-                    username=config.SUPERADMIN_USERNAME,
-                    hashed_password=_pwd_context.hash(config.SUPERADMIN_PASSWORD),
-                    role="superadmin",
-                    site_id=None,
+                    username=config.ADMIN_USERNAME,
+                    hashed_password=_pwd_context.hash(config.ADMIN_PASSWORD),
+                    role="admin",
+                    site_id=site.id,
                     must_change_password=False,
                 ))
-                logger.info("superadmin 계정 자동 생성: username=%s", config.SUPERADMIN_USERNAME)
+                logger.info("admin 계정 자동 생성: username=%s site_id=%s", config.ADMIN_USERNAME, site.id)
 
     # 기존 cctv_channels 중 site_id가 NULL인 레코드 backfill
     async with AsyncSessionLocal() as session:
@@ -75,9 +82,11 @@ async def lifespan(app: FastAPI):
                 select(func.count()).select_from(CctvChannel).where(CctvChannel.site_id == None)
             )
             if unassigned:
-                default_site = Site(name="default")
-                session.add(default_site)
-                await session.flush()
+                default_site = await session.scalar(select(Site).where(Site.name == config.SITE_NAME))
+                if not default_site:
+                    default_site = Site(name=config.SITE_NAME)
+                    session.add(default_site)
+                    await session.flush()
                 await session.execute(
                     sa_update(CctvChannel)
                     .where(CctvChannel.site_id == None)
@@ -111,6 +120,7 @@ async def lifespan(app: FastAPI):
                     "slot":          slot,
                     "name":          ch.camera_name,
                     "channelName":   ch.camera_name,
+                    "mtxPath":       _mediamtx_channel_name(site_id_str, ch.camera_name),
                     "rtspUrl":       ch.source_url,
                     "sourceType":    ch.source_type,
                     "ingestion_url": ch.source_url,

@@ -17,11 +17,6 @@
     <!-- 정보 -->
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-2 mb-1 flex-wrap">
-        <span
-          v-if="isSuperadmin && event.site_name"
-          class="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
-          style="background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border);"
-        >{{ event.site_name }}</span>
         <span class="text-sm font-medium" style="color: var(--text-primary);">{{ event.channel_name }}</span>
         <span class="text-xs" style="color: var(--text-muted);">·</span>
         <span class="text-xs" style="color: var(--text-muted);">{{ timeRangeLabel }}</span>
@@ -59,12 +54,9 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuthStore } from '../../stores/authStore.js'
 
 const props = defineProps({ event: Object })
 const router = useRouter()
-const authStore = useAuthStore()
-const isSuperadmin = computed(() => authStore.isSuperadmin)
 
 const isIncident = computed(() => (props.event.incident_count ?? 1) > 1)
 

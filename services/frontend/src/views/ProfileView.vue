@@ -90,18 +90,16 @@ const auth = useAuthStore()
 const router = useRouter()
 const { isDark, toggle } = useTheme()
 
-const roleLabel = computed(() => auth.isSuperadmin ? 'SUPER' : auth.isAdmin ? 'ADMIN' : 'VIEW')
+const roleLabel = computed(() => auth.isAdmin ? 'ADMIN' : 'USER')
 const userInitial = computed(() => (auth.user?.username?.[0] ?? '?').toUpperCase())
-const siteLabel = computed(() => auth.user?.site_name || (auth.isSuperadmin ? '전체 현장' : '—'))
+const siteLabel = computed(() => auth.user?.site_name || '—')
 const badgeStyle = computed(() =>
-  auth.isSuperadmin ? 'background:#1e3a8a;color:#93c5fd;'
-    : auth.isAdmin  ? 'background:#7f1d1d;color:#fca5a5;'
-    :                 'background:#1f2937;color:#9ca3af;'
+  auth.isAdmin ? 'background:#7f1d1d;color:#fca5a5;'
+    :            'background:#1f2937;color:#9ca3af;'
 )
 const avatarStyle = computed(() =>
-  auth.isSuperadmin ? 'background:rgba(30,58,138,0.3);color:#93c5fd;'
-    : auth.isAdmin  ? 'background:rgba(127,29,29,0.3);color:#fca5a5;'
-    :                 'background:var(--bg-elevated);color:var(--text-muted);'
+  auth.isAdmin ? 'background:rgba(127,29,29,0.3);color:#fca5a5;'
+    :            'background:var(--bg-elevated);color:var(--text-muted);'
 )
 
 const pw = ref({ current_password: '', new_password: '' })

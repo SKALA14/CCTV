@@ -57,7 +57,7 @@ async function handleSubmit() {
     await changeMyPassword(form.value)
     // must_change_password 플래그 갱신
     await authStore.fetchMe()
-    router.replace({ name: 'dashboard' })
+    router.replace({ name: 'wall' })
   } catch (e) {
     error.value = e.response?.data?.detail ?? e.message
   } finally {

@@ -20,8 +20,7 @@ class User(Base):
     __tablename__ = "users"
     __table_args__ = (
         CheckConstraint(
-            "(role = 'superadmin' AND site_id IS NULL) OR "
-            "(role != 'superadmin' AND site_id IS NOT NULL)",
+            "role IN ('admin', 'user') AND site_id IS NOT NULL",
             name="ck_user_site_role",
         ),
     )

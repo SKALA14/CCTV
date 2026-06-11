@@ -1,15 +1,5 @@
 <template>
   <nav class="flex flex-col items-center gap-1 px-2">
-    <router-link to="/" class="nav-tab" exact-active-class="active">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <rect x="3" y="3" width="7" height="7" rx="1.5"/>
-        <rect x="14" y="3" width="7" height="7" rx="1.5"/>
-        <rect x="3" y="14" width="7" height="7" rx="1.5"/>
-        <rect x="14" y="14" width="7" height="7" rx="1.5"/>
-      </svg>
-      <span>메인</span>
-    </router-link>
-
     <router-link to="/search" class="nav-tab" active-class="active">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <circle cx="11" cy="11" r="7"/>
@@ -28,8 +18,8 @@
       <span>메뉴얼</span>
     </router-link>
 
-    <!-- superadmin 전용 -->
-    <template v-if="authStore.isSuperadmin">
+    <!-- admin 전용 -->
+    <template v-if="authStore.isAdmin">
       <div class="nav-divider"></div>
 
       <router-link to="/status" class="nav-tab" active-class="active">

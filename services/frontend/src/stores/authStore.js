@@ -8,8 +8,7 @@ export const useAuthStore = defineStore('auth', () => {
     const initialized = ref(false)
 
     const isLoggedIn    = computed(() => user.value !== null)
-    const isAdmin       = computed(() => user.value?.role === 'admin' || user.value?.role === 'superadmin')
-    const isSuperadmin  = computed(() => user.value?.role === 'superadmin')
+    const isAdmin       = computed(() => user.value?.role === 'admin')
     const mustChangePwd = computed(() => user.value?.must_change_password === true)
 
     async function fetchMe() {
@@ -33,5 +32,5 @@ export const useAuthStore = defineStore('auth', () => {
         user.value = null
     }
 
-    return { user, isLoggedIn, isAdmin, isSuperadmin, mustChangePwd, initialized, fetchMe, login, logout }
+    return { user, isLoggedIn, isAdmin, mustChangePwd, initialized, fetchMe, login, logout }
 })
