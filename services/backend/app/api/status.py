@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import require_admin
+from app.api.deps import require_admin, get_current_user
 from app.config import config
 from app.db.session import get_db
 from app.db.models import Site, User, CctvChannel, EventLog
@@ -60,6 +60,26 @@ def _today_start() -> datetime:
     # "오늘"은 한국 시간(KST) 자정 기준. tz-aware라 UTC로 저장된 occurred_at과 정확히 비교됨.
     now = datetime.now(_KST)
     return now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+@router.get("/health")
+async def health(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),   # 전 계정(보기 권한) — 사이드바 상태 pill용
+) -> dict:
+    """자기 현장 채널 온라인 요약 {online, total}. frames 스트림 최신 프레임 기준."""
+    channels = (await db.execute(
+        select(CctvChannel).where(CctvChannel.site_id == current_user.site_id)
+    )).scalars().all()
+    total = len(channels)
+    if total == 0:
+        return {"online": 0, "total": 0}
+    raw = await _get_redis().xrevrange(config.FRAMES_STREAM, count=_FRAMES_SCAN_COUNT)
+    latest = _latest_frame_ts([fields for _id, fields in raw])
+    now = time.time()
+    sid = str(current_user.site_id)
+    online = sum(1 for ch in channels if _is_online(latest.get((sid, ch.camera_id)), now))
+    return {"online": online, "total": total}
 
 
 @router.get("/overview")

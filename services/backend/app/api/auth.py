@@ -168,6 +168,7 @@ class UserInfo(BaseModel):
     site_id:              str | None = None
     site_name:            str | None = None
     must_change_password: bool = False
+    last_login:           str | None = None   # ISO8601 (Redis 기록값) — 계정 칩 "마지막 접속" 표시용
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -213,6 +214,11 @@ async def login(request: Request, body: LoginRequest, response: Response):
         )
     except Exception as e:
         logger.warning("[auth] last_login 기록 실패: %s", e)
+    last_login: str | None = None
+    try:
+        last_login = await _redis.get(f"user:last_login:{user.id}")
+    except Exception:
+        last_login = None
     return UserInfo(
         user_id=str(user.id),
         username=user.username,
@@ -220,6 +226,7 @@ async def login(request: Request, body: LoginRequest, response: Response):
         site_id=str(user.site_id) if user.site_id else None,
         site_name=site_name,
         must_change_password=user.must_change_password,
+        last_login=last_login,
     )
 
 
@@ -238,6 +245,11 @@ async def me(request: Request):
         async with AsyncSessionLocal() as session:
             site = await session.get(Site, user.site_id)
             site_name = site.name if site else None
+    last_login: str | None = None
+    try:
+        last_login = await _redis.get(f"user:last_login:{user.id}")
+    except Exception:
+        last_login = None
     return UserInfo(
         user_id=str(user.id),
         username=user.username,
@@ -245,4 +257,5 @@ async def me(request: Request):
         site_id=str(user.site_id) if user.site_id else None,
         site_name=site_name,
         must_change_password=user.must_change_password,
+        last_login=last_login,
     )
