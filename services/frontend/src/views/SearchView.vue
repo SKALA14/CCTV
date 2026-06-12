@@ -38,7 +38,8 @@
 
       <ChannelFilter
         :channels="channels"
-        v-model="selectedChannelId"
+        :model-value="selectedChannelId"
+        @update:model-value="handleChannelChange"
       />
     </div>
 
@@ -51,7 +52,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import SearchBar     from '../components/search/SearchBar.vue'
 import ChannelFilter from '../components/search/ChannelFilter.vue'
 import ResultList    from '../components/search/ResultList.vue'
@@ -106,25 +107,27 @@ function getQuickFilterDates(key) {
 
 async function handleSearch(query, startDate = null, endDate = null, skipTimeParse = false) {
   lastQuery.value = query
-  await search(
-    query,
-    selectedChannelId.value,
-    startDate,
-    endDate,
-    skipTimeParse,
-  )
+  if (!query.trim()) {
+    await load(selectedChannelId.value ? { channel_id: selectedChannelId.value } : {})
+  } else {
+    await search(query, selectedChannelId.value, startDate, endDate, skipTimeParse)
+  }
   eventStore.setSearchResults(events.value)
 }
 
 async function handleQuickFilter(key) {
   if (selectedQuickFilter.value === key) {
     selectedQuickFilter.value = null
-    if (lastQuery.value) await handleSearch(lastQuery.value)
+    if (lastQuery.value) {
+      await handleSearch(lastQuery.value)
+    } else {
+      await load(selectedChannelId.value ? { channel_id: selectedChannelId.value } : {})
+    }
     return
   }
   selectedQuickFilter.value = key
+  const { startDate, endDate } = getQuickFilterDates(key)
   if (lastQuery.value) {
-    const { startDate, endDate } = getQuickFilterDates(key)
     await handleSearch(lastQuery.value, startDate, endDate)
   }
 }
@@ -133,15 +136,15 @@ async function clearAppliedFilter() {
   await handleSearch(lastQuery.value, null, null, true)
 }
 
-watch(selectedChannelId, async () => {
+async function handleChannelChange(channelId) {
+  selectedChannelId.value = channelId
   if (lastQuery.value) {
     const dates = selectedQuickFilter.value
       ? getQuickFilterDates(selectedQuickFilter.value)
       : { startDate: null, endDate: null }
     await handleSearch(lastQuery.value, dates.startDate, dates.endDate)
   } else {
-    const params = selectedChannelId.value ? { channel_id: selectedChannelId.value } : {}
-    await load(params)
+    await load(channelId ? { channel_id: channelId } : {})
   }
-})
+}
 </script>
