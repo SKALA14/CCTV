@@ -225,8 +225,8 @@ async def analyze_manual(
 
     # 카테고리 정규화 (실패해도 기존 items는 정상 반환)
     try:
-        static_categories = await normalize_categories(static_items)
-        dynamic_categories = await normalize_categories(dynamic_items)
+        static_categories = await normalize_categories(static_items, "static")
+        dynamic_categories = await normalize_categories(dynamic_items, "dynamic")
     except Exception as e:
         logger.warning("카테고리 정규화 실패, 빈 배열로 대체: %s", e)
         static_categories = []
@@ -375,8 +375,8 @@ async def confirm_manual(
     static_items = [i.strip() for i in body.static if i and i.strip()]
     dynamic_items = [i.strip() for i in body.dynamic if i and i.strip()]
     try:
-        static_cats = await normalize_categories(static_items)
-        dynamic_cats = await normalize_categories(dynamic_items)
+        static_cats = await normalize_categories(static_items, "static")
+        dynamic_cats = await normalize_categories(dynamic_items, "dynamic")
     except Exception as e:
         logger.warning("카테고리 재산정 실패, GENERAL fallback: %s", e)
         static_cats = [{"code": "GENERAL", "label": "일반", "items": static_items}] if static_items else []
