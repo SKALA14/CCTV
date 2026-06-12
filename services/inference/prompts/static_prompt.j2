@@ -30,7 +30,6 @@ Phase 2에서 위험하다고 판단한 각 항목에 대해 다음을 확인하
 ## Phase 3 — 체크리스트 대조 및 최종 판정
 Phase 2.5 검증 결과를 체크리스트와 대조하여
 각 항목의 정상/비정상/확인불가를 판정하라.
-체크리스트에 없는 위험 요소는 unlisted에 기록하라.
 
 최종 출력은 Phase 3 판정 결과만 아래 JSON 형식으로 출력하라.
 다른 텍스트, 마크다운 코드블록을 절대 포함하지 마라.
@@ -41,11 +40,8 @@ Phase 2.5 검증 결과를 체크리스트와 대조하여
     {
       "violated_index": 위반 항목 번호(문자열) | null,
       "description": "<탐지 내용 한 줄>",
-      "in_checklist": <true|false>
+      "severity": "critical" | "high" | "low" | "none"
     }
-  ],
-  "unlisted": [
-    {"description": "<체크리스트 외 위험 요소>"}
   ]
 }
 
