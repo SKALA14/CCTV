@@ -1,7 +1,10 @@
 import logging
 import os
 import time
+from datetime import datetime, timezone, timedelta
 from typing import Any
+
+_KST = timezone(timedelta(hours=9))
 
 import requests
 
@@ -81,19 +84,19 @@ def build_general_payload(vlm_result: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
+_ANOMALY_TYPE_DISPLAY = {"fallen": "fall"}
+
+
 def build_emergency_payload(alert: dict[str, Any]) -> dict[str, Any]:
-    camera_id    = alert.get("camera_id", "unknown")
-    timestamp    = alert.get("timestamp", "")
-    anomaly_type = alert.get("anomaly_type", "emergency")
-    danger_level = alert.get("danger_level", "critical")
-    description  = alert.get("description", "")
-    frame        = alert.get("frame", "")
-    source_model = alert.get("source_model", "")
-    confidence   = alert.get("confidence", "")
+    camera_id    = alert.get("camera_name") or alert.get("camera_id", "unknown")
+    raw_ts       = alert.get("timestamp", "")
     try:
-        conf_display = f"{float(confidence):.2f}"
+        timestamp = datetime.fromtimestamp(float(raw_ts), tz=_KST).strftime("%Y-%m-%d %H:%M:%S")
     except (TypeError, ValueError):
-        conf_display = "-"
+        timestamp = raw_ts
+    raw_type     = alert.get("anomaly_type", "emergency")
+    anomaly_type = _ANOMALY_TYPE_DISPLAY.get(raw_type, raw_type)
+    description  = alert.get("description", "")
 
     fallback_text = f"[EMERGENCY] {camera_id} | {timestamp} | {anomaly_type}"
 
@@ -102,26 +105,19 @@ def build_emergency_payload(alert: dict[str, Any]) -> dict[str, Any]:
         "blocks": [
             {
                 "type": "header",
-                "text": {"type": "plain_text", "text": "긴급 상황 감지 알림"},
+                "text": {"type": "plain_text", "text": "🚨 긴급 상황 감지"},
             },
             {
                 "type": "section",
-                "fields": [
-                    {"type": "mrkdwn", "text": f"*카메라 ID:*\n{camera_id}"},
-                    {"type": "mrkdwn", "text": f"*발생 시각:*\n{timestamp}"},
-                    {"type": "mrkdwn", "text": f"*이상 유형:*\n{anomaly_type}"},
-                    {"type": "mrkdwn", "text": f"*위험도:*\n{danger_level}"},
-                    {"type": "mrkdwn", "text": f"*신뢰도:*\n{conf_display}"},
-                    {"type": "mrkdwn", "text": f"*프레임:*\n{frame}"},
-                ],
-            },
-            {
-                "type": "section",
-                "text": {"type": "mrkdwn", "text": f"*탐지 모델:*\n{source_model}"},
-            },
-            {
-                "type": "section",
-                "text": {"type": "mrkdwn", "text": f"*설명:*\n{description}"},
+                "text": {
+                    "type": "mrkdwn",
+                    "text": (
+                        f"*카메라 ID:* {camera_id}\n"
+                        f"*발생 시각:* {timestamp}\n"
+                        f"*이상 유형:* {anomaly_type}\n"
+                        f"*설명:* {description}"
+                    ),
+                },
             },
             {"type": "divider"},
         ],
