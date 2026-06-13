@@ -145,7 +145,7 @@ class PoseYOLO:
                              idx, person_conf, detail["angle"], detail["ratio"], detail["score"])
                 continue
 
-            reason = "정면 낙상 감지 (높이 급감)" if height_dropped else "작업자 낙상 감지"
+            reason = "작업자 낙상 감지"
             detections.append({
                 "route": "emergency",
                 "anomaly_type": "fallen",

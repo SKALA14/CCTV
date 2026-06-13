@@ -131,6 +131,7 @@ async def lifespan(app: FastAPI):
                 }
                 await _r.set(f"camera:{site_id_str}:{ch.camera_id}:source_url",  ch.source_url)
                 await _r.set(f"camera:{site_id_str}:{ch.camera_id}:source_type", ch.source_type)
+                await _r.set(f"camera:{site_id_str}:{ch.camera_id}:camera_name", ch.camera_name)
                 if ch.description:
                     await _r.set(f"camera_instruction:{site_id_str}:{ch.camera_id}", ch.description)
         finally:

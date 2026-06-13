@@ -52,12 +52,11 @@ def _get_client() -> aioredis.Redis:
 
 
 async def _ensure_consumer_groups() -> None:
-    # DB 적재는 VLM(events) 결과만 수행. alerts(Emergency/YOLO)는 검색 페이지에 저장하지 않고
-    # ws.py 토스트 + notification Slack 알림으로만 처리한다.
-    try:
-        await _get_client().xgroup_create(config.EVENTS_STREAM, CONSUMER_GROUP, id="0", mkstream=True)
-    except aioredis.ResponseError:
-        pass
+    for stream in (config.EVENTS_STREAM, config.ALERTS_STREAM):
+        try:
+            await _get_client().xgroup_create(stream, CONSUMER_GROUP, id="0", mkstream=True)
+        except aioredis.ResponseError:
+            pass
 
 
 def _save_snapshots_sync(event_id: str, camera_id: str, frame_path: str) -> list[str]:
@@ -278,12 +277,13 @@ async def _consume_stream(
             await asyncio.sleep(3)
 
 
-# 워커 진입점. events 스트림(VLM 결과)만 구독해 DB에 적재한다.
-# alerts(Emergency/YOLO)는 검색 페이지에 저장하지 않고 notification·ws.py가 알림만 처리한다.
 async def run_worker() -> None:
     openai_client = AsyncOpenAI()
 
     await _ensure_consumer_groups()
-    logger.info("backend worker started (events stream only)")
+    logger.info("backend worker started (events + alerts streams)")
 
-    await _consume_stream(config.EVENTS_STREAM, "general", openai_client)
+    await asyncio.gather(
+        _consume_stream(config.EVENTS_STREAM, "general",   openai_client),
+        _consume_stream(config.ALERTS_STREAM, "emergency", openai_client),
+    )

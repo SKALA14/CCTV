@@ -171,6 +171,7 @@ async def create_channel(
 
     await _redis.set(f"{cam_prefix}:source_url", ingestion_url)
     await _redis.set(f"{cam_prefix}:source_type", ingestion_type)
+    await _redis.set(f"{cam_prefix}:camera_name", body.channelName)
     if body.zone:
         await _redis.set(f"{cam_prefix}:zone", body.zone)
         note = _get_zone_note(body.zone, site_id_str)
