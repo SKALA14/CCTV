@@ -13,8 +13,6 @@ class EventLogRead(BaseModel):
     event_type:    str
     danger_level:  str
     reason:        str | None
-    confidence:    float | None
-    vlm_confidence: float | None
     pose_event:    str | None
     source_model:  str | None
     frame_path:    str | None
