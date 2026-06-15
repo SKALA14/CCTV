@@ -30,8 +30,8 @@
           <button
             class="text-xs px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
             :style="isCsvDragging
-              ? 'background: rgba(59,130,246,0.1); color: var(--blue); border: 1px solid var(--blue);'
-              : 'background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border);'"
+              ? 'background: rgba(59,130,246,0.15); color: #93c5fd; border: 1px solid rgba(59,130,246,0.5);'
+              : 'background: rgba(59,130,246,0.1); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3);'"
             @click="csvInput.click()"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -67,8 +67,8 @@
         <div v-if="registeredZones.length" class="flex flex-wrap gap-1.5">
           <span
             v-for="z in registeredZones" :key="z"
-            class="text-xs px-2.5 py-1 rounded-full"
-            style="background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border);"
+            class="text-xs px-2.5 py-1 rounded-full font-medium"
+            style="background: rgba(59,130,246,0.12); color: #93c5fd; border: 1px solid rgba(59,130,246,0.25);"
           >{{ z }}</span>
         </div>
         <p v-else class="text-xs" style="color: var(--text-subtle);">등록된 구역 없음</p>
@@ -88,8 +88,8 @@
           <button
             class="text-xs px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
             :style="isDragging
-              ? 'background: rgba(59,130,246,0.1); color: var(--blue); border: 1px solid var(--blue);'
-              : 'background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border);'"
+              ? 'background: rgba(59,130,246,0.15); color: #93c5fd; border: 1px solid rgba(59,130,246,0.5);'
+              : 'background: rgba(59,130,246,0.1); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3);'"
             @click="fileInput.click()"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -197,7 +197,7 @@
               class="rounded-xl p-3" style="background: var(--bg-elevated); border: 1px solid var(--border);">
               <p class="text-sm font-semibold mb-2.5" style="color: var(--text-primary);">{{ zone.zone }}</p>
               <div class="mb-2.5">
-                <p class="text-[11px] font-medium mb-1.5" style="color: var(--text-subtle);">STATIC</p>
+                <span class="text-[10px] font-semibold inline-block mb-1.5" style="color: var(--text-subtle);">정적</span>
                 <div class="space-y-1.5">
                   <ChecklistItem
                     v-for="(item, i) in zone.static"
@@ -210,7 +210,7 @@
                 </div>
               </div>
               <div>
-                <p class="text-[11px] font-medium mb-1.5" style="color: var(--text-subtle);">DYNAMIC</p>
+                <span class="text-[10px] font-semibold inline-block mb-1.5" style="color: var(--text-subtle);">동적</span>
                 <div class="space-y-1.5">
                   <ChecklistItem
                     v-for="(item, i) in zone.dynamic"
