@@ -6,20 +6,7 @@
       style="height: 44px; border-bottom: 1px solid var(--border); background: var(--bg-card);"
     >
       <div class="flex items-center gap-3">
-        <div class="flex items-center gap-2">
-          <svg width="22" height="26" viewBox="0 0 28 32" fill="none">
-            <circle cx="14" cy="13" r="13" fill="#1e293b" stroke="#334155" stroke-width="0.8"/>
-            <circle cx="14" cy="13" r="10" fill="#e2e8f0"/>
-            <circle cx="14" cy="13" r="8" fill="#1e293b"/>
-            <circle cx="14" cy="13" r="5" fill="#f1f5f9"/>
-            <circle cx="14" cy="13" r="3.2" fill="#0f172a"/>
-            <circle cx="11.8" cy="10.8" r="1.3" fill="white" opacity="0.85"/>
-            <circle cx="15.5" cy="14" r="0.6" fill="white" opacity="0.6"/>
-            <ellipse cx="14" cy="28" rx="6.5" ry="1.6" fill="#1e293b" stroke="#334155" stroke-width="0.8"/>
-            <rect x="11.5" y="25.5" width="5" height="3.5" rx="0.5" fill="#1e293b" stroke="#334155" stroke-width="0.8"/>
-          </svg>
-          <span style="font-size:18px; font-weight:700; letter-spacing:4px; color:#c0513a;">SIREN</span>
-        </div>
+        <img src="@/assets/logo.png" alt="SIREN" style="height:32px; object-fit:contain;"/>
         <span
           class="flex items-center gap-1.5 text-xs px-2 py-0.5 rounded"
           style="background: var(--bg-elevated); color: var(--text-muted);"
