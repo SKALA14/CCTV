@@ -6,7 +6,10 @@
       style="height: 44px; border-bottom: 1px solid var(--border); background: var(--bg-card);"
     >
       <div class="flex items-center gap-3">
-        <img src="/logo.png" alt="SIREN" style="height:32px; object-fit:contain;"/>
+        <div class="flex items-center gap-2">
+          <img src="/pic.png" alt="" style="height:34px; object-fit:contain;"/>
+          <img src="/letter.png" alt="SIREN" style="height:22px; object-fit:contain;"/>
+        </div>
         <span
           class="flex items-center gap-1.5 text-xs px-2 py-0.5 rounded"
           style="background: var(--bg-elevated); color: var(--text-muted);"
