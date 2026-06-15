@@ -13,20 +13,27 @@
       <div v-for="z in zones" :key="z.zone" class="rounded-2xl p-4" style="background: var(--bg-card); border: 1px solid var(--border);">
         <div class="flex items-center justify-between mb-3">
           <h2 class="font-semibold text-sm" style="color: var(--text-primary);">{{ z.zone }}</h2>
-          <span class="text-[10px] px-2 py-0.5 rounded-full" style="background: var(--bg-elevated); color: var(--text-muted);">
+          <span class="text-[10px] font-medium px-2 py-0.5 rounded-full" style="background: rgba(59,130,246,0.15); color: #60a5fa;">
             점검 {{ z.static.length + z.dynamic.length }}항목
           </span>
         </div>
-        <div v-if="z.static.length" class="mb-2">
-          <p class="text-[10px] font-medium mb-1" style="color: var(--text-subtle);">정적 {{ z.static.length }}</p>
-          <ul class="space-y-0.5">
-            <li v-for="(it, i) in z.static.slice(0, 3)" :key="i" class="text-xs truncate" style="color: var(--text-muted);">· {{ it }}</li>
+        <div v-if="z.static.length" class="mb-3">
+          <div class="flex items-center gap-1.5 mb-1.5">
+            <span class="text-[10px] font-semibold" style="color: var(--text-subtle);">정적</span>
+            <span class="text-[10px]" style="color: var(--text-subtle);">{{ z.static.length }}개</span>
+          </div>
+          <ul class="space-y-1">
+            <li v-for="(it, i) in z.static" :key="i" class="text-xs leading-relaxed" style="color: var(--text-primary);">· {{ it }}</li>
           </ul>
         </div>
+        <div v-if="z.static.length && z.dynamic.length" class="mb-3" style="border-top: 1px solid var(--border);"></div>
         <div v-if="z.dynamic.length">
-          <p class="text-[10px] font-medium mb-1" style="color: var(--text-subtle);">동적 {{ z.dynamic.length }}</p>
-          <ul class="space-y-0.5">
-            <li v-for="(it, i) in z.dynamic.slice(0, 3)" :key="i" class="text-xs truncate" style="color: var(--text-muted);">· {{ it }}</li>
+          <div class="flex items-center gap-1.5 mb-1.5">
+            <span class="text-[10px] font-semibold" style="color: var(--text-subtle);">동적</span>
+            <span class="text-[10px]" style="color: var(--text-subtle);">{{ z.dynamic.length }}개</span>
+          </div>
+          <ul class="space-y-1">
+            <li v-for="(it, i) in z.dynamic" :key="i" class="text-xs leading-relaxed" style="color: var(--text-primary);">· {{ it }}</li>
           </ul>
         </div>
         <p v-if="!z.static.length && !z.dynamic.length" class="text-xs" style="color: var(--text-subtle);">점검 항목 미설정</p>
@@ -35,25 +42,38 @@
   </div>
 </template>
 
+<script>
+export default { name: 'ZoneView' }
+</script>
+
 <script setup>
-import { ref, onMounted } from 'vue'
+import { onMounted, onActivated, computed } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useManualStore } from '../stores/manualStore.js'
 import { fetchZones, fetchChecklist } from '../api/manuals.js'
 
-const zones = ref([])
-const loading = ref(true)
+const store = useManualStore()
+const { zoneViewData, zoneViewLoaded } = storeToRefs(store)
 
-onMounted(async () => {
+const zones = computed(() => zoneViewData.value)
+const loading = computed(() => !zoneViewLoaded.value && zoneViewData.value.length === 0)
+
+async function loadZones() {
+  if (zoneViewLoaded.value) return
   try {
     const [names, cl] = await Promise.all([fetchZones(), fetchChecklist()])
     const byName = {}
     for (const z of (cl.zones || [])) byName[z.zone] = z
-    zones.value = (names || []).map(name => ({
+    zoneViewData.value = (names || []).map(name => ({
       zone: name,
       static: byName[name]?.static || [],
       dynamic: byName[name]?.dynamic || [],
     }))
-  } catch { zones.value = [] } finally {
-    loading.value = false
+  } catch { zoneViewData.value = [] } finally {
+    zoneViewLoaded.value = true
   }
-})
+}
+
+onMounted(loadZones)
+onActivated(loadZones)  // keep-alive로 복귀 시에도 zoneViewLoaded 초기화 감지
 </script>

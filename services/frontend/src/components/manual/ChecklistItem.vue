@@ -1,7 +1,7 @@
 <template>
   <div
     class="flex items-start gap-2 px-3 py-2 rounded-lg group"
-    style="background: var(--bg-elevated);"
+    style="background: var(--bg-card); border: 1px solid var(--border);"
   >
     <!-- 보기 모드 -->
     <template v-if="!editing">
