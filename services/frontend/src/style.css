@@ -285,14 +285,14 @@ body {
     color: #fff;
 }
 
-.danger-badge.medium {
-    background: var(--badge-medium);
-    color: var(--badge-medium-text, #fff);
-}
-
 .danger-badge.low {
     background: var(--badge-low);
     color: #fff;
+}
+
+.danger-badge.none {
+    background: #374151;
+    color: #9ca3af;
 }
 
 /* ── 드롭다운(select) 공통 ── */

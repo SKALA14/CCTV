@@ -85,8 +85,9 @@ function formatTime(ts) {
 }
 
 function dangerClass(level) {
-  if (level === 'critical' || level === 'high') return 'bg-red-900/30 text-red-400'
-  if (level === 'medium') return 'bg-yellow-900/30 text-yellow-400'
-  return 'bg-green-900/30 text-green-400'
+  if (level === 'critical') return 'bg-red-900/30 text-red-400'
+  if (level === 'high')     return 'bg-orange-900/30 text-orange-400'
+  if (level === 'low')      return 'bg-yellow-900/30 text-yellow-400'
+  return 'bg-green-900/30 text-green-400'   // none
 }
 </script>
