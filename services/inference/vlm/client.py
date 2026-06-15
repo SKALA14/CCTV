@@ -16,8 +16,20 @@ from redis_client import get_client
 
 logger = logging.getLogger(__name__)
 
-_VALID_LEVELS = {"critical", "high", "low", "none"}
 _REFUSAL_PHRASES = ("i'm sorry", "i cannot", "i can't", "i am sorry", "cannot assist", "can't assist")
+_VALID_SEVERITIES = frozenset({"critical", "high", "low", "none"})
+
+
+def _extract_description(data: dict) -> str:
+    """최상위 description 우선, 없으면 detections 첫 항목에서 추출."""
+    desc = str(data.get("description", "")).strip()
+    if desc:
+        return desc
+    for det in data.get("detections", []):
+        d = str(det.get("description", "")).strip()
+        if d:
+            return d
+    return ""
 
 
 def _encode_image(image_path: str) -> tuple[str, str]:
@@ -69,15 +81,14 @@ class VLMClient:
     def _parse(self, raw_text: str, categories: dict[str, str] | None = None) -> dict:
         """VLM 응답을 표준 dict로 파싱. 실패 시 normal fallback.
 
-        categories: {"1": "SAFETY_BARRIERS", ...} — violated_index 조회용.
-        categories 없거나 비어있으면 anomaly_type = "GENERAL" fallback.
+        categories: {"1": "SAFETY_BARRIERS", ...} — violated_index → anomaly_type 조회용.
+        danger_level은 VLM이 출력한 detections[].severity에서 직접 읽음 (체크리스트에서 복사).
         """
         normal = {
             "result": "normal",
             "anomaly_type": "normal",
             "danger_level": "none",
             "description": "",
-            "confidence": 0.0,
         }
 
         if raw_text.find("{") == -1:
@@ -98,30 +109,39 @@ class VLMClient:
 
         try:
             result = str(data.get("result", "normal"))
-            level = data.get("danger_level", "none")
 
-            if result != "anomaly":
+            if result not in ("anomaly", "unverifiable"):
                 return {
                     "result": "normal",
                     "anomaly_type": "normal",
                     "danger_level": "none",
-                    "description": str(data.get("description", "")),
-                    "confidence": float(max(0.0, min(1.0, data.get("confidence", 0.5)))),
+                    "description": _extract_description(data),
                 }
 
-            # violated_index → anomaly_type 변환
-            violated_index = str(data.get("violated_index") or "").strip()
-            if categories and violated_index:
-                anomaly_type = categories.get(violated_index, "GENERAL")
-            else:
-                anomaly_type = "GENERAL"
+            if result == "unverifiable":
+                return {
+                    "result": "unverifiable",
+                    "anomaly_type": "normal",
+                    "danger_level": "none",
+                    "description": _extract_description(data),
+                }
+
+            # violated_index + severity: 위반 detection에서 직접 추출
+            violated_det = next(
+                (d for d in data.get("detections", [])
+                 if str(d.get("violated_index") or "").strip() not in ("", "null")),
+                {},
+            )
+            violated_index = str(violated_det.get("violated_index") or "").strip()
+            raw_sev = str(violated_det.get("severity", "low"))
+            danger_level = raw_sev if raw_sev in _VALID_SEVERITIES else "low"
+            anomaly_type = categories.get(violated_index, "GENERAL") if (categories and violated_index) else "GENERAL"
 
             return {
                 "result": "anomaly",
                 "anomaly_type": anomaly_type,
-                "danger_level": level if level in _VALID_LEVELS else "none",
-                "description": str(data.get("description", "")),
-                "confidence": float(max(0.0, min(1.0, data.get("confidence", 0.5)))),
+                "danger_level": danger_level,
+                "description": _extract_description(data),
             }
         except (ValueError, TypeError) as e:
             logger.warning("VLM 값 변환 실패: %s | data: %s", e, data)
@@ -135,7 +155,6 @@ class VLMClient:
                 "anomaly_type": "normal",
                 "danger_level": "none",
                 "description": "",
-                "confidence": 0.0,
             }
         raw = self._predict(prompt, frame_paths)
         logger.debug("VLM raw: %s", raw[:200])
@@ -163,6 +182,24 @@ def _split_cam_key(camera_id: str) -> tuple[str, str]:
     return "", camera_id
 
 
+def _load_zone_meta(camera_id: str, zone: str) -> tuple[str, str]:
+    """CHECKLIST_DIR/{site_id}/zones.json에서 zone의 description과 note 반환."""
+    site_id, _ = _split_cam_key(camera_id)
+    if not (site_id and zone):
+        return "", ""
+    zones_path = Path(config.CHECKLIST_DIR) / site_id / "zones.json"
+    if not zones_path.exists():
+        return "", ""
+    try:
+        data = json.loads(zones_path.read_text(encoding="utf-8"))
+        for z in data:
+            if isinstance(z, dict) and z.get("zone") == zone:
+                return z.get("description", ""), z.get("note", "")
+    except Exception as e:
+        logger.warning("zones.json 읽기 실패 (camera=%s): %s", camera_id, e)
+    return "", ""
+
+
 def _load_checklist(track: str, camera_id: str = "") -> str:
     """체크리스트 파일을 매번 디스크에서 읽어 반환 (현장별).
     camera_id는 compound '{site_id}:{cam_id}'. site_id가 있으면 CHECKLIST_DIR/{site_id}/ 하위.
@@ -176,14 +213,16 @@ def _load_checklist(track: str, camera_id: str = "") -> str:
         zone = get_client().get(f"camera:{camera_id}:zone") or ""
         if zone:
             safe = zone.replace(" ", "_")
-            zone_path = base / f"zone_{safe}_{track}.md"
-            if zone_path.exists():
-                return zone_path.read_text(encoding="utf-8")
-    path = base / f"{track}_checklist.md"
-    if not path.exists():
-        logger.warning("체크리스트 파일 없음: %s", path)
-        return ""
-    return path.read_text(encoding="utf-8")
+            for ext in (".json", ".md"):
+                zone_path = base / f"zone_{safe}_{track}{ext}"
+                if zone_path.exists():
+                    return zone_path.read_text(encoding="utf-8")
+    for ext in (".json", ".md"):
+        path = base / f"{track}_checklist{ext}"
+        if path.exists():
+            return path.read_text(encoding="utf-8")
+    logger.warning("체크리스트 파일 없음: %s", base / f"{track}_checklist.json")
+    return ""
 
 
 def _get_categories_key(track: str, camera_id: str) -> str:
@@ -206,11 +245,12 @@ def render_prompt(filename: str, camera_id: str) -> tuple[str, dict[str, str]]:
     """camera_id, Redis camera_instruction, 체크리스트를 주입해 프롬프트 렌더링.
 
     반환: (rendered_prompt, categories_dict)
-    categories_dict: {"1": "SAFETY_BARRIERS", "2": "SAFETY_SIGNS", ...}
-    Redis 조회 실패 시 categories_dict = {} (anomaly_type fallback 처리는 _parse()가 담당)
+    categories_dict: {"1": "SAFETY_BARRIERS", ...} — violated_index → anomaly_type
+    danger_level은 VLM이 체크리스트에서 읽은 severity를 detections에 출력 → _parse()가 직접 사용.
     """
     track = filename.split("_", 1)[0]  # "dynamic_prompt.j2" → "dynamic"
-    instruction = get_client().get(f"camera_instruction:{camera_id}") or ""
+    zone = get_client().get(f"camera:{camera_id}:zone") or ""
+    description, note = _load_zone_meta(camera_id, zone)
     checklist = _load_checklist(track, camera_id)
 
     categories_key = _get_categories_key(track, camera_id)
@@ -222,7 +262,9 @@ def render_prompt(filename: str, camera_id: str) -> tuple[str, dict[str, str]]:
 
     prompt = _get_template(filename).render(
         camera_id=camera_id,
-        instruction=instruction,
+        zone=zone,
+        description=description,
+        note=note,
         checklist=checklist,
     )
     return prompt, categories

@@ -60,7 +60,7 @@ def run(
             result = vlm.analyze(frame_paths, prompt, categories)
             elapsed = time.monotonic() - t0
 
-            if result.get("result") != "normal":
+            if result.get("result") == "anomaly":
                 if not should_publish(result, cam_key, "dynamic"):
                     logger.info("[dynamic.vlm] ← gate filtered (%.1fs): camera=%s",
                                 elapsed, cam_id)

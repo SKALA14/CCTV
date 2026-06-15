@@ -184,7 +184,6 @@ async def _process_message(
     danger_level = fields.get("danger_level", "none")
     description  = fields.get("description", "")
     frame_path   = fields.get("frame_path")
-    confidence   = fields.get("confidence")
     source_model = fields.get("source_model")
     track        = fields.get("track")
 
@@ -222,7 +221,6 @@ async def _process_message(
                 danger_level=danger_level,
                 description=description,
                 frame_path=frame_path,
-                confidence=float(confidence) if confidence else None,
                 source_model=source_model,
                 source_path=frame_path,
                 occurred_at=occurred_at,

@@ -38,8 +38,6 @@ def _to_schema(
         event_type=event.event_type,
         danger_level=event.danger_level,
         reason=event.description,
-        confidence=event.confidence,
-        vlm_confidence=None,
         pose_event=None,
         source_model=event.source_model,
         frame_path=event.frame_path,
