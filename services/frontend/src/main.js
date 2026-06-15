@@ -6,10 +6,10 @@ import './style.css'
 
 // 저장된 테마를 렌더링 전에 즉시 적용 (깜빡임 방지)
 const savedTheme = localStorage.getItem('cctv_theme')
-if (savedTheme === 'light') {
-  document.documentElement.classList.add('light')
-} else {
+if (savedTheme === 'dark') {
   document.documentElement.classList.add('dark')
+} else {
+  document.documentElement.classList.add('light')
 }
 
 const app = createApp(App)

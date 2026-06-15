@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     EVENTS_MAXLEN: int = 500
 
     # OpenAI
+    # TODO: MVP는 OpenAI Vision API 사용. 운영 단계에서 자체 VLM 서빙으로 교체 예정.
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o"
 
