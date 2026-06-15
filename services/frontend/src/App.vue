@@ -47,9 +47,11 @@
         <div v-if="isLiveView" style="height: 100%">
           <DashboardView />
         </div>
-        <keep-alive include="ManualView">
-          <router-view v-if="!isLiveView" />
-        </keep-alive>
+        <router-view v-if="!isLiveView" v-slot="{ Component }">
+          <keep-alive include="ManualView,ZoneView">
+            <component :is="Component" />
+          </keep-alive>
+        </router-view>
       </main>
     </div>
   </div>

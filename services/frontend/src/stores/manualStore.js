@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, reactive } from 'vue'
 import { fetchManuals, uploadManual, deleteManual } from '../api/manuals.js'
 
 export const useManualStore = defineStore('manual', () => {
+  // ── 업로드된 파일 목록 ──────────────────────────────────────
   const files = ref([])
   const loading = ref(false)
 
@@ -27,5 +28,37 @@ export const useManualStore = defineStore('manual', () => {
     files.value = files.value.filter(f => f.id !== id)
   }
 
-  return { files, loading, load, upload, remove }
+  // ── ManualView 세션 상태 (탭 이동 후에도 유지) ───────────────
+  const docFile = ref(null)
+  const uploadError = ref('')
+  const zoneFile = ref(null)
+  const csvError = ref('')
+  const registeredZones = ref([])
+  const zoneRegister = reactive({ loading: false, error: '' })
+  const checklist = reactive({
+    sessionId: '',
+    static: [],
+    dynamic: [],
+    staticCategories: [],
+    dynamicCategories: [],
+    zones: [],
+    loading: false,
+    error: '',
+    saved: false,
+    zoneSaved: false,
+    zoneError: '',
+  })
+
+  // ── ZoneView 데이터 (탭 이동 후에도 유지) ───────────────────
+  const zoneViewData = ref([])
+  const zoneViewLoaded = ref(false)
+
+  return {
+    files, loading, load, upload, remove,
+    docFile, uploadError,
+    zoneFile, csvError,
+    registeredZones, zoneRegister,
+    checklist,
+    zoneViewData, zoneViewLoaded,
+  }
 })

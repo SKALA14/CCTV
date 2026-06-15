@@ -1,272 +1,247 @@
 <template>
-  <div class="p-4 max-w-3xl mx-auto">
+  <div class="flex flex-col gap-4 p-4 h-full min-h-0">
 
-    <!-- 구역 정보 섹션 -->
-    <div v-if="canManage" class="mb-8">
-      <div class="mb-2 flex items-center justify-between">
-        <div>
-          <h2 class="font-semibold text-base" style="color: var(--text-primary);">구역 정보</h2>
-          <p class="text-xs mt-0.5" style="color: var(--text-subtle);">구역을 먼저 등록하면 매뉴얼 분석 시 구역별 체크리스트가 자동 생성됩니다</p>
-        </div>
-        <button
-          class="text-xs px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
-          style="background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border);"
-          @click="downloadSample"
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12M8 12l4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          샘플 다운로드
-        </button>
-      </div>
+    <!-- 상단: 압축 업로드 카드 2열 -->
+    <div v-if="canManage" class="grid grid-cols-2 gap-4 flex-shrink-0">
 
-      <div
-        class="rounded-xl border-2 border-dashed transition-colors mb-3 flex flex-col items-center justify-center gap-2 py-8 cursor-pointer"
-        :class="isCsvDragging ? 'border-blue-500 bg-blue-500/5' : ''"
-        :style="!isCsvDragging ? 'border-color: var(--input-border);' : ''"
-        @dragover.prevent="isCsvDragging = true"
-        @dragleave.prevent="isCsvDragging = false"
-        @drop.prevent="onCsvDrop"
-        @click="csvInput.click()"
-      >
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-subtle);">
-          <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12M8 8l4-4 4 4" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <p class="text-sm" style="color: var(--text-muted);">CSV · XLSX 파일을 드래그하거나 클릭해서 업로드</p>
-        <p class="text-xs" style="color: var(--text-subtle);">최대 5MB</p>
-        <input ref="csvInput" type="file" class="hidden" accept=".csv,.xlsx" @change="onCsvChange" />
-      </div>
-      <p v-if="csvError" class="text-sm mb-2" style="color: var(--red);">{{ csvError }}</p>
-      <div v-if="zoneFile" class="rounded-xl px-4 py-3 mb-3 flex items-center gap-3"
-        style="background: var(--bg-card); border: 1px solid var(--border);">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--green); flex-shrink:0;">
-          <path d="M20 6L9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <span class="text-sm truncate flex-1" style="color: var(--text-primary);">{{ zoneFile.name }}</span>
-        <button
-          class="text-xs py-1 px-3 rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition-colors"
-          :disabled="zoneRegister.loading"
-          @click="onRegisterZones"
-        >
-          <span v-if="zoneRegister.loading" class="flex items-center gap-1.5">
-            <span class="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block"></span>
-            등록 중
-          </span>
-          <span v-else>구역 등록</span>
-        </button>
-      </div>
-      <p v-if="zoneRegister.error" class="text-xs mb-2" style="color: var(--red);">{{ zoneRegister.error }}</p>
-
-      <!-- 등록된 구역 목록 -->
-      <div v-if="registeredZones.length" class="flex flex-wrap gap-2 mt-1">
-        <span
-          v-for="z in registeredZones" :key="z"
-          class="text-xs px-2.5 py-1 rounded-full"
-          style="background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border);"
-        >{{ z }}</span>
-      </div>
-      <p v-else class="text-xs mt-1" style="color: var(--text-subtle);">등록된 구역 없음</p>
-    </div>
-
-    <!-- 매뉴얼 분석 섹션 -->
-    <div v-if="canManage" class="mb-8">
-      <h2 class="font-semibold text-base mb-4" style="color: var(--text-primary);">메뉴얼 파일 관리</h2>
-
-      <div
-        class="rounded-xl border-2 border-dashed transition-colors mb-3 flex flex-col items-center justify-center gap-2 py-10 cursor-pointer"
-        :class="isDragging ? 'border-blue-500 bg-blue-500/5' : ''"
-        :style="!isDragging ? 'border-color: var(--input-border);' : ''"
-        @dragover.prevent="isDragging = true"
-        @dragleave.prevent="isDragging = false"
-        @drop.prevent="onDrop"
-        @click="fileInput.click()"
-      >
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-subtle);">
-          <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12M8 8l4-4 4 4" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <p class="text-sm" style="color: var(--text-muted);">안전 문서를 드래그하거나 클릭해서 업로드</p>
-        <p class="text-xs" style="color: var(--text-subtle);">PDF · 최대 20MB</p>
-        <input ref="fileInput" type="file" class="hidden" accept=".pdf" @change="onFileChange" />
-      </div>
-      <p v-if="uploadError" class="text-sm mb-3" style="color: var(--red);">{{ uploadError }}</p>
-      <div v-if="docFile" class="rounded-xl px-4 py-3 mb-3 flex items-center gap-3"
-        style="background: var(--bg-card); border: 1px solid var(--border);">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--green); flex-shrink:0;">
-          <path d="M20 6L9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <span class="text-sm truncate" style="color: var(--text-primary);">{{ docFile.name }}</span>
-      </div>
-
-      <button
-        :disabled="!docFile || checklist.loading"
-        class="w-full py-3 rounded-xl font-semibold text-sm transition-all mb-6"
-        :class="docFile && !checklist.loading
-          ? 'bg-blue-600 text-white hover:bg-blue-500 shadow-lg shadow-blue-900/30'
-          : 'text-[#48484a] cursor-not-allowed'"
-        :style="!docFile || checklist.loading ? 'background: var(--bg-elevated);' : ''"
-        @click="onAnalyze"
-      >
-        <span v-if="checklist.loading" class="flex items-center justify-center gap-2">
-          <span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block"></span>
-          분석 중...
-        </span>
-        <span v-else>{{ docFile ? '분석 시작' : 'PDF를 업로드하세요' }}</span>
-      </button>
-
-      <div v-if="checklist.error && !checklist.sessionId" class="rounded-xl p-4 mb-6"
-        style="background: var(--bg-card); border: 1px solid var(--border);">
-        <p class="text-sm" style="color: var(--red);">{{ checklist.error }}</p>
-      </div>
-
-      <div v-if="checklist.sessionId" class="rounded-xl p-4 mb-6"
-        style="background: var(--bg-card); border: 1px solid var(--border);">
-        <ChecklistReview
-          :session-id="checklist.sessionId"
-          :static="checklist.static"
-          :dynamic="checklist.dynamic"
-          :loading="checklist.loading"
-          :error="checklist.error"
-          @refine="onRefine"
-          @confirm="onConfirm"
-        />
-        <p v-if="checklist.saved" class="text-xs mt-3 text-center" style="color: var(--green);">
-          체크리스트가 저장되었습니다.
-        </p>
-      </div>
-
-      <div v-if="checklist.zones.length" class="mb-6">
-        <h3 class="font-semibold text-sm mb-3" style="color: var(--text-primary);">구역별 확인 항목</h3>
-        <p class="text-xs mb-3" style="color: var(--text-subtle);">항목에 마우스를 올려 연필 아이콘으로 수정하거나 삭제할 수 있습니다. 편집 후 위 "확정"으로 저장하세요.</p>
-        <div class="flex flex-col gap-3">
-          <div v-for="zone in checklist.zones" :key="zone.zone"
-            class="rounded-xl p-4" style="background: var(--bg-card); border: 1px solid var(--border);">
-            <p class="text-sm font-semibold mb-3" style="color: var(--text-primary);">{{ zone.zone }}</p>
-            <div class="mb-3">
-              <p class="text-[11px] font-medium mb-1.5" style="color: var(--text-subtle);">STATIC</p>
-              <div class="space-y-1.5">
-                <ChecklistItem
-                  v-for="(item, i) in zone.static"
-                  :key="'s' + i"
-                  :item="item"
-                  @update="zone.static[i] = $event"
-                  @remove="zone.static.splice(i, 1)"
-                />
-                <button class="text-xs" style="color: var(--blue);" @click="zone.static.push('')">+ 항목 추가</button>
-              </div>
-            </div>
-            <div>
-              <p class="text-[11px] font-medium mb-1.5" style="color: var(--text-subtle);">DYNAMIC</p>
-              <div class="space-y-1.5">
-                <ChecklistItem
-                  v-for="(item, i) in zone.dynamic"
-                  :key="'d' + i"
-                  :item="item"
-                  @update="zone.dynamic[i] = $event"
-                  @remove="zone.dynamic.splice(i, 1)"
-                />
-                <button class="text-xs" style="color: var(--blue);" @click="zone.dynamic.push('')">+ 항목 추가</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 파일 목록 -->
-    <template v-if="canManage">
-      <div v-if="store.loading" class="flex justify-center py-8">
-        <div class="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-      <div v-else-if="store.files.length === 0" class="text-center py-12 text-sm" style="color: var(--text-subtle);">
-        업로드된 메뉴얼이 없습니다
-      </div>
-      <div v-else class="rounded-xl" style="background: var(--bg-card); border: 1px solid var(--border);">
-        <div
-          v-for="(file, i) in store.files"
-          :key="file.id"
-          class="flex items-center gap-3 px-4 py-3"
-          :style="i < store.files.length - 1 ? 'border-bottom: 1px solid var(--border);' : ''"
-        >
-          <div class="w-8 h-8 rounded flex items-center justify-center flex-shrink-0"
-            style="background: var(--bg-elevated);">
-            <span class="text-[10px] font-mono uppercase" style="color: var(--text-muted);">{{ ext(file.name) }}</span>
-          </div>
-          <div class="flex-1 min-w-0">
-            <p class="text-sm truncate" style="color: var(--text-primary);">{{ file.name }}</p>
-            <p class="text-xs" style="color: var(--text-subtle);">{{ formatSize(file.size) }} · {{ formatDate(file.uploaded_at) }}</p>
-          </div>
+      <!-- ① 구역 정보 등록 -->
+      <div class="rounded-xl p-4" style="background: var(--bg-card); border: 1px solid var(--border);">
+        <div class="flex items-center justify-between mb-1">
+          <h2 class="font-semibold text-base" style="color: var(--text-primary);">구역 정보 등록</h2>
           <button
-            class="text-xs rounded px-2 py-1 transition-colors"
-            style="color: var(--red); border: 1px solid var(--border);"
-            @click="store.remove(file.id, null)"
-          >삭제</button>
+            class="text-xs px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 flex-shrink-0"
+            style="background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border);"
+            @click="downloadSample"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12M8 12l4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            샘플 다운로드
+          </button>
+        </div>
+        <p class="text-xs mb-3" style="color: var(--text-subtle);">구역을 먼저 등록하면 매뉴얼 분석 시 구역별 체크리스트가 자동 생성됩니다</p>
+
+        <!-- 파일 선택 버튼 (드래그 포함) -->
+        <div class="flex items-center gap-2 mb-3"
+          @dragover.prevent="isCsvDragging = true"
+          @dragleave.prevent="isCsvDragging = false"
+          @drop.prevent="onCsvDrop"
+        >
+          <button
+            class="text-xs px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
+            :style="isCsvDragging
+              ? 'background: rgba(59,130,246,0.1); color: var(--blue); border: 1px solid var(--blue);'
+              : 'background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border);'"
+            @click="csvInput.click()"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12M8 8l4-4 4 4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            CSV · XLSX 파일 선택
+          </button>
+          <span class="text-xs" style="color: var(--text-subtle);">최대 5MB · 드래그 가능</span>
+          <input ref="csvInput" type="file" class="hidden" accept=".csv,.xlsx" @change="onCsvChange" />
+        </div>
+        <p v-if="csvError" class="text-xs mb-2" style="color: var(--red);">{{ csvError }}</p>
+
+        <div v-if="zoneFile" class="rounded-lg px-3 py-2 mb-2 flex items-center gap-2"
+          style="background: var(--bg-elevated); border: 1px solid var(--border);">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--green); flex-shrink:0;">
+            <path d="M20 6L9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="text-xs truncate flex-1" style="color: var(--text-primary);">{{ zoneFile.name }}</span>
+          <button
+            class="text-xs py-0.5 px-2.5 rounded-md bg-blue-600 text-white hover:bg-blue-500 transition-colors flex-shrink-0"
+            :disabled="zoneRegister.loading"
+            @click="onRegisterZones"
+          >
+            <span v-if="zoneRegister.loading" class="flex items-center gap-1">
+              <span class="w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin inline-block"></span>
+              등록 중
+            </span>
+            <span v-else>구역 등록</span>
+          </button>
+        </div>
+        <p v-if="zoneRegister.error" class="text-xs mb-2" style="color: var(--red);">{{ zoneRegister.error }}</p>
+
+        <div v-if="registeredZones.length" class="flex flex-wrap gap-1.5">
+          <span
+            v-for="z in registeredZones" :key="z"
+            class="text-xs px-2.5 py-1 rounded-full"
+            style="background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border);"
+          >{{ z }}</span>
+        </div>
+        <p v-else class="text-xs" style="color: var(--text-subtle);">등록된 구역 없음</p>
+      </div>
+
+      <!-- ② 매뉴얼 파일 관리 -->
+      <div class="rounded-xl p-4" style="background: var(--bg-card); border: 1px solid var(--border);">
+        <h2 class="font-semibold text-base mb-1" style="color: var(--text-primary);">매뉴얼 파일 관리</h2>
+        <p class="text-xs mb-3" style="color: var(--text-subtle);">분석할 PDF 안전 문서를 업로드하세요</p>
+
+        <!-- 파일 선택 버튼 (드래그 포함) -->
+        <div class="flex items-center gap-2 mb-3"
+          @dragover.prevent="isDragging = true"
+          @dragleave.prevent="isDragging = false"
+          @drop.prevent="onDrop"
+        >
+          <button
+            class="text-xs px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
+            :style="isDragging
+              ? 'background: rgba(59,130,246,0.1); color: var(--blue); border: 1px solid var(--blue);'
+              : 'background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border);'"
+            @click="fileInput.click()"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12M8 8l4-4 4 4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            PDF 파일 선택
+          </button>
+          <span class="text-xs" style="color: var(--text-subtle);">최대 20MB · 드래그 가능</span>
+          <input ref="fileInput" type="file" class="hidden" accept=".pdf" @change="onFileChange" />
+        </div>
+        <p v-if="uploadError" class="text-xs mb-2" style="color: var(--red);">{{ uploadError }}</p>
+
+        <div v-if="docFile" class="rounded-lg px-3 py-2 flex items-center gap-2"
+          style="background: var(--bg-elevated); border: 1px solid var(--border);">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--green); flex-shrink:0;">
+            <path d="M20 6L9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="text-xs truncate" style="color: var(--text-primary);">{{ docFile.name }}</span>
         </div>
       </div>
-    </template>
 
-    <!-- 현재 적용 중인 체크리스트 (읽기 전용 참조) -->
-    <div class="mb-8">
-      <h2 class="font-semibold text-base mb-1" style="color: var(--text-primary);">현재 적용 중인 체크리스트</h2>
-      <p class="text-xs mb-3" style="color: var(--text-subtle);">VLM 분석에 실제 사용되는 확정 체크리스트입니다. 수정하려면 위에서 메뉴얼을 분석해 다시 확정하세요.</p>
-
-      <!-- 구역 선택: 전체(공통) + 구역별 -->
-      <div class="flex flex-wrap gap-2 mb-4">
-        <button
-          class="text-xs px-3 py-1.5 rounded-full transition-colors"
-          :style="selectedConfirmZone === null
-            ? 'background: var(--blue); color: #fff; border: 1px solid var(--blue);'
-            : 'background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border);'"
-          @click="selectedConfirmZone = null"
-        >전체</button>
-        <button
-          v-for="z in confirmedChecklist.zones" :key="z.zone"
-          class="text-xs px-3 py-1.5 rounded-full transition-colors"
-          :style="selectedConfirmZone === z.zone
-            ? 'background: var(--blue); color: #fff; border: 1px solid var(--blue);'
-            : 'background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border);'"
-          @click="selectedConfirmZone = z.zone"
-        >{{ z.zone }}</button>
-      </div>
-
-      <!-- 전체(공통) 보기 -->
-      <div v-if="selectedConfirmZone === null" class="grid grid-cols-1 gap-4">
-        <div class="rounded-xl p-4" style="background: var(--bg-card); border: 1px solid var(--border);">
-          <p class="text-[11px] font-medium mb-2" style="color: var(--text-subtle);">STATIC</p>
-          <pre v-if="confirmedChecklist.static" class="text-xs whitespace-pre-wrap leading-relaxed" style="color: var(--text-muted);">{{ confirmedChecklist.static }}</pre>
-          <p v-else class="text-xs" style="color: var(--text-subtle);">확정된 STATIC 체크리스트 없음</p>
-        </div>
-        <div class="rounded-xl p-4" style="background: var(--bg-card); border: 1px solid var(--border);">
-          <p class="text-[11px] font-medium mb-2" style="color: var(--text-subtle);">DYNAMIC</p>
-          <pre v-if="confirmedChecklist.dynamic" class="text-xs whitespace-pre-wrap leading-relaxed" style="color: var(--text-muted);">{{ confirmedChecklist.dynamic }}</pre>
-          <p v-else class="text-xs" style="color: var(--text-subtle);">확정된 DYNAMIC 체크리스트 없음</p>
-        </div>
-      </div>
-
-      <!-- 구역별 보기 -->
-      <div v-else-if="activeConfirmZone" class="grid grid-cols-1 gap-4">
-        <div class="rounded-xl p-4" style="background: var(--bg-card); border: 1px solid var(--border);">
-          <p class="text-[11px] font-medium mb-2" style="color: var(--text-subtle);">STATIC</p>
-          <ul v-if="activeConfirmZone.static.length" class="flex flex-col gap-1">
-            <li v-for="(item, i) in activeConfirmZone.static" :key="i" class="text-xs" style="color: var(--text-muted);">· {{ item }}</li>
-          </ul>
-          <p v-else class="text-xs" style="color: var(--text-subtle);">이 구역의 STATIC 항목 없음</p>
-        </div>
-        <div class="rounded-xl p-4" style="background: var(--bg-card); border: 1px solid var(--border);">
-          <p class="text-[11px] font-medium mb-2" style="color: var(--text-subtle);">DYNAMIC</p>
-          <ul v-if="activeConfirmZone.dynamic.length" class="flex flex-col gap-1">
-            <li v-for="(item, i) in activeConfirmZone.dynamic" :key="i" class="text-xs" style="color: var(--text-muted);">· {{ item }}</li>
-          </ul>
-          <p v-else class="text-xs" style="color: var(--text-subtle);">이 구역의 DYNAMIC 항목 없음</p>
-        </div>
-      </div>
     </div>
+
+    <!-- 하단: 스크롤 가능한 분석 카드 2열 -->
+    <div v-if="canManage" class="grid grid-cols-2 gap-4 flex-1 min-h-0">
+
+      <!-- ③ 체크리스트 검토 -->
+      <div class="rounded-xl flex flex-col min-h-0" style="background: var(--bg-card); border: 1px solid var(--border);">
+        <!-- 고정 헤더 + 분석 버튼 -->
+        <div class="p-4 flex-shrink-0">
+          <h2 class="font-semibold text-base mb-3" style="color: var(--text-primary);">체크리스트 검토</h2>
+          <button
+            :disabled="!docFile || checklist.loading"
+            class="w-full py-2.5 rounded-xl font-semibold text-sm transition-all"
+            :class="docFile && !checklist.loading
+              ? 'bg-blue-600 text-white hover:bg-blue-500 shadow-lg shadow-blue-900/30'
+              : 'text-[#48484a] cursor-not-allowed'"
+            :style="!docFile || checklist.loading ? 'background: var(--bg-elevated);' : ''"
+            @click="onAnalyze"
+          >
+            <span v-if="checklist.loading" class="flex items-center justify-center gap-2">
+              <span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block"></span>
+              분석 중...
+            </span>
+            <span v-else>{{ docFile ? '분석 시작' : 'PDF를 먼저 업로드하세요' }}</span>
+          </button>
+        </div>
+
+        <!-- 스크롤 영역 -->
+        <div class="flex-1 overflow-y-auto min-h-0 px-4 pb-4">
+          <div v-if="checklist.error && !checklist.sessionId" class="rounded-xl p-3 mb-3"
+            style="background: var(--bg-elevated); border: 1px solid var(--border);">
+            <p class="text-sm" style="color: var(--red);">{{ checklist.error }}</p>
+          </div>
+
+          <div v-if="checklist.sessionId">
+            <ChecklistReview
+              :session-id="checklist.sessionId"
+              :static="checklist.static"
+              :dynamic="checklist.dynamic"
+              :loading="checklist.loading"
+              :error="checklist.error"
+              @refine="onRefine"
+              @confirm="onConfirm"
+            />
+            <p v-if="checklist.saved" class="text-xs mt-3 text-center" style="color: var(--green);">
+              체크리스트가 저장되었습니다.
+            </p>
+          </div>
+
+          <p v-if="!checklist.sessionId && !checklist.loading && !checklist.error" class="text-sm text-center py-6" style="color: var(--text-subtle);">
+            PDF 분석 후 체크리스트가 표시됩니다
+          </p>
+        </div>
+      </div>
+
+      <!-- ④ 구역별 확인 항목 -->
+      <div class="rounded-xl flex flex-col min-h-0" style="background: var(--bg-card); border: 1px solid var(--border);">
+        <!-- 고정 헤더 -->
+        <div class="p-4 pb-3 flex-shrink-0">
+          <div class="flex items-center justify-between mb-0.5">
+            <h2 class="font-semibold text-base" style="color: var(--text-primary);">구역별 확인 항목</h2>
+            <button
+              v-if="checklist.zones.length && checklist.sessionId"
+              :disabled="checklist.loading"
+              class="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50"
+              @click="onConfirmZones"
+            >
+              <span v-if="checklist.loading" class="flex items-center gap-1">
+                <span class="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block"></span>
+                저장 중
+              </span>
+              <span v-else>확정</span>
+            </button>
+          </div>
+          <p v-if="checklist.zones.length" class="text-xs" style="color: var(--text-subtle);">항목에 마우스를 올려 연필 아이콘으로 수정·삭제할 수 있습니다.</p>
+          <p v-if="checklist.zoneSaved" class="text-xs mt-1" style="color: var(--green);">구역별 항목이 저장되었습니다.</p>
+          <p v-if="checklist.zoneError" class="text-xs mt-1" style="color: var(--red);">{{ checklist.zoneError }}</p>
+        </div>
+
+        <!-- 스크롤 영역 -->
+        <div class="flex-1 overflow-y-auto min-h-0 px-4 pb-4">
+          <div v-if="checklist.zones.length" class="flex flex-col gap-3">
+            <div v-for="zone in checklist.zones" :key="zone.zone"
+              class="rounded-xl p-3" style="background: var(--bg-elevated); border: 1px solid var(--border);">
+              <p class="text-sm font-semibold mb-2.5" style="color: var(--text-primary);">{{ zone.zone }}</p>
+              <div class="mb-2.5">
+                <p class="text-[11px] font-medium mb-1.5" style="color: var(--text-subtle);">STATIC</p>
+                <div class="space-y-1.5">
+                  <ChecklistItem
+                    v-for="(item, i) in zone.static"
+                    :key="'s' + i"
+                    :item="item"
+                    @update="zone.static[i] = $event"
+                    @remove="zone.static.splice(i, 1)"
+                  />
+                  <button class="text-xs" style="color: var(--blue);" @click="zone.static.push('')">+ 항목 추가</button>
+                </div>
+              </div>
+              <div>
+                <p class="text-[11px] font-medium mb-1.5" style="color: var(--text-subtle);">DYNAMIC</p>
+                <div class="space-y-1.5">
+                  <ChecklistItem
+                    v-for="(item, i) in zone.dynamic"
+                    :key="'d' + i"
+                    :item="item"
+                    @update="zone.dynamic[i] = $event"
+                    @remove="zone.dynamic.splice(i, 1)"
+                  />
+                  <button class="text-xs" style="color: var(--blue);" @click="zone.dynamic.push('')">+ 항목 추가</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p v-else class="text-sm text-center py-6" style="color: var(--text-subtle);">분석 후 구역별 항목이 표시됩니다</p>
+        </div>
+      </div>
+
+    </div>
+
   </div>
 </template>
 
+<script>
+export default { name: 'ManualView' }
+</script>
+
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useManualStore } from '../stores/manualStore.js'
-import { analyzeManual, refineManual, confirmManual, registerZones, fetchZones, fetchChecklist } from '../api/manuals.js'
+import { analyzeManual, refineManual, confirmManual, registerZones, fetchZones } from '../api/manuals.js'
 import { useAuthStore } from '../stores/authStore.js'
 import ChecklistReview from '../components/manual/ChecklistReview.vue'
 import ChecklistItem from '../components/manual/ChecklistItem.vue'
@@ -274,38 +249,29 @@ import ChecklistItem from '../components/manual/ChecklistItem.vue'
 const store = useManualStore()
 const authStore = useAuthStore()
 
-const confirmedChecklist = reactive({ static: '', dynamic: '', zones: [] })
-const selectedConfirmZone = ref(null)   // null = 전체(공통)
-const activeConfirmZone = computed(() =>
-  confirmedChecklist.zones.find(z => z.zone === selectedConfirmZone.value) || null
-)
+// storeToRefs: ref 값들을 반응형으로 분리 (탭 이동 후에도 유지됨)
+const { docFile, uploadError, zoneFile, csvError, registeredZones } = storeToRefs(store)
+// reactive 객체는 직접 참조
+const checklist = store.checklist
+const zoneRegister = store.zoneRegister
 
-const registeredZones = ref([])
-
-// 관리 권한: admin만 매뉴얼·구역을 관리. user는 읽기 전용.
 const canManage = computed(() => authStore.user?.role === 'admin')
 
-async function loadConfirmedView() {
-  selectedConfirmZone.value = null
-  try {
-    const cl = await fetchChecklist(null)
-    confirmedChecklist.static = cl.static || ''
-    confirmedChecklist.dynamic = cl.dynamic || ''
-    confirmedChecklist.zones = cl.zones || []
-  } catch { confirmedChecklist.static = ''; confirmedChecklist.dynamic = ''; confirmedChecklist.zones = [] }
-  try { registeredZones.value = await fetchZones(null) } catch { registeredZones.value = [] }
-  // 관리 가능하면 업로드 파일 목록도 로드
-  if (canManage.value) store.load(null)
-}
-
-onMounted(loadConfirmedView)
-
-// 문서 업로드
+// 순수 UI 상태만 로컬
 const fileInput = ref(null)
 const isDragging = ref(false)
-const uploadError = ref('')
-const docFile = ref(null)
+const csvInput = ref(null)
+const isCsvDragging = ref(false)
 
+async function loadRegisteredZones() {
+  try { registeredZones.value = await fetchZones(null) } catch { registeredZones.value = [] }
+}
+
+onMounted(() => {
+  if (registeredZones.value.length === 0) loadRegisteredZones()
+})
+
+// 문서 업로드
 const MAX_SIZE = 20 * 1024 * 1024
 
 function validate(file) {
@@ -335,12 +301,6 @@ function onDrop(e) {
 }
 
 // 구역 파일 업로드
-const csvInput = ref(null)
-const isCsvDragging = ref(false)
-const csvError = ref('')
-const zoneFile = ref(null)
-const zoneRegister = reactive({ loading: false, error: '' })
-
 const CSV_MAX_SIZE = 5 * 1024 * 1024
 
 function validateCsv(file) {
@@ -380,7 +340,7 @@ async function onRegisterZones() {
   zoneRegister.error = ''
   try {
     await registerZones(zoneFile.value, null)
-    await loadConfirmedView()
+    await loadRegisteredZones()
   } catch (e) {
     const detail = e?.response?.data?.detail
     zoneRegister.error = typeof detail === 'string' ? detail : '등록에 실패했습니다.'
@@ -390,18 +350,6 @@ async function onRegisterZones() {
 }
 
 // 분석
-const checklist = reactive({
-  sessionId: '',
-  static: [],
-  dynamic: [],
-  staticCategories: [],
-  dynamicCategories: [],
-  zones: [],
-  loading: false,
-  error: '',
-  saved: false,
-})
-
 async function onAnalyze() {
   checklist.sessionId = ''
   checklist.static = []
@@ -454,7 +402,9 @@ async function onConfirm({ sessionId, static: staticItems, dynamic: dynamicItems
   try {
     await confirmManual(sessionId, staticItems, dynamicItems, checklist.zones, checklist.staticCategories, checklist.dynamicCategories, null)
     checklist.saved = true
-    loadConfirmedView()
+    checklist.zoneSaved = false
+    store.zoneViewLoaded = false
+    loadRegisteredZones()
   } catch {
     checklist.error = '저장에 실패했습니다. 다시 시도해주세요.'
   } finally {
@@ -462,18 +412,18 @@ async function onConfirm({ sessionId, static: staticItems, dynamic: dynamicItems
   }
 }
 
-function ext(name) { return name.split('.').pop() }
-
-function formatSize(bytes) {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
-}
-
-function formatDate(iso) {
-  return new Date(iso).toLocaleString('ko-KR', {
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit',
-  })
+async function onConfirmZones() {
+  checklist.loading = true
+  checklist.zoneError = ''
+  checklist.zoneSaved = false
+  try {
+    await confirmManual(checklist.sessionId, checklist.static, checklist.dynamic, checklist.zones, checklist.staticCategories, checklist.dynamicCategories, null)
+    checklist.zoneSaved = true
+    store.zoneViewLoaded = false
+  } catch {
+    checklist.zoneError = '저장에 실패했습니다. 다시 시도해주세요.'
+  } finally {
+    checklist.loading = false
+  }
 }
 </script>

@@ -35,25 +35,38 @@
   </div>
 </template>
 
+<script>
+export default { name: 'ZoneView' }
+</script>
+
 <script setup>
-import { ref, onMounted } from 'vue'
+import { onMounted, onActivated, computed } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useManualStore } from '../stores/manualStore.js'
 import { fetchZones, fetchChecklist } from '../api/manuals.js'
 
-const zones = ref([])
-const loading = ref(true)
+const store = useManualStore()
+const { zoneViewData, zoneViewLoaded } = storeToRefs(store)
 
-onMounted(async () => {
+const zones = computed(() => zoneViewData.value)
+const loading = computed(() => !zoneViewLoaded.value && zoneViewData.value.length === 0)
+
+async function loadZones() {
+  if (zoneViewLoaded.value) return
   try {
     const [names, cl] = await Promise.all([fetchZones(), fetchChecklist()])
     const byName = {}
     for (const z of (cl.zones || [])) byName[z.zone] = z
-    zones.value = (names || []).map(name => ({
+    zoneViewData.value = (names || []).map(name => ({
       zone: name,
       static: byName[name]?.static || [],
       dynamic: byName[name]?.dynamic || [],
     }))
-  } catch { zones.value = [] } finally {
-    loading.value = false
+  } catch { zoneViewData.value = [] } finally {
+    zoneViewLoaded.value = true
   }
-})
+}
+
+onMounted(loadZones)
+onActivated(loadZones)  // keep-alive로 복귀 시에도 zoneViewLoaded 초기화 감지
 </script>
