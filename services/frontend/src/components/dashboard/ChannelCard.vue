@@ -101,7 +101,7 @@ const lastEvent = computed(() => {
 function formatEventTime(ts) {
   if (!ts) return ''
   const n = Number(ts)
-  const d = isNaN(n) ? new Date(ts) : new Date(n * (String(ts).length <= 10 ? 1000 : 1))
+  const d = isNaN(n) ? new Date(ts) : new Date(n < 1e12 ? n * 1000 : n)
   return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
