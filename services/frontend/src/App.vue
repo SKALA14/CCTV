@@ -7,12 +7,18 @@
       style="background: var(--bg-card); border-color: var(--border);"
     >
       <!-- 앱 로고 -->
-      <div class="mb-5 flex flex-col items-center gap-0.5">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.8">
-          <path d="M15 10l4.553-2.277A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14"/>
-          <rect x="2" y="6" width="13" height="12" rx="2"/>
+      <div class="mb-5 flex flex-col items-center">
+        <svg width="28" height="32" viewBox="0 0 28 32" fill="none">
+          <circle cx="14" cy="13" r="13" fill="#1e293b" stroke="#334155" stroke-width="0.8"/>
+          <circle cx="14" cy="13" r="10" fill="#e2e8f0"/>
+          <circle cx="14" cy="13" r="8" fill="#1e293b"/>
+          <circle cx="14" cy="13" r="5" fill="#f1f5f9"/>
+          <circle cx="14" cy="13" r="3.2" fill="#0f172a"/>
+          <circle cx="11.8" cy="10.8" r="1.3" fill="white" opacity="0.85"/>
+          <circle cx="15.5" cy="14" r="0.6" fill="white" opacity="0.6"/>
+          <ellipse cx="14" cy="28" rx="6.5" ry="1.6" fill="#1e293b" stroke="#334155" stroke-width="0.8"/>
+          <rect x="11.5" y="25.5" width="5" height="3.5" rx="0.5" fill="#1e293b" stroke="#334155" stroke-width="0.8"/>
         </svg>
-        <span class="text-[9px] font-semibold tracking-widest" style="color: var(--text-muted);">CCTV</span>
       </div>
 
 
