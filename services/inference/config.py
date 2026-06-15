@@ -24,7 +24,6 @@ class Settings(BaseSettings):
     EVENTS_MAXLEN: int = 500
 
     # OpenAI
-    # TODO: MVP는 OpenAI Vision API 사용. 운영 단계에서 자체 VLM 서빙으로 교체 예정.
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o"
 
@@ -48,7 +47,7 @@ class Settings(BaseSettings):
 
     # Pose
     POSE_MODEL_PATH: str = "models/yolo26m-pose.pt"
-    POSE_CONF: float = 0.5
+    POSE_CONF: float = 0.3
     POSE_KEYPOINT_CONF: float = 0.3
     FALL_TORSO_ANGLE_THRESH: float = 45.0   # 옆 낙상: torso 기울기 임계값 (기존 55→45)
     FALL_BBOX_RATIO_THRESH: float = 1.3
