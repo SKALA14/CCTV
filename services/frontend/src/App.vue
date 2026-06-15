@@ -8,7 +8,7 @@
     >
       <!-- 앱 로고 -->
       <div class="mb-5 flex flex-col items-center">
-        <img src="@/assets/logo2.png" alt="SIREN" style="width:36px; height:36px; object-fit:contain;"/>
+        <img src="/logo2.png" alt="SIREN" style="width:36px; height:36px; object-fit:contain;"/>
       </div>
 
 
