@@ -6,7 +6,7 @@
       style="height: 44px; border-bottom: 1px solid var(--border); background: var(--bg-card);"
     >
       <div class="flex items-center gap-3">
-        <span class="text-xs font-bold tracking-widest uppercase" style="color: var(--text-primary);">AI CCTV</span>
+        <img src="/logo.png" alt="SIREN" style="height:32px; object-fit:contain;"/>
         <span
           class="flex items-center gap-1.5 text-xs px-2 py-0.5 rounded"
           style="background: var(--bg-elevated); color: var(--text-muted);"

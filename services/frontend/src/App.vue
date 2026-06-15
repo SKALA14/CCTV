@@ -7,20 +7,10 @@
       style="background: var(--bg-card); border-color: var(--border);"
     >
       <!-- 앱 로고 -->
-      <div class="mb-5 flex flex-col items-center gap-0.5">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.8">
-          <path d="M15 10l4.553-2.277A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14"/>
-          <rect x="2" y="6" width="13" height="12" rx="2"/>
-        </svg>
-        <span class="text-[9px] font-semibold tracking-widest" style="color: var(--text-muted);">CCTV</span>
+      <div class="mb-5 flex flex-col items-center">
+        <img src="/logo2.png" alt="SIREN" style="width:36px; height:36px; object-fit:contain;"/>
       </div>
 
-      <!-- 시스템 상태 점등 (채널 온라인 n/N) -->
-      <div v-if="authStore.isLoggedIn && health.total > 0"
-        class="mb-4 flex flex-col items-center gap-0.5" :title="healthTitle">
-        <span class="w-2 h-2 rounded-full" :style="`background: ${healthColor}`"></span>
-        <span class="text-[9px] font-mono" style="color: var(--text-muted);">{{ health.online }}/{{ health.total }}</span>
-      </div>
 
       <!-- 네비게이션 -->
       <AppNav class="w-full" />
