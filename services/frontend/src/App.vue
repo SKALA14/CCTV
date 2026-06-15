@@ -15,12 +15,6 @@
         <span class="text-[9px] font-semibold tracking-widest" style="color: var(--text-muted);">CCTV</span>
       </div>
 
-      <!-- 시스템 상태 점등 (채널 온라인 n/N) -->
-      <div v-if="authStore.isLoggedIn && health.total > 0"
-        class="mb-4 flex flex-col items-center gap-0.5" :title="healthTitle">
-        <span class="w-2 h-2 rounded-full" :style="`background: ${healthColor}`"></span>
-        <span class="text-[9px] font-mono" style="color: var(--text-muted);">{{ health.online }}/{{ health.total }}</span>
-      </div>
 
       <!-- 네비게이션 -->
       <AppNav class="w-full" />
