@@ -54,16 +54,14 @@
     </header>
 
     <!-- 바디: 채널 그리드 + 알림 히스토리 패널 -->
-    <div class="flex flex-1 min-h-0">
-      <div class="flex-1 min-w-0">
-        <ChannelGrid
-          :slots="slots"
-          :can-edit="canEdit"
-          @add="openAddModal"
-          @edit="openEditModal"
-          @remove="handleRemove"
-        />
-      </div>
+    <div class="flex-1 min-h-0 relative">
+      <ChannelGrid
+        :slots="slots"
+        :can-edit="canEdit"
+        @add="openAddModal"
+        @edit="openEditModal"
+        @remove="handleRemove"
+      />
       <EventPanel v-if="panelOpen" />
     </div>
 

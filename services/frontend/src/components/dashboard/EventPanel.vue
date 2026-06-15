@@ -1,7 +1,7 @@
 <template>
   <aside
-    class="flex flex-col flex-shrink-0 overflow-hidden"
-    style="width: 236px; border-left: 1px solid var(--border); background: var(--bg-card);"
+    class="flex flex-col overflow-hidden absolute right-0 top-0 bottom-0"
+    style="width: 236px; border-left: 1px solid var(--border); background: var(--bg-card); z-index: 10; box-shadow: -4px 0 20px rgba(0,0,0,0.35);"
   >
     <div
       class="flex items-center justify-between px-4 py-2.5 flex-shrink-0"
@@ -80,7 +80,7 @@ function resolveChannelName(n) {
 function formatTime(ts) {
   if (!ts) return ''
   const n = Number(ts)
-  const d = isNaN(n) ? new Date(ts) : new Date(n * (String(ts).length <= 10 ? 1000 : 1))
+  const d = isNaN(n) ? new Date(ts) : new Date(n < 1e12 ? n * 1000 : n)
   return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 

@@ -146,7 +146,7 @@ services:
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
       ALERTS_STREAM: alerts
       EVENTS_STREAM: events
-      INCIDENT_GAP_SEC: "10"
+      INCIDENT_GAP_SEC: "30"
     depends_on:
       - redis
     restart: always
