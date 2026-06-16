@@ -20,6 +20,7 @@ class FrameFeatureExtractor:
         self._prev_mask: dict[str, np.ndarray] = {}
 
     def extract(self, camera_id: str, frame: np.ndarray, timestamp_sec: float) -> dict:
+        """이전 프레임과 비교해 외형 변화·옵티컬 플로우·전경 통계 등 trigger용 feature를 추출한다."""
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         total_pixels = float(gray.size)
 

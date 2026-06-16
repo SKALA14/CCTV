@@ -1,3 +1,4 @@
+// MediaMTX WHEP 영상 수신(구독) composable — 재연결 포함
 import { ref, onUnmounted } from 'vue'
 
 const RETRY_LIMIT    = 10

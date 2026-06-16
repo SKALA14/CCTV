@@ -1,3 +1,4 @@
+// 공용 axios 인스턴스 — baseURL·쿠키 전송·401 리다이렉트 인터셉터
 import axios from 'axios'
 
 const api = axios.create({

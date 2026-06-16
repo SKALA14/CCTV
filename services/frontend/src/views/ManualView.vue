@@ -1,3 +1,4 @@
+<!-- 안전 매뉴얼 화면 — 구역 등록·PDF 분석·체크리스트 확정 -->
 <template>
   <div class="flex flex-col gap-4 p-4 h-full min-h-0">
 

@@ -1,3 +1,4 @@
+<!-- 이벤트 검색 화면 — 자연어·날짜·채널 필터 -->
 <template>
   <div class="p-4 max-w-3xl mx-auto">
     <div class="mb-4 space-y-3">

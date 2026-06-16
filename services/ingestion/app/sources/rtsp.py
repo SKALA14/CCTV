@@ -1,3 +1,6 @@
+# RTSP 스트림 인풋에 대응하는 구현체
+# 연결 실패 시 3초 간격으로 최대 10회 재시도한다.
+
 import logging
 
 import cv2

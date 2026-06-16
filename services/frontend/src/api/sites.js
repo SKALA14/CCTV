@@ -1,3 +1,4 @@
+// 현장 API — 현장 목록·단건 조회
 import api from './index.js'
 
 // 현장은 설치 시 seed로 등록 — 조회만 제공.

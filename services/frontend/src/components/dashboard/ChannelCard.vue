@@ -1,3 +1,4 @@
+<!-- 채널 카드 — 영상 + 상태 배지 -->
 <template>
   <div class="channel-card" :class="cardStateClass">
     <div class="status-badge" :class="badgeClass">

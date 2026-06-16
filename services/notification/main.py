@@ -1,3 +1,6 @@
+# notification 서비스 진입점.
+# alerts/events 스트림을 Consumer Group으로 소비해 Slack으로 알림을 전송한다.
+
 import logging
 import os
 import time
@@ -19,6 +22,7 @@ CONSUMER_NAME  = "notification-worker"
 
 
 def _ensure_groups(r: redis.Redis) -> None:
+    """alerts/events 스트림에 Consumer Group을 생성한다(이미 있으면 무시)."""
     for stream in (ALERTS_STREAM, EVENTS_STREAM):
         try:
             r.xgroup_create(stream, CONSUMER_GROUP, id="$", mkstream=True)
@@ -27,6 +31,7 @@ def _ensure_groups(r: redis.Redis) -> None:
 
 
 def _consume(r: redis.Redis) -> None:
+    """alerts/events에서 메시지를 읽어 종류별로 Slack 전송하고 처리 완료 후 xack한다."""
     streams = {ALERTS_STREAM: ">", EVENTS_STREAM: ">"}
     results = r.xreadgroup(
         CONSUMER_GROUP, CONSUMER_NAME,
@@ -40,19 +45,22 @@ def _consume(r: redis.Redis) -> None:
     for stream, messages in results:
         for msg_id, fields in messages:
             try:
+                # alerts는 긴급(YOLO), events는 일반(VLM) 알림으로 분기 처리한다.
                 if stream == ALERTS_STREAM:
                     send_emergency_alert(fields, WEBHOOK_URL)
                 else:
                     send_general_alert(fields, WEBHOOK_URL)
                 r.xack(stream, CONSUMER_GROUP, msg_id)
             except Exception:
+                # 한 건 실패가 루프를 끊지 않도록 로깅만 하고 다음 메시지로 진행(xack 생략 → 재처리 대상).
                 logger.exception("알림 전송 실패 stream=%s msg_id=%s", stream, msg_id)
 
 
 def main() -> None:
+    """Redis 연결·그룹 생성 후 소비 루프를 돈다(스트림 읽기 오류 시 3초 후 재시도)."""
     r = redis.from_url(REDIS_URL, decode_responses=True)
     _ensure_groups(r)
-    logger.info("notification worker started (alerts=%s, events=%s)", ALERTS_STREAM, EVENTS_STREAM)
+    logger.info("notification 워커 시작 (alerts=%s, events=%s)", ALERTS_STREAM, EVENTS_STREAM)
 
     while True:
         try:

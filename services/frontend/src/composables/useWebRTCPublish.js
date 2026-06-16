@@ -1,3 +1,4 @@
+// 브라우저 웹캠을 WHIP로 송출(publish)하는 composable
 import { ref, onUnmounted } from 'vue'
 
 export function useWebRTCPublish() {

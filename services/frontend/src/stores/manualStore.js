@@ -1,3 +1,4 @@
+// 매뉴얼 전역 상태 — 업로드 파일 목록
 import { defineStore } from 'pinia'
 import { ref, reactive } from 'vue'
 import { fetchManuals, uploadManual, deleteManual } from '../api/manuals.js'

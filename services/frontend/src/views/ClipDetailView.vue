@@ -1,3 +1,4 @@
+<!-- 클립 상세 페이지 — 이벤트 로드 후 ClipDetail 렌더 -->
 <template>
   <div class="p-4">
     <div v-if="loading" class="flex justify-center items-center h-64">

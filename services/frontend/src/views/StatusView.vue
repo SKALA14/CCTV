@@ -1,3 +1,4 @@
+<!-- 시스템 현황 화면 — 구역 요약·기기 상태·계정 (admin 전용) -->
 <template>
   <div class="p-6 max-w-5xl mx-auto">
     <div class="mb-5">

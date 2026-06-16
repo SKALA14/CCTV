@@ -1,3 +1,4 @@
+<!-- 채널 그리드 — 4개 슬롯 격자 배치 -->
 <template>
   <div class="grid grid-cols-2 grid-rows-2 gap-3 p-4" style="height: 100%;">
     <template v-for="i in 4" :key="i - 1">

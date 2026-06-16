@@ -1,3 +1,4 @@
+// 다크/라이트 테마 토글·영속화 composable
 import { ref, watch } from 'vue'
 
 const STORAGE_KEY = 'cctv_theme'

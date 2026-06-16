@@ -1,3 +1,4 @@
+<!-- 체크리스트 검토 패널 (static/dynamic 2열) -->
 <template>
   <div class="space-y-4">
     <!-- 헤더 -->

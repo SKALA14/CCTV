@@ -1,3 +1,4 @@
+<!-- 체크리스트 개별 항목 — 보기/수정 -->
 <template>
   <div
     class="flex items-start gap-2 px-3 py-2 rounded-lg group"

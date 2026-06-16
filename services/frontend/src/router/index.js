@@ -1,3 +1,4 @@
+// 라우트 정의 + 인증/권한 네비게이션 가드
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/authStore.js'
 import DashboardView      from '../views/DashboardView.vue'

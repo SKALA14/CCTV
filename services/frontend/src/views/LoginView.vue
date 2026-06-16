@@ -1,4 +1,4 @@
-<!-- src/views/LoginView.vue -->
+<!-- 로그인 화면 -->
 <template>
   <div class="min-h-screen flex items-center justify-center bg-gray-900">
     <div class="w-full max-w-sm bg-gray-800 rounded-xl p-8 shadow-lg">

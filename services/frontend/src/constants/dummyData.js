@@ -1,3 +1,4 @@
+// 더미 모드용 샘플 채널·이벤트 데이터
 export const DUMMY_CHANNELS = [
   { id: 'cam_01', name: '정문 CCTV', url: '', status: 'ok', options: [] },
   { id: 'cam_02', name: '공장 내부 A', url: '', status: 'ok', options: [] },

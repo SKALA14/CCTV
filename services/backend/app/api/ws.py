@@ -1,4 +1,5 @@
 # services/backend/app/api/ws.py
+"""실시간 이벤트 WebSocket. alerts/events 스트림을 구독해 자기 현장 메시지만 클라이언트로 푸시한다."""
 import asyncio
 import json
 import logging

@@ -1,3 +1,4 @@
+<!-- 관리 화면 — 자기 현장 계정 관리 (admin 전용) -->
 <template>
   <div class="p-6 h-full overflow-auto">
     <!-- 계정 패널 — admin 자기 현장의 user 계정 관리 -->

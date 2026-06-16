@@ -1,3 +1,6 @@
+# services/backend/app/api/agent/pdf_parser.py
+"""업로드된 PDF에서 텍스트를 추출하는 헬퍼."""
+
 import io
 
 import pdfplumber

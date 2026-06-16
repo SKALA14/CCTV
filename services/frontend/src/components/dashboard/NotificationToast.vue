@@ -1,3 +1,4 @@
+<!-- 실시간 알림 토스트 (우하단) -->
 <template>
   <div
     class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"

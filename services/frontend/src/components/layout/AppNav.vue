@@ -1,3 +1,4 @@
+<!-- 좌측 네비게이션 탭 -->
 <template>
   <nav class="flex flex-col items-center gap-1 px-2">
     <router-link to="/search" class="nav-tab" active-class="active">

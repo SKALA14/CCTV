@@ -1,3 +1,6 @@
+# services/backend/app/api/events.py
+"""이벤트 조회·자연어 검색 API. raw 이벤트를 incident로 묶어 응답한다."""
+
 import asyncio
 import uuid
 from datetime import datetime
@@ -131,6 +134,7 @@ async def list_events(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),   # 인증 필요
 ):
+    """필터·페이징으로 자기 현장 이벤트를 incident 단위로 묶어 조회한다."""
     query = select(EventLog)
 
     # 현장 격리: 모든 계정은 자기 현장으로 스코프 (admin/user 2단계 — 교차 현장 조회 없음)
@@ -191,6 +195,7 @@ async def search_events(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),   # 인증 필요
 ):
+    """자연어 질의를 시간표현 파싱·동의어 확장·벡터 검색으로 처리해 incident별 유사도순 반환한다."""
     # 현장 격리: 모든 계정은 자기 현장으로 스코프 (admin/user 2단계 — 교차 현장 조회 없음)
     effective_site_id = current_user.site_id  # UUID
 
@@ -296,6 +301,7 @@ async def get_event(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),   # 인증 필요
 ):
+    """단건 이벤트를 조회한다. 타 현장 이벤트는 존재를 숨기기 위해 404로 응답한다."""
     event = await db.get(EventLog, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="이벤트를 찾을 수 없습니다")

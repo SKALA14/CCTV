@@ -1,3 +1,4 @@
+<!-- 구역 화면 — 현장 구역별 점검 항목 현황 -->
 <template>
   <div class="p-4 max-w-3xl mx-auto">
     <h1 class="text-lg font-bold mb-1" style="color: var(--text-primary);">구역</h1>

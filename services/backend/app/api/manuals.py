@@ -1,3 +1,6 @@
+# services/backend/app/api/manuals.py
+"""안전 매뉴얼 업로드·체크리스트 API. PDF 분석·구역 등록·확정/병합을 LLM 에이전트로 처리한다."""
+
 import csv
 import io
 import json

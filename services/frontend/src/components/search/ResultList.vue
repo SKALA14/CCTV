@@ -1,3 +1,4 @@
+<!-- 검색 결과 목록 -->
 <template>
   <div>
     <div v-if="loading" class="flex justify-center py-12">

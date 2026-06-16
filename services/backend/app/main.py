@@ -1,7 +1,6 @@
 # FastAPI 앱 팩토리.
-# lifespan에서 DB 테이블 자동 생성 및 event worker 백그라운드 태스크를 시작한다.
-# CORS 미들웨어 설정 및 라우터(events, ws)를 등록한다.
-# FastAPI 앱 팩토리. 서버 시작 시 DB 테이블 생성과 Redis 워커를 초기화하고, 라우터와 CORS를 등록한다.
+# lifespan에서 DB 테이블 생성·계정 시드·채널 복구 후 event worker 백그라운드 태스크를 시작한다.
+# CORS·rate-limit 미들웨어와 도메인별 라우터를 등록한다.
 
 import asyncio
 import logging

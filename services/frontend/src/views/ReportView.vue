@@ -1,3 +1,4 @@
+<!-- 안전 리포트 화면 — 기간별 이벤트 집계 차트 -->
 <template>
   <div class="p-4 max-w-3xl mx-auto">
     <div class="flex items-center justify-between mb-4">

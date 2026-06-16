@@ -1,3 +1,4 @@
+<!-- 관제 대시보드 — 채널 그리드·실시간 알림 -->
 <template>
   <div class="h-full flex flex-col">
     <!-- 헤더 바 -->

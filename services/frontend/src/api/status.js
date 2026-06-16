@@ -1,3 +1,4 @@
+// 상태 API — 현황·기기·계정·헬스 조회
 import api from './index.js'
 
 export const getOverview    = () => api.get('/status/overview').then(r => r.data)

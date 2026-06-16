@@ -1,3 +1,4 @@
+<!-- 내 프로필 화면 -->
 <template>
   <div class="p-6 max-w-2xl mx-auto">
     <h1 class="text-lg font-bold" style="color: var(--text-primary);">프로필</h1>

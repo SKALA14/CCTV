@@ -1,3 +1,6 @@
+# services/backend/app/api/channels.py
+"""CCTV 채널 CRUD API. MediaMTX 경로·Redis 카메라 키·DB 채널을 함께 관리한다."""
+
 import json
 import logging
 import uuid

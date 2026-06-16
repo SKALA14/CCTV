@@ -1,3 +1,4 @@
+<!-- 알림 히스토리 패널 (우측) -->
 <template>
   <aside
     class="flex flex-col overflow-hidden absolute right-0 top-0 bottom-0"

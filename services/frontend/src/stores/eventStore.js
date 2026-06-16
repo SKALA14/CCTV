@@ -1,3 +1,4 @@
+// 이벤트 전역 상태 — 실시간 이벤트·토스트·알림 히스토리
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { TOAST_DURATION } from '../constants/events.js'

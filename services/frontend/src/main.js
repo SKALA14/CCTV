@@ -1,3 +1,4 @@
+// 앱 진입점 — 테마 선적용 후 Pinia·라우터 등록·마운트
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'

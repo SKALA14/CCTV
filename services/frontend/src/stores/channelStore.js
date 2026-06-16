@@ -1,3 +1,4 @@
+// 채널 슬롯 전역 상태 — 그리드 슬롯·경고 점등 관리
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 

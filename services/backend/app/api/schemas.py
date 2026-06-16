@@ -1,3 +1,6 @@
+# services/backend/app/api/schemas.py
+"""이벤트 API 요청/응답 Pydantic 스키마 정의."""
+
 import uuid
 from datetime import datetime
 

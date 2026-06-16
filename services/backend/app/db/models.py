@@ -1,3 +1,6 @@
+# services/backend/app/db/models.py
+"""ORM 모델 정의 — sites / users / cctv_channels / event_logs 테이블."""
+
 import uuid
 from datetime import datetime
 

@@ -1,3 +1,4 @@
+<!-- 비밀번호 변경 화면 (최초 로그인 시 강제) -->
 <template>
   <div class="flex items-center justify-center h-full">
     <div class="w-full max-w-sm p-8 rounded-2xl" style="background: var(--bg-card); border: 1px solid var(--border);">

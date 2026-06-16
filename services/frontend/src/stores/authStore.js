@@ -1,4 +1,4 @@
-// src/stores/authStore.js
+// 인증 전역 상태 — 로그인 사용자·권한·세션 초기화
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getMe, login as apiLogin, logout as apiLogout } from '../api/auth.js'

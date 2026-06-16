@@ -1,3 +1,6 @@
+# services/backend/app/api/agent/checklist_agent.py
+"""안전 매뉴얼 PDF 기반 체크리스트 LLM 에이전트 — 분석·정제·구역 배분·카테고리화·증분 비교."""
+
 import json
 import logging
 import uuid

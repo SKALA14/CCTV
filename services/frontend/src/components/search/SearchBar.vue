@@ -1,3 +1,4 @@
+<!-- 자연어 검색 입력 바 -->
 <template>
   <div class="flex gap-2">
     <input

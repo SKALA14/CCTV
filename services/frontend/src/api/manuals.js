@@ -1,3 +1,4 @@
+// 매뉴얼 API — 파일·체크리스트·구역·PDF 분석 호출
 import { DUMMY_MODE } from '../constants/mode.js'
 import api from './index.js'
 
