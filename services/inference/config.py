@@ -65,7 +65,7 @@ class Settings(BaseSettings):
 
     # Dynamic (Dual-EMA Trigger + VLM)
     GENERAL_WINDOW_SEC: float = 10.0
-    GENERAL_MIN_FRAMES: int = 3
+    GENERAL_MIN_FRAMES: int = 2
     GENERAL_BUFFER_SIZE: int = 5
     GENERAL_MIN_CALL_INTERVAL: float = 30.0
 

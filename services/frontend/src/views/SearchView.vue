@@ -4,44 +4,51 @@
     <div class="mb-4 space-y-3">
       <SearchBar @search="handleSearch" />
 
-      <!-- 빠른 날짜 필터 버튼 -->
-      <div class="flex flex-wrap gap-2">
-        <span
-          v-for="f in QUICK_FILTERS"
-          :key="f.key"
-          class="px-3 py-1 rounded-full text-sm cursor-pointer transition-colors select-none"
-          :class="selectedQuickFilter === f.key ? 'bg-blue-600 text-white' : ''"
-          :style="selectedQuickFilter !== f.key
-            ? 'border: 1px solid var(--border); color: var(--text-muted);'
-            : 'border: 1px solid transparent;'"
-          @click="handleQuickFilter(f.key)"
-        >{{ f.label }}</span>
-      </div>
+      <!-- 빠른 날짜 필터 -->
+      <div>
+        <p class="text-[11px] font-semibold uppercase tracking-wider mb-1.5" style="color: var(--text-subtle);">기간</p>
+        <div class="flex flex-wrap gap-2">
+          <span
+            v-for="f in QUICK_FILTERS"
+            :key="f.key"
+            class="px-3 py-1 rounded-full text-sm cursor-pointer transition-colors select-none"
+            :class="selectedQuickFilter === f.key ? 'bg-blue-600 text-white' : ''"
+            :style="selectedQuickFilter !== f.key
+              ? 'border: 1px solid var(--border); color: var(--text-muted);'
+              : 'border: 1px solid transparent;'"
+            @click="handleQuickFilter(f.key)"
+          >{{ f.label }}</span>
+        </div>
 
-      <!-- 자연어 필터 칩 -->
-      <div
-        v-if="appliedFilter && !selectedQuickFilter"
-        class="flex items-center gap-2"
-      >
-        <span class="text-xs" style="color: var(--text-muted);">검색어에서 감지:</span>
-        <span
-          class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs"
-          style="background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-primary);"
+        <!-- 자연어 필터 칩 -->
+        <div
+          v-if="appliedFilter && !selectedQuickFilter"
+          class="flex items-center gap-2 mt-1.5"
         >
-          {{ appliedFilter }}
-          <button
-            class="ml-0.5 leading-none"
-            style="color: var(--text-muted);"
-            @click="clearAppliedFilter"
-          >×</button>
-        </span>
+          <span class="text-xs" style="color: var(--text-muted);">검색어에서 감지:</span>
+          <span
+            class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs"
+            style="background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-primary);"
+          >
+            {{ appliedFilter }}
+            <button
+              class="ml-0.5 leading-none"
+              style="color: var(--text-muted);"
+              @click="clearAppliedFilter"
+            >×</button>
+          </span>
+        </div>
       </div>
 
-      <ChannelFilter
-        :channels="channels"
-        :model-value="selectedChannelId"
-        @update:model-value="handleChannelChange"
-      />
+      <!-- 채널 필터 -->
+      <div>
+        <p class="text-[11px] font-semibold uppercase tracking-wider mb-1.5" style="color: var(--text-subtle);">채널</p>
+        <ChannelFilter
+          :channels="channels"
+          :model-value="selectedChannelId"
+          @update:model-value="handleChannelChange"
+        />
+      </div>
     </div>
 
     <ResultList
