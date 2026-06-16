@@ -11,6 +11,11 @@
       >분석 중...</span>
     </div>
 
+    <!-- 드래그 힌트 -->
+    <p class="text-[11px]" style="color: var(--text-subtle);">
+      항목을 드래그해 오른쪽 구역에 추가할 수 있습니다.
+    </p>
+
     <!-- 2컬럼 리스트 -->
     <div class="grid grid-cols-2 gap-4">
       <div>
@@ -20,6 +25,7 @@
             v-for="(item, i) in localStatic"
             :key="i"
             :item="item"
+            :draggable="true"
             @update="localStatic[i] = $event"
             @remove="localStatic.splice(i, 1)"
           />
@@ -33,6 +39,7 @@
             v-for="(item, i) in localDynamic"
             :key="i"
             :item="item"
+            :draggable="true"
             @update="localDynamic[i] = $event"
             @remove="localDynamic.splice(i, 1)"
           />

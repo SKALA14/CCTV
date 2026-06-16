@@ -2,7 +2,10 @@
 <template>
   <div
     class="flex items-start gap-2 px-3 py-2 rounded-lg group"
+    :class="draggable && !editing ? 'cursor-grab active:cursor-grabbing' : ''"
     style="background: var(--bg-card); border: 1px solid var(--border);"
+    :draggable="draggable && !editing"
+    @dragstart="onDragStart"
   >
     <!-- 보기 모드 -->
     <template v-if="!editing">
@@ -48,12 +51,20 @@
 <script setup>
 import { ref, nextTick, onMounted } from 'vue'
 
-const props = defineProps({ item: { type: String, required: true } })
+const props = defineProps({
+  item: { type: String, required: true },
+  draggable: { type: Boolean, default: false },
+})
 const emit = defineEmits(['remove', 'update'])
 
 const editing = ref(false)
 const draft = ref(props.item)
 const inputEl = ref(null)
+
+function onDragStart(e) {
+  e.dataTransfer.setData('text/plain', props.item)
+  e.dataTransfer.effectAllowed = 'copy'
+}
 
 async function startEdit() {
   draft.value = props.item

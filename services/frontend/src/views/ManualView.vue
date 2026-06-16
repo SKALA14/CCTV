@@ -199,7 +199,15 @@
               <p class="text-sm font-semibold mb-2.5" style="color: var(--text-primary);">{{ zone.zone }}</p>
               <div class="mb-2.5">
                 <span class="text-[10px] font-semibold inline-block mb-1.5" style="color: var(--text-subtle);">정적</span>
-                <div class="space-y-1.5">
+                <div
+                  class="space-y-1.5 rounded-lg p-1 transition-colors min-h-[32px]"
+                  :style="dropTarget === zone.zone + '-static'
+                    ? 'border: 1px dashed var(--blue); background: rgba(59,130,246,0.06);'
+                    : 'border: 1px solid transparent;'"
+                  @dragover.prevent="dropTarget = zone.zone + '-static'"
+                  @dragleave="dropTarget = null"
+                  @drop.prevent="onDropToZone($event, zone, 'static')"
+                >
                   <ChecklistItem
                     v-for="(item, i) in zone.static"
                     :key="'s' + i"
@@ -207,12 +215,25 @@
                     @update="zone.static[i] = $event"
                     @remove="zone.static.splice(i, 1)"
                   />
+                  <p
+                    v-if="dropTarget === zone.zone + '-static' && !zone.static.length"
+                    class="text-xs text-center py-1"
+                    style="color: var(--blue);"
+                  >여기에 놓기</p>
                   <button class="text-xs" style="color: var(--blue);" @click="zone.static.push('')">+ 항목 추가</button>
                 </div>
               </div>
               <div>
                 <span class="text-[10px] font-semibold inline-block mb-1.5" style="color: var(--text-subtle);">동적</span>
-                <div class="space-y-1.5">
+                <div
+                  class="space-y-1.5 rounded-lg p-1 transition-colors min-h-[32px]"
+                  :style="dropTarget === zone.zone + '-dynamic'
+                    ? 'border: 1px dashed var(--blue); background: rgba(59,130,246,0.06);'
+                    : 'border: 1px solid transparent;'"
+                  @dragover.prevent="dropTarget = zone.zone + '-dynamic'"
+                  @dragleave="dropTarget = null"
+                  @drop.prevent="onDropToZone($event, zone, 'dynamic')"
+                >
                   <ChecklistItem
                     v-for="(item, i) in zone.dynamic"
                     :key="'d' + i"
@@ -220,6 +241,11 @@
                     @update="zone.dynamic[i] = $event"
                     @remove="zone.dynamic.splice(i, 1)"
                   />
+                  <p
+                    v-if="dropTarget === zone.zone + '-dynamic' && !zone.dynamic.length"
+                    class="text-xs text-center py-1"
+                    style="color: var(--blue);"
+                  >여기에 놓기</p>
                   <button class="text-xs" style="color: var(--blue);" @click="zone.dynamic.push('')">+ 항목 추가</button>
                 </div>
               </div>
@@ -316,6 +342,14 @@ const fileInput = ref(null)
 const isDragging = ref(false)
 const csvInput = ref(null)
 const isCsvDragging = ref(false)
+const dropTarget = ref(null)
+
+function onDropToZone(e, zone, type) {
+  dropTarget.value = null
+  const text = e.dataTransfer.getData('text/plain')?.trim()
+  if (!text || zone[type].includes(text)) return
+  zone[type].push(text)
+}
 
 // user(읽기 전용) 조회용 — 통일 체크리스트 + 등록된 매뉴얼 파일명
 const viewStatic = ref([])
