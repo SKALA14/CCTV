@@ -3,7 +3,7 @@
   <div class="flex flex-col gap-4 p-4 h-full min-h-0">
 
     <!-- 상단: 압축 업로드 카드 2열 -->
-    <div v-if="canManage" class="grid grid-cols-2 gap-4 flex-shrink-0">
+    <div class="grid grid-cols-2 gap-4 flex-shrink-0">
 
       <!-- ① 구역 정보 등록 -->
       <div class="rounded-xl p-4" style="background: var(--bg-card); border: 1px solid var(--border);">
@@ -78,7 +78,7 @@
       <!-- ② 매뉴얼 파일 관리 -->
       <div class="rounded-xl p-4" style="background: var(--bg-card); border: 1px solid var(--border);">
         <h2 class="font-semibold text-base mb-1" style="color: var(--text-primary);">매뉴얼 파일 관리</h2>
-        <p class="text-xs mb-3" style="color: var(--text-subtle);">분석할 PDF 안전 문서를 업로드하세요</p>
+        <p class="text-xs mb-3" style="color: var(--text-subtle);">분석할 PDF 안전 문서를 업로드하세요. 여러 파일을 선택하면 합산 분석됩니다.</p>
 
         <!-- 파일 선택 버튼 (드래그 포함) -->
         <div class="flex items-center gap-2 mb-3"
@@ -98,24 +98,30 @@
             </svg>
             PDF 파일 선택
           </button>
-          <span class="text-xs" style="color: var(--text-subtle);">최대 20MB · 드래그 가능</span>
-          <input ref="fileInput" type="file" class="hidden" accept=".pdf" @change="onFileChange" />
+          <span class="text-xs" style="color: var(--text-subtle);">최대 20MB · 다중 선택 · 드래그 가능</span>
+          <input ref="fileInput" type="file" class="hidden" accept=".pdf" multiple @change="onFileChange" />
         </div>
         <p v-if="uploadError" class="text-xs mb-2" style="color: var(--red);">{{ uploadError }}</p>
 
-        <div v-if="docFile" class="rounded-lg px-3 py-2 flex items-center gap-2"
-          style="background: var(--bg-elevated); border: 1px solid var(--border);">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--green); flex-shrink:0;">
-            <path d="M20 6L9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <span class="text-xs truncate" style="color: var(--text-primary);">{{ docFile.name }}</span>
+        <div v-if="docFiles.length" class="flex flex-col gap-1">
+          <div
+            v-for="(f, i) in docFiles" :key="i"
+            class="rounded-lg px-3 py-1.5 flex items-center gap-2"
+            style="background: var(--bg-elevated); border: 1px solid var(--border);"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--green); flex-shrink:0;">
+              <path d="M20 6L9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span class="text-xs truncate flex-1" style="color: var(--text-primary);">{{ f.name }}</span>
+            <button class="text-xs flex-shrink-0" style="color: var(--text-muted);" @click="docFiles.splice(i, 1)">✕</button>
+          </div>
         </div>
       </div>
 
     </div>
 
     <!-- 하단: 스크롤 가능한 분석 카드 2열 -->
-    <div v-if="canManage" class="grid grid-cols-2 gap-4 flex-1 min-h-0">
+    <div class="grid grid-cols-2 gap-4 flex-1 min-h-0">
 
       <!-- ③ 체크리스트 검토 -->
       <div class="rounded-xl flex flex-col min-h-0" style="background: var(--bg-card); border: 1px solid var(--border);">
@@ -123,19 +129,19 @@
         <div class="p-4 flex-shrink-0">
           <h2 class="font-semibold text-base mb-3" style="color: var(--text-primary);">체크리스트 검토</h2>
           <button
-            :disabled="!docFile || checklist.loading"
+            :disabled="!docFiles.length || checklist.loading"
             class="w-full py-2.5 rounded-xl font-semibold text-sm transition-all"
-            :class="docFile && !checklist.loading
+            :class="docFiles.length && !checklist.loading
               ? 'bg-blue-600 text-white hover:bg-blue-500 shadow-lg shadow-blue-900/30'
               : 'text-[#48484a] cursor-not-allowed'"
-            :style="!docFile || checklist.loading ? 'background: var(--bg-elevated);' : ''"
+            :style="!docFiles.length || checklist.loading ? 'background: var(--bg-elevated);' : ''"
             @click="onAnalyze"
           >
             <span v-if="checklist.loading" class="flex items-center justify-center gap-2">
               <span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block"></span>
               분석 중...
             </span>
-            <span v-else>{{ docFile ? '분석 시작' : 'PDF를 먼저 업로드하세요' }}</span>
+            <span v-else>{{ docFiles.length ? `분석 시작 (${docFiles.length}개)` : 'PDF를 먼저 업로드하세요' }}</span>
           </button>
         </div>
 
@@ -257,59 +263,6 @@
 
     </div>
 
-    <!-- ───────────── user(읽기 전용): 통일 체크리스트 + 등록 매뉴얼 ───────────── -->
-    <div v-if="!canManage" class="flex flex-col gap-4 flex-1 min-h-0">
-
-      <!-- 등록된 매뉴얼 파일 -->
-      <div class="rounded-xl p-4 flex-shrink-0" style="background: var(--bg-card); border: 1px solid var(--border);">
-        <h2 class="font-semibold text-base mb-2" style="color: var(--text-primary);">등록된 매뉴얼</h2>
-        <div v-if="viewManualName" class="rounded-lg px-3 py-2 flex items-center gap-2"
-          style="background: var(--bg-elevated); border: 1px solid var(--border);">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--text-muted); flex-shrink:0;">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
-          </svg>
-          <span class="text-sm truncate" style="color: var(--text-primary);">{{ viewManualName }}</span>
-        </div>
-        <p v-else class="text-xs" style="color: var(--text-subtle);">등록된 매뉴얼 파일이 없습니다</p>
-      </div>
-
-      <!-- 통일 체크리스트 (읽기 전용) -->
-      <div class="rounded-xl flex flex-col min-h-0 flex-1" style="background: var(--bg-card); border: 1px solid var(--border);">
-        <div class="p-4 pb-3 flex-shrink-0">
-          <h2 class="font-semibold text-base mb-0.5" style="color: var(--text-primary);">체크리스트</h2>
-          <p class="text-xs" style="color: var(--text-subtle);">현장에 적용 중인 안전 점검 항목입니다.</p>
-        </div>
-        <div class="flex-1 overflow-y-auto min-h-0 px-4 pb-4">
-          <div v-if="viewLoading" class="flex justify-center py-10">
-            <div class="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-          </div>
-          <div v-else-if="viewStatic.length || viewDynamic.length" class="grid grid-cols-2 gap-4">
-            <div>
-              <p class="text-xs font-medium mb-2" style="color: var(--text-muted);">Static (정적 상태)</p>
-              <div class="space-y-1.5">
-                <div v-for="(it, i) in viewStatic" :key="'vs' + i"
-                  class="px-3 py-2 rounded-lg text-sm leading-relaxed"
-                  style="background: var(--bg-card); border: 1px solid var(--border); color: var(--text-primary);">{{ it }}</div>
-                <p v-if="!viewStatic.length" class="text-xs" style="color: var(--text-subtle);">항목 없음</p>
-              </div>
-            </div>
-            <div>
-              <p class="text-xs font-medium mb-2" style="color: var(--text-muted);">Dynamic (행동·이벤트)</p>
-              <div class="space-y-1.5">
-                <div v-for="(it, i) in viewDynamic" :key="'vd' + i"
-                  class="px-3 py-2 rounded-lg text-sm leading-relaxed"
-                  style="background: var(--bg-card); border: 1px solid var(--border); color: var(--text-primary);">{{ it }}</div>
-                <p v-if="!viewDynamic.length" class="text-xs" style="color: var(--text-subtle);">항목 없음</p>
-              </div>
-            </div>
-          </div>
-          <p v-else class="text-sm text-center py-6" style="color: var(--text-subtle);">아직 등록된 체크리스트가 없습니다</p>
-        </div>
-      </div>
-
-    </div>
-
   </div>
 </template>
 
@@ -318,24 +271,20 @@ export default { name: 'ManualView' }
 </script>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useManualStore } from '../stores/manualStore.js'
-import { analyzeManual, refineManual, confirmManual, registerZones, fetchZones, fetchChecklist, fetchManuals } from '../api/manuals.js'
-import { useAuthStore } from '../stores/authStore.js'
+import { analyzeManual, refineManual, confirmManual, registerZones, fetchZones } from '../api/manuals.js'
 import ChecklistReview from '../components/manual/ChecklistReview.vue'
 import ChecklistItem from '../components/manual/ChecklistItem.vue'
 
 const store = useManualStore()
-const authStore = useAuthStore()
 
 // storeToRefs: ref 값들을 반응형으로 분리 (탭 이동 후에도 유지됨)
-const { docFile, uploadError, zoneFile, csvError, registeredZones } = storeToRefs(store)
+const { docFiles, uploadError, zoneFile, csvError, registeredZones } = storeToRefs(store)
 // reactive 객체는 직접 참조
 const checklist = store.checklist
 const zoneRegister = store.zoneRegister
-
-const canManage = computed(() => authStore.user?.role === 'admin')
 
 // 순수 UI 상태만 로컬
 const fileInput = ref(null)
@@ -351,77 +300,44 @@ function onDropToZone(e, zone, type) {
   zone[type].push(text)
 }
 
-// user(읽기 전용) 조회용 — 통일 체크리스트 + 등록된 매뉴얼 파일명
-const viewStatic = ref([])
-const viewDynamic = ref([])
-const viewManualName = ref('')
-const viewLoading = ref(false)
-
 async function loadRegisteredZones() {
   try { registeredZones.value = await fetchZones(null) } catch { registeredZones.value = [] }
 }
 
-// 번호 매겨진 마크다운 텍스트("1. ...") 또는 배열을 항목 리스트로 변환
-function parseChecklistText(text) {
-  if (Array.isArray(text)) return text.map(s => String(s).trim()).filter(Boolean)
-  if (!text) return []
-  return text
-    .split('\n')
-    .map(l => l.replace(/^\s*\d+[.)]\s*/, '').trim())
-    .filter(Boolean)
-}
-
-async function loadReadOnly() {
-  viewLoading.value = true
-  try {
-    const [cl, manuals] = await Promise.all([fetchChecklist(null), fetchManuals(null).catch(() => [])])
-    viewStatic.value = parseChecklistText(cl.static)
-    viewDynamic.value = parseChecklistText(cl.dynamic)
-    viewManualName.value = Array.isArray(manuals) && manuals.length ? (manuals[0].name || '') : ''
-  } catch {
-    viewStatic.value = []
-    viewDynamic.value = []
-    viewManualName.value = ''
-  } finally {
-    viewLoading.value = false
-  }
-}
-
 onMounted(() => {
-  if (canManage.value) {
-    if (registeredZones.value.length === 0) loadRegisteredZones()
-  } else {
-    loadReadOnly()
-  }
+  if (registeredZones.value.length === 0) loadRegisteredZones()
 })
 
 // 문서 업로드
 const MAX_SIZE = 20 * 1024 * 1024
 
 function validate(file) {
-  if (!file.name.match(/\.pdf$/i)) return 'PDF 파일만 업로드할 수 있습니다'
-  if (file.size > MAX_SIZE) return '파일 크기는 20MB 이하여야 합니다'
+  if (!file.name.match(/\.pdf$/i)) return `${file.name}: PDF 파일만 업로드할 수 있습니다`
+  if (file.size > MAX_SIZE) return `${file.name}: 파일 크기는 20MB 이하여야 합니다`
   return null
 }
 
-async function handleFile(file) {
+async function handleFiles(fileList) {
   uploadError.value = ''
-  const err = validate(file)
-  if (err) { uploadError.value = err; return }
-  await store.upload(file, null)
-  docFile.value = file
+  const incoming = Array.from(fileList)
+  for (const file of incoming) {
+    const err = validate(file)
+    if (err) { uploadError.value = err; return }
+    if (!docFiles.value.some(f => f.name === file.name && f.size === file.size)) {
+      docFiles.value.push(file)
+      await store.upload(file, null)
+    }
+  }
 }
 
 function onFileChange(e) {
-  const file = e.target.files[0]
-  if (file) handleFile(file)
+  if (e.target.files.length) handleFiles(e.target.files)
   e.target.value = ''
 }
 
 function onDrop(e) {
   isDragging.value = false
-  const file = e.dataTransfer.files[0]
-  if (file) handleFile(file)
+  if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files)
 }
 
 // 구역 파일 업로드
@@ -485,7 +401,7 @@ async function onAnalyze() {
   checklist.error = ''
   checklist.loading = true
   try {
-    const result = await analyzeManual(docFile.value, null)
+    const result = await analyzeManual(docFiles.value, null)
     checklist.sessionId = result.session_id
     checklist.static = result.static
     checklist.dynamic = result.dynamic

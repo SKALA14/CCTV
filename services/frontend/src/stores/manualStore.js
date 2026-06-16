@@ -30,7 +30,7 @@ export const useManualStore = defineStore('manual', () => {
   }
 
   // ── ManualView 세션 상태 (탭 이동 후에도 유지) ───────────────
-  const docFile = ref(null)
+  const docFiles = ref([])
   const uploadError = ref('')
   const zoneFile = ref(null)
   const csvError = ref('')
@@ -56,7 +56,7 @@ export const useManualStore = defineStore('manual', () => {
 
   return {
     files, loading, load, upload, remove,
-    docFile, uploadError,
+    docFiles, uploadError,
     zoneFile, csvError,
     registeredZones, zoneRegister,
     checklist,

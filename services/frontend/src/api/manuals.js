@@ -43,7 +43,7 @@ export async function deleteManual(id, siteId = null) {
   return api.delete(`/manuals/${id}${_siteQuery(siteId)}`)
 }
 
-export async function analyzeManual(file, siteId = null) {
+export async function analyzeManual(files, siteId = null) {
   if (DUMMY_MODE) {
     return {
       session_id: crypto.randomUUID(),
@@ -53,7 +53,8 @@ export async function analyzeManual(file, siteId = null) {
     }
   }
   const form = new FormData()
-  form.append('file', file)
+  const fileList = Array.isArray(files) ? files : [files]
+  fileList.forEach(f => form.append('files', f))
   return api.post(`/manuals/analyze${_siteQuery(siteId)}`, form, { timeout: 120000 }).then(r => r.data)
 }
 
