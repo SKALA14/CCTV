@@ -105,7 +105,7 @@ def _build_categories_map(items: list[str], categories: list) -> dict[str, str]:
 @router.get("")
 async def list_manuals(
     site_id: str | None = Query(None),
-    current_user: User = Depends(require_admin),   # admin만
+    current_user: User = Depends(get_current_user),   # viewer 이상 — 읽기 전용 파일명 조회
 ) -> list[dict]:
     """업로드된 매뉴얼 파일 메타데이터 목록 (현장별)."""
     sid = _effective_site_id(current_user, site_id)
@@ -171,16 +171,17 @@ async def get_current_checklist(
     if sid is None:
         return {"static": "", "dynamic": "", "zones": []}
     site_dir = _site_dir(sid)
-    static_path = site_dir / _STATIC_FILE
-    dynamic_path = site_dir / _DYNAMIC_FILE
     structured = await checklist_store.load_structured(site_dir, _get_redis(), str(sid))
     zones = [
         {"zone": z.get("zone", ""), "static": z.get("static", []), "dynamic": z.get("dynamic", [])}
         for z in structured.get("zones", [])
     ]
+    # 통일 체크리스트는 단일 원본(checklist.json)에서 파생. (레거시 .md는 더 이상 생성되지 않음)
+    static_items = checklist_store.flatten_categories(structured.get("static", {}).get("categories", []))
+    dynamic_items = checklist_store.flatten_categories(structured.get("dynamic", {}).get("categories", []))
     return {
-        "static": static_path.read_text(encoding="utf-8") if static_path.exists() else "",
-        "dynamic": dynamic_path.read_text(encoding="utf-8") if dynamic_path.exists() else "",
+        "static": checklist_store.format_numbered(static_items),
+        "dynamic": checklist_store.format_numbered(dynamic_items),
         "zones": zones,
     }
 

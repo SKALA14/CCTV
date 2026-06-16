@@ -230,6 +230,59 @@
 
     </div>
 
+    <!-- ───────────── user(읽기 전용): 통일 체크리스트 + 등록 매뉴얼 ───────────── -->
+    <div v-if="!canManage" class="flex flex-col gap-4 flex-1 min-h-0">
+
+      <!-- 등록된 매뉴얼 파일 -->
+      <div class="rounded-xl p-4 flex-shrink-0" style="background: var(--bg-card); border: 1px solid var(--border);">
+        <h2 class="font-semibold text-base mb-2" style="color: var(--text-primary);">등록된 매뉴얼</h2>
+        <div v-if="viewManualName" class="rounded-lg px-3 py-2 flex items-center gap-2"
+          style="background: var(--bg-elevated); border: 1px solid var(--border);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--text-muted); flex-shrink:0;">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          <span class="text-sm truncate" style="color: var(--text-primary);">{{ viewManualName }}</span>
+        </div>
+        <p v-else class="text-xs" style="color: var(--text-subtle);">등록된 매뉴얼 파일이 없습니다</p>
+      </div>
+
+      <!-- 통일 체크리스트 (읽기 전용) -->
+      <div class="rounded-xl flex flex-col min-h-0 flex-1" style="background: var(--bg-card); border: 1px solid var(--border);">
+        <div class="p-4 pb-3 flex-shrink-0">
+          <h2 class="font-semibold text-base mb-0.5" style="color: var(--text-primary);">체크리스트</h2>
+          <p class="text-xs" style="color: var(--text-subtle);">현장에 적용 중인 안전 점검 항목입니다.</p>
+        </div>
+        <div class="flex-1 overflow-y-auto min-h-0 px-4 pb-4">
+          <div v-if="viewLoading" class="flex justify-center py-10">
+            <div class="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+          <div v-else-if="viewStatic.length || viewDynamic.length" class="grid grid-cols-2 gap-4">
+            <div>
+              <p class="text-xs font-medium mb-2" style="color: var(--text-muted);">Static (정적 상태)</p>
+              <div class="space-y-1.5">
+                <div v-for="(it, i) in viewStatic" :key="'vs' + i"
+                  class="px-3 py-2 rounded-lg text-sm leading-relaxed"
+                  style="background: var(--bg-card); border: 1px solid var(--border); color: var(--text-primary);">{{ it }}</div>
+                <p v-if="!viewStatic.length" class="text-xs" style="color: var(--text-subtle);">항목 없음</p>
+              </div>
+            </div>
+            <div>
+              <p class="text-xs font-medium mb-2" style="color: var(--text-muted);">Dynamic (행동·이벤트)</p>
+              <div class="space-y-1.5">
+                <div v-for="(it, i) in viewDynamic" :key="'vd' + i"
+                  class="px-3 py-2 rounded-lg text-sm leading-relaxed"
+                  style="background: var(--bg-card); border: 1px solid var(--border); color: var(--text-primary);">{{ it }}</div>
+                <p v-if="!viewDynamic.length" class="text-xs" style="color: var(--text-subtle);">항목 없음</p>
+              </div>
+            </div>
+          </div>
+          <p v-else class="text-sm text-center py-6" style="color: var(--text-subtle);">아직 등록된 체크리스트가 없습니다</p>
+        </div>
+      </div>
+
+    </div>
+
   </div>
 </template>
 
@@ -241,7 +294,7 @@ export default { name: 'ManualView' }
 import { ref, onMounted, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useManualStore } from '../stores/manualStore.js'
-import { analyzeManual, refineManual, confirmManual, registerZones, fetchZones } from '../api/manuals.js'
+import { analyzeManual, refineManual, confirmManual, registerZones, fetchZones, fetchChecklist, fetchManuals } from '../api/manuals.js'
 import { useAuthStore } from '../stores/authStore.js'
 import ChecklistReview from '../components/manual/ChecklistReview.vue'
 import ChecklistItem from '../components/manual/ChecklistItem.vue'
@@ -263,12 +316,48 @@ const isDragging = ref(false)
 const csvInput = ref(null)
 const isCsvDragging = ref(false)
 
+// user(읽기 전용) 조회용 — 통일 체크리스트 + 등록된 매뉴얼 파일명
+const viewStatic = ref([])
+const viewDynamic = ref([])
+const viewManualName = ref('')
+const viewLoading = ref(false)
+
 async function loadRegisteredZones() {
   try { registeredZones.value = await fetchZones(null) } catch { registeredZones.value = [] }
 }
 
+// 번호 매겨진 마크다운 텍스트("1. ...") 또는 배열을 항목 리스트로 변환
+function parseChecklistText(text) {
+  if (Array.isArray(text)) return text.map(s => String(s).trim()).filter(Boolean)
+  if (!text) return []
+  return text
+    .split('\n')
+    .map(l => l.replace(/^\s*\d+[.)]\s*/, '').trim())
+    .filter(Boolean)
+}
+
+async function loadReadOnly() {
+  viewLoading.value = true
+  try {
+    const [cl, manuals] = await Promise.all([fetchChecklist(null), fetchManuals(null).catch(() => [])])
+    viewStatic.value = parseChecklistText(cl.static)
+    viewDynamic.value = parseChecklistText(cl.dynamic)
+    viewManualName.value = Array.isArray(manuals) && manuals.length ? (manuals[0].name || '') : ''
+  } catch {
+    viewStatic.value = []
+    viewDynamic.value = []
+    viewManualName.value = ''
+  } finally {
+    viewLoading.value = false
+  }
+}
+
 onMounted(() => {
-  if (registeredZones.value.length === 0) loadRegisteredZones()
+  if (canManage.value) {
+    if (registeredZones.value.length === 0) loadRegisteredZones()
+  } else {
+    loadReadOnly()
+  }
 })
 
 // 문서 업로드
