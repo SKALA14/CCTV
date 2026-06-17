@@ -1,3 +1,4 @@
+// 이벤트 목록·검색 로딩 상태 composable
 import { ref } from 'vue'
 import { DUMMY_MODE } from '../constants/mode.js'
 import { DUMMY_EVENTS } from '../constants/dummyData.js'

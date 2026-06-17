@@ -1,3 +1,4 @@
+<!-- 실시간 알림 토스트 (우하단) -->
 <template>
   <div
     class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"
@@ -78,7 +79,7 @@ function resolveChannelName(notif) {
 function formatTime(ts) {
   if (!ts) return ''
   const n = Number(ts)
-  const d = isNaN(n) ? new Date(ts) : new Date(n * (String(ts).length <= 10 ? 1000 : 1))
+  const d = isNaN(n) ? new Date(ts) : new Date(n < 1e12 ? n * 1000 : n)
   return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 

@@ -1,3 +1,4 @@
+// 실시간 이벤트 WebSocket 연결 관리 — 자동 재연결·리스너 등록
 const WS_URL = import.meta.env.VITE_WS_URL || `ws://${location.host}/ws`
 
 let socket = null

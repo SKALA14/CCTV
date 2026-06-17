@@ -1,6 +1,5 @@
 """VLM 이벤트 발행 전 Quality Gate.
 
-Confidence Gate: 저확신 anomaly 억제
 Cross-pipeline Dedup: 동일 카메라 중복 이벤트 억제
 """
 
@@ -15,28 +14,12 @@ logger = logging.getLogger(__name__)
 
 
 def should_publish(result: dict, camera_id: str, pipeline: str) -> bool:
-    """Confidence Gate + Dedup Check 순차 적용.
+    """Dedup Check 적용.
 
     True면 이벤트 발행 허용, False면 억제.
-    normal 결과는 Gate 없이 True 반환 (기존 동작 유지).
     """
     if result.get("result") != "anomaly":
         return True
-
-    # --- Confidence Gate ---
-    confidence = float(result.get("confidence", 0.0))
-    threshold = config.MIN_CONFIDENCE
-    # Future: camera:{camera_id}:min_confidence Redis key로 카메라별 오버라이드
-    # Future: danger_level별 차등 임계값
-
-    if confidence < threshold:
-        logger.info(
-            "[%s] SUPPRESSED cam=%s confidence=%.2f threshold=%.2f danger=%s type=%s",
-            pipeline, camera_id, confidence, threshold,
-            result.get("danger_level", "none"),
-            result.get("anomaly_type", "GENERAL"),
-        )
-        return False
 
     # --- Cross-pipeline Dedup ---
     dedup_key = f"event:dedup:{camera_id}"

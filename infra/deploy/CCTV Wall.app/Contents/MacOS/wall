@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# 더블클릭(.app) → 스플래시 앱 창 즉시 표시 + 뒤에서 스택 기동 → 준비되면 자동으로 wall 전환
+# (macOS / 개발·데모용). 터미널 없이 실행. 진단 로그는 ~/.cctv-wall.log.
+set -euo pipefail
+exec >>"$HOME/.cctv-wall.log" 2>&1
+echo "=== $(date) wall launch ==="
+
+notify() { osascript -e "display notification \"$1\" with title \"CCTV Wall\"" 2>/dev/null || true; }
+trap 'notify "기동 실패 — ~/.cctv-wall.log 확인"' ERR
+
+# 번들 위치: <deploy>/CCTV Wall.app/Contents/MacOS/wall
+DEPLOY_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"   # = infra/deploy
+INFRA_DIR="$(cd "$DEPLOY_DIR/.." && pwd)"              # = infra
+CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+PROFILE="$HOME/.cctv-wall-chrome"                      # 사용자 기본 크롬과 분리된 전용 프로필
+SPLASH="file://${DEPLOY_DIR// /%20}/splash.html"       # 경로 내 공백 → %20
+
+# 1) 스플래시 앱 창 즉시 표시 (스플래시 JS가 준비되면 wall 로 자동 전환)
+echo "▶ 스플래시 창 열기…"
+"$CHROME" \
+  --app="$SPLASH" \
+  --user-data-dir="$PROFILE" \
+  --no-first-run \
+  --no-default-browser-check \
+  >/dev/null 2>&1 &
+
+# 2) 뒤에서 스택 기동 (첫 빌드 동안 스플래시가 계속 보임)
+echo "▶ docker compose up -d…"
+export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"   # Docker Desktop 기본 경로
+cd "$INFRA_DIR"
+docker compose up -d
+
+echo "✓ done (스플래시가 준비 감지 후 wall 로 전환)"

@@ -1,3 +1,4 @@
+<!-- 채널 등록·수정 모달 -->
 <template>
   <div
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
@@ -23,6 +24,7 @@
             placeholder="예: 정문 CCTV"
             class="w-full h-10 px-3 rounded-lg text-sm focus:outline-none transition-colors"
             :style="`background: var(--input-bg); border: 1px solid ${errors.name ? '#ef4444' : 'var(--input-border)'}; color: var(--text-primary);`"
+            @input="nameUserEdited = !!$event.target.value.trim()"
           />
           <p v-if="errors.name" class="text-xs mt-1 text-red-400">{{ errors.name }}</p>
         </div>
@@ -103,6 +105,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'submit'])
 
 const isEdit = !!props.initial?.name
+const nameUserEdited = ref(isEdit)
 
 const zones = ref([])
 onMounted(async () => {
@@ -119,7 +122,9 @@ const form = reactive({
 const errors = reactive({ name: '', rtspUrl: '' })
 
 watch(() => form.zone, (zone) => {
-  form.name = zone
+  if (!nameUserEdited.value) {
+    form.name = zone
+  }
 })
 
 function validate() {

@@ -1,3 +1,4 @@
+<!-- 검색 결과 카드 — 썸네일·요약·위험도 배지 -->
 <template>
   <div class="flex gap-4 py-4 last:border-b-0" style="border-bottom: 1px solid var(--border);">
     <!-- 썸네일 -->

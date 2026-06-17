@@ -1,3 +1,4 @@
+// 이벤트 API — 목록·단건·자연어 검색 호출
 import api from './index.js'
 
 export const fetchEvents = (params = {}) =>

@@ -1,3 +1,6 @@
+# services/backend/app/api/agent/instruction_agent.py
+"""채널별 자유 텍스트 지시를 현장 체크리스트와 비교해 static/dynamic VLM 문장으로 변환하는 LLM 에이전트."""
+
 import json
 import logging
 from pathlib import Path

@@ -1,3 +1,4 @@
+// WebSocket 수신 이벤트를 eventStore에 연결하는 composable
 import { onMounted, onUnmounted } from 'vue'
 import { connectWS, onWSMessage, closeWS } from '../api/websocket.js'
 import { useEventStore } from '../stores/eventStore.js'

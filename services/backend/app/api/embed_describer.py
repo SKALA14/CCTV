@@ -1,3 +1,6 @@
+# services/backend/app/api/embed_describer.py
+"""이벤트 정보를 임베딩에 유리한 한국어 묘사 텍스트로 확장하는 LLM 보조 모듈."""
+
 import logging
 import os
 from openai import AsyncOpenAI
@@ -16,6 +19,7 @@ _openai = None
 
 
 async def describe_for_embedding(event_type: str, danger_level: str, description: str) -> str:
+    """이벤트 필드를 임베딩용 묘사 문장으로 확장한다. 실패 시 원본 필드를 이어붙여 반환."""
     user_content = f"event_type={event_type}, danger_level={danger_level}, description={description}"
     try:
         # Use _get_openai() at runtime; tests will patch _openai directly

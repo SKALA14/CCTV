@@ -1,43 +1,48 @@
+<!-- 체크리스트 검토 패널 (static/dynamic 2열) -->
 <template>
   <div class="space-y-4">
-    <!-- 헤더 -->
-    <div class="flex items-center justify-between">
-      <h3 class="font-semibold text-sm" style="color: var(--text-primary);">체크리스트 검토</h3>
+    <!-- 드래그 힌트 -->
+    <div class="flex items-center justify-between gap-3">
+      <p class="text-[11px]" style="color: var(--text-subtle);">
+      항목을 드래그해 오른쪽 구역에 추가할 수 있습니다.
+      </p>
       <span
         v-if="loading"
-        class="text-xs px-2 py-0.5 rounded-full"
-        style="background: var(--bg-elevated); color: var(--text-muted);"
+        class="text-xs px-2 py-0.5 rounded-full whitespace-nowrap"
+        style="background: #eef2df; color: #64731e; border: 1px solid #b6c77a;"
       >분석 중...</span>
     </div>
 
-    <!-- 2컬럼 리스트 -->
-    <div class="grid grid-cols-2 gap-4">
-      <div>
+    <!-- 세로 리스트 -->
+    <div class="space-y-4">
+      <section class="rounded-xl p-4" style="background: var(--bg-card); border: 1px solid var(--border);">
         <p class="text-xs font-medium mb-2" style="color: var(--text-muted);">Static (정적 상태)</p>
         <div class="space-y-1.5">
           <ChecklistItem
             v-for="(item, i) in localStatic"
             :key="i"
             :item="item"
+            :draggable="true"
             @update="localStatic[i] = $event"
             @remove="localStatic.splice(i, 1)"
           />
-          <button class="text-xs mt-0.5" style="color: var(--blue);" @click="localStatic.push('')">+ 항목 추가</button>
+          <button class="text-xs mt-0.5 font-medium" style="color: #64731e;" @click="localStatic.push('')">+ 항목 추가</button>
         </div>
-      </div>
-      <div>
+      </section>
+      <section class="rounded-xl p-4" style="background: var(--bg-card); border: 1px solid var(--border);">
         <p class="text-xs font-medium mb-2" style="color: var(--text-muted);">Dynamic (행동·이벤트)</p>
         <div class="space-y-1.5">
           <ChecklistItem
             v-for="(item, i) in localDynamic"
             :key="i"
             :item="item"
+            :draggable="true"
             @update="localDynamic[i] = $event"
             @remove="localDynamic.splice(i, 1)"
           />
-          <button class="text-xs mt-0.5" style="color: var(--blue);" @click="localDynamic.push('')">+ 항목 추가</button>
+          <button class="text-xs mt-0.5 font-medium" style="color: #64731e;" @click="localDynamic.push('')">+ 항목 추가</button>
         </div>
-      </div>
+      </section>
     </div>
 
     <!-- 피드백 입력 -->
@@ -58,7 +63,8 @@
           @click="onRefine"
         >재생성</button>
         <button
-          class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-500 transition-colors"
+          class="px-3 py-1.5 rounded-lg text-white text-sm transition-colors"
+          style="background: #77942e;"
           :disabled="loading"
           @click="onConfirm"
         >확정</button>

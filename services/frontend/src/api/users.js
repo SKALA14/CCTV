@@ -1,3 +1,4 @@
+// 계정 API — 현장별 user 관리·비밀번호 변경 호출
 import api from './index.js'
 
 export const getUsers         = (siteId)              => api.get(`/sites/${siteId}/users`).then(r => r.data)

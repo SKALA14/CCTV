@@ -9,7 +9,7 @@ import asyncio
 import logging
 
 from config import config
-from redis_client import get_async_client
+from redis_client import get_pubsub_client
 from static import vlm_worker
 from vlm.client import VLMClient
 
@@ -72,23 +72,28 @@ async def _listen_registrations(vlm: VLMClient) -> None:
 
     메시지 포맷: "{site_id}:{cam_id}" (예: "abc12345-...:cam1")
     """
-    pubsub = get_async_client().pubsub()
-    await pubsub.subscribe("camera:registered")
-    logger.info("[static] 채널 등록 이벤트 구독 시작")
-    async for message in pubsub.listen():
-        if message["type"] != "message":
-            continue
-        data = message["data"]  # "{site_id}:{cam_id}"
-        # site_id는 UUID 형식 (하이픈 포함), cam_id는 "cam0"~"cam3"
-        # "{site_id}:{cam_id}"에서 첫 번째 ':'을 기준으로 분리
-        parts = data.split(":", 1)
-        if len(parts) == 2:
-            site_id, cam_id = parts
-        else:
-            site_id, cam_id = "", data
-        logger.info("[static] 신규 카메라 등록 감지: site=%s cam=%s → 비동기 스캔 예약",
-                    site_id, cam_id)
-        asyncio.create_task(_scan_after_registration(vlm, site_id, cam_id))
+    while True:
+        try:
+            pubsub = get_pubsub_client().pubsub()
+            await pubsub.subscribe("camera:registered")
+            logger.info("[static] 채널 등록 이벤트 구독 시작")
+            async for message in pubsub.listen():
+                if message["type"] != "message":
+                    continue
+                data = message["data"]  # "{site_id}:{cam_id}"
+                # site_id는 UUID 형식 (하이픈 포함), cam_id는 "cam0"~"cam3"
+                # "{site_id}:{cam_id}"에서 첫 번째 ':'을 기준으로 분리
+                parts = data.split(":", 1)
+                if len(parts) == 2:
+                    site_id, cam_id = parts
+                else:
+                    site_id, cam_id = "", data
+                logger.info("[static] 신규 카메라 등록 감지: site=%s cam=%s → 비동기 스캔 예약",
+                            site_id, cam_id)
+                asyncio.create_task(_scan_after_registration(vlm, site_id, cam_id))
+        except Exception as e:
+            logger.warning("[static] 등록 이벤트 구독 끊김 (%s) — 3초 후 재연결", e)
+            await asyncio.sleep(3)
 
 
 async def _main() -> None:

@@ -1,3 +1,6 @@
+# services/backend/app/db/models.py
+"""ORM 모델 정의 — sites / users / cctv_channels / event_logs 테이블."""
+
 import uuid
 from datetime import datetime
 
@@ -73,7 +76,6 @@ class EventLog(Base):
     thumbnail_url: Mapped[str | None]     = mapped_column(Text)
     snapshot_urls: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     clip_url:      Mapped[str | None]     = mapped_column(Text)
-    confidence:   Mapped[float | None]    = mapped_column(nullable=True)
     source_model: Mapped[str | None]      = mapped_column(String(50))
     occurred_at:  Mapped[datetime]        = mapped_column(DateTime(timezone=True), nullable=False)
     created_at:   Mapped[datetime]        = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -1,3 +1,6 @@
+# services/backend/app/api/manuals.py
+"""안전 매뉴얼 업로드·체크리스트 API. PDF 분석·구역 등록·확정/병합을 LLM 에이전트로 처리한다."""
+
 import csv
 import io
 import json
@@ -10,7 +13,7 @@ import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Query
 from pydantic import BaseModel
 
-from app.api.deps import require_admin, get_current_user
+from app.api.deps import get_current_user
 from app.api import checklist_store
 from app.db.models import User
 from app.api.agent.checklist_agent import analyze_pdf, refine_checklist, subset_by_zones, normalize_categories, diff_checklist
@@ -105,7 +108,7 @@ def _build_categories_map(items: list[str], categories: list) -> dict[str, str]:
 @router.get("")
 async def list_manuals(
     site_id: str | None = Query(None),
-    current_user: User = Depends(require_admin),   # admin만
+    current_user: User = Depends(get_current_user),   # viewer 이상 — 읽기 전용 파일명 조회
 ) -> list[dict]:
     """업로드된 매뉴얼 파일 메타데이터 목록 (현장별)."""
     sid = _effective_site_id(current_user, site_id)
@@ -119,7 +122,7 @@ async def list_manuals(
 async def upload_manual(
     file: UploadFile = File(...),
     site_id: str | None = Query(None),   # 하위호환용 — 무시됨(자기 현장 사용)
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
     """매뉴얼 파일 메타데이터를 현장별 Redis에 저장."""
     sid = _effective_site_id(current_user, site_id)
@@ -147,7 +150,7 @@ async def upload_manual(
 async def delete_manual(
     file_id: str,
     site_id: str | None = Query(None),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
     sid = _effective_site_id(current_user, site_id)
     if sid is None:
@@ -171,38 +174,43 @@ async def get_current_checklist(
     if sid is None:
         return {"static": "", "dynamic": "", "zones": []}
     site_dir = _site_dir(sid)
-    static_path = site_dir / _STATIC_FILE
-    dynamic_path = site_dir / _DYNAMIC_FILE
     structured = await checklist_store.load_structured(site_dir, _get_redis(), str(sid))
     zones = [
         {"zone": z.get("zone", ""), "static": z.get("static", []), "dynamic": z.get("dynamic", [])}
         for z in structured.get("zones", [])
     ]
+    # 통일 체크리스트는 단일 원본(checklist.json)에서 파생. (레거시 .md는 더 이상 생성되지 않음)
+    static_items = checklist_store.flatten_categories(structured.get("static", {}).get("categories", []))
+    dynamic_items = checklist_store.flatten_categories(structured.get("dynamic", {}).get("categories", []))
     return {
-        "static": static_path.read_text(encoding="utf-8") if static_path.exists() else "",
-        "dynamic": dynamic_path.read_text(encoding="utf-8") if dynamic_path.exists() else "",
+        "static": checklist_store.format_numbered(static_items),
+        "dynamic": checklist_store.format_numbered(dynamic_items),
         "zones": zones,
     }
 
 
 @router.post("/analyze")
 async def analyze_manual(
-    file: UploadFile = File(...),
+    files: list[UploadFile] = File(...),
     site_id: str | None = Query(None),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
-    """PDF 업로드 → 체크리스트 분석. zones.json이 있으면 구역별 subset도 반환."""
+    """PDF 업로드(1개 이상) → 텍스트 합산 후 체크리스트 분석. zones.json이 있으면 구역별 subset도 반환."""
     sid = _effective_site_id(current_user, site_id)
     if sid is None:
         raise HTTPException(status_code=403, detail="현장이 지정되지 않은 계정입니다.")
-    if not file.filename or not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="PDF 파일만 분석 가능합니다.")
 
-    content = await file.read()
-    try:
-        pdf_text = extract_text_from_pdf(content)
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+    texts: list[str] = []
+    for f in files:
+        if not f.filename or not f.filename.lower().endswith(".pdf"):
+            raise HTTPException(status_code=400, detail=f"{f.filename}: PDF 파일만 분석 가능합니다.")
+        content = await f.read()
+        try:
+            texts.append(extract_text_from_pdf(content))
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=f"{f.filename}: {e}")
+
+    pdf_text = "\n\n".join(texts)
 
     try:
         result, session_id = await analyze_pdf(pdf_text)
@@ -225,8 +233,8 @@ async def analyze_manual(
 
     # 카테고리 정규화 (실패해도 기존 items는 정상 반환)
     try:
-        static_categories = await normalize_categories(static_items)
-        dynamic_categories = await normalize_categories(dynamic_items)
+        static_categories = await normalize_categories(static_items, "static")
+        dynamic_categories = await normalize_categories(dynamic_items, "dynamic")
     except Exception as e:
         logger.warning("카테고리 정규화 실패, 빈 배열로 대체: %s", e)
         static_categories = []
@@ -261,7 +269,7 @@ async def analyze_manual(
 async def refine_manual(
     body: RefineRequest,
     site_id: str | None = Query(None),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
     """피드백 반영해 체크리스트 재생성."""
     # refine은 세션 기반이라 sid를 직접 쓰진 않지만, 현장 미지정(권한 가드) 차단용
@@ -324,7 +332,7 @@ def _parse_zones(content: bytes, filename: str) -> list[dict]:
 async def register_zones(
     zones_file: UploadFile = File(...),
     site_id: str | None = Query(None),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
     sid = _effective_site_id(current_user, site_id)
     if sid is None:
@@ -363,7 +371,7 @@ async def list_zones(
 async def confirm_manual(
     body: ConfirmRequest,
     site_id: str | None = Query(None),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
     """확정된 체크리스트를 checklist.json(단일 원본) + 파생물로 저장."""
     sid = _effective_site_id(current_user, site_id)
@@ -375,8 +383,8 @@ async def confirm_manual(
     static_items = [i.strip() for i in body.static if i and i.strip()]
     dynamic_items = [i.strip() for i in body.dynamic if i and i.strip()]
     try:
-        static_cats = await normalize_categories(static_items)
-        dynamic_cats = await normalize_categories(dynamic_items)
+        static_cats = await normalize_categories(static_items, "static")
+        dynamic_cats = await normalize_categories(dynamic_items, "dynamic")
     except Exception as e:
         logger.warning("카테고리 재산정 실패, GENERAL fallback: %s", e)
         static_cats = [{"code": "GENERAL", "label": "일반", "items": static_items}] if static_items else []
@@ -404,7 +412,7 @@ async def confirm_manual(
 async def analyze_diff(
     file: UploadFile = File(...),
     site_id: str | None = Query(None),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
     """새 PDF를 분석해 기존 확정 체크리스트와 비교한 추가/삭제후보 반환."""
     sid = _effective_site_id(current_user, site_id)
@@ -451,7 +459,7 @@ async def analyze_diff(
 async def merge_checklist(
     body: MergeRequest,
     site_id: str | None = Query(None),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
     """수락된 추가/삭제를 기존 체크리스트에 병합. 추가 항목은 구역 자동 배치."""
     sid = _effective_site_id(current_user, site_id)

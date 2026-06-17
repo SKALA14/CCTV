@@ -1,3 +1,4 @@
+<!-- 채널 카드 — 영상 + 상태 배지 -->
 <template>
   <div class="channel-card" :class="cardStateClass">
     <div class="status-badge" :class="badgeClass">
@@ -101,7 +102,7 @@ const lastEvent = computed(() => {
 function formatEventTime(ts) {
   if (!ts) return ''
   const n = Number(ts)
-  const d = isNaN(n) ? new Date(ts) : new Date(n * (String(ts).length <= 10 ? 1000 : 1))
+  const d = isNaN(n) ? new Date(ts) : new Date(n < 1e12 ? n * 1000 : n)
   return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
@@ -161,3 +162,86 @@ watch(() => props.channel.url, () => {
   startStream()
 })
 </script>
+
+<style scoped>
+.channel-card {
+  position: relative;
+  height: 100%;
+  border-radius: 20px;
+  overflow: hidden;
+  background: #1A2209;
+  border: 1px solid rgba(192, 245, 61, 0.15);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.channel-card:hover { border-color: rgba(192, 245, 61, 0.30); box-shadow: 0 4px 20px rgba(192, 245, 61, 0.08); }
+.channel-card.alert-state  { border-color: rgba(239, 68, 68, 0.60); animation: alert-pulse 1.5s ease-in-out infinite; }
+.channel-card.warning-state { border-color: rgba(251, 191, 36, 0.55); }
+
+.video-area { position: absolute; inset: 0; }
+
+/* 상태 배지 (LIVE / 위험 / 경고) */
+.status-badge {
+  position: absolute;
+  top: 14px; left: 14px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 13px;
+  border-radius: 9999px;
+  backdrop-filter: blur(10px);
+  letter-spacing: 0.04em;
+}
+.status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+.badge-ok  { background: rgba(0,0,0,0.50); color: #C0F53D; border: 1px solid rgba(192,245,61,0.35); }
+.badge-ok .status-dot { background: #C0F53D; animation: pulse 2s ease-in-out infinite; }
+.badge-alert   { background: rgba(220,38,38,0.22); color: #fca5a5; border: 1px solid rgba(220,38,38,0.45); }
+.badge-alert .status-dot { background: #ef4444; }
+.badge-warning { background: rgba(251,191,36,0.15); color: #fde68a; border: 1px solid rgba(251,191,36,0.40); }
+.badge-warning .status-dot { background: #fbbf24; }
+
+/* 호버 액션 버튼 */
+.hover-actions {
+  position: absolute;
+  top: 14px; right: 14px;
+  z-index: 10;
+  display: none;
+  gap: 6px;
+}
+.channel-card:hover .hover-actions { display: flex; }
+
+.hover-btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(0,0,0,0.65);
+  color: #FAFFF3;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: all 0.15s ease;
+}
+.hover-btn:hover { background: rgba(192,245,61,0.18); border-color: rgba(192,245,61,0.45); color: #C0F53D; }
+
+/* 하단 채널명 스트립 */
+.name-strip {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  padding: 48px 16px 16px;
+  background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%);
+  color: #FAFFF3;
+  font-size: 14px;
+  font-weight: 600;
+  z-index: 5;
+}
+
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+@keyframes alert-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+  50%       { box-shadow: 0 0 14px 4px rgba(239,68,68,0.30); }
+}
+</style>

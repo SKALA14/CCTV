@@ -1,3 +1,4 @@
+<!-- 채널 필터 칩 -->
 <template>
   <div class="flex flex-wrap gap-2">
     <span

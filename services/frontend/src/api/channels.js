@@ -1,3 +1,4 @@
+// 채널 API — CCTV 채널 CRUD 호출
 import api from './index.js'
 import { DUMMY_MODE } from '../constants/mode.js'
 

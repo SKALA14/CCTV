@@ -1,3 +1,6 @@
+# services/backend/app/api/time_parser.py
+"""검색어의 한국어 상대 시간 표현(오늘/어제/지난 주 등)을 (정제 쿼리, 시작·종료 시각, 라벨)로 파싱한다."""
+
 import re
 from datetime import datetime, timedelta, timezone
 
@@ -38,6 +41,7 @@ _PATTERNS = [
 def parse_time_expression(
     query: str,
 ) -> tuple[str, datetime | None, datetime | None, str | None]:
+    """쿼리에서 시간 표현을 떼어내 (시간어 제거된 쿼리, 시작, 종료, 적용 라벨)을 반환한다. 매칭 없으면 원본·None."""
     now = _now()
 
     for pattern, key in _PATTERNS:

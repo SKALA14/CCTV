@@ -1,3 +1,6 @@
+# services/backend/app/api/schemas.py
+"""이벤트 API 요청/응답 Pydantic 스키마 정의."""
+
 import uuid
 from datetime import datetime
 
@@ -13,8 +16,6 @@ class EventLogRead(BaseModel):
     event_type:    str
     danger_level:  str
     reason:        str | None
-    confidence:    float | None
-    vlm_confidence: float | None
     pose_event:    str | None
     source_model:  str | None
     frame_path:    str | None

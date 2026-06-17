@@ -13,7 +13,7 @@ import cv2
 import numpy as np
 
 from config import config
-from redis_client import xack, xadd
+from redis_client import get_client, xack, xadd
 from schema import FrameJob, ModelResult, PendingFrame
 
 logger = logging.getLogger(__name__)
@@ -177,8 +177,10 @@ def _handle_fire(
 def _publish_emergency(job: FrameJob, det: dict) -> None:
     logger.warning("[emergency] alerts 발행: site=%s camera=%s type=%s",
                    job.site_id, job.camera_id, det.get("anomaly_type"))
+    camera_name = get_client().get(f"camera:{job.site_id}:{job.camera_id}:camera_name") or job.camera_id
     xadd(config.ALERTS_STREAM, {
         "camera_id": job.camera_id,
+        "camera_name": camera_name,
         "site_id": job.site_id,   # 현장 격리 — ws.py 토스트 라우팅 + worker DB 저장에 사용
         "anomaly_type": det.get("anomaly_type", "unknown"),
         "danger_level": det.get("danger_level", "critical"),

@@ -1,3 +1,6 @@
+# services/backend/app/api/query_expander.py
+"""검색어를 CCTV 보안 도메인 동의어로 확장하는 LLM 보조 모듈."""
+
 import json
 import logging
 from openai import AsyncOpenAI
@@ -16,6 +19,7 @@ _openai = None
 
 
 async def expand_query(q: str) -> list[str]:
+    """검색어를 동의어 포함 최대 5개 변형으로 확장한다. 실패 시 원본만 담은 리스트 반환."""
     try:
         # Use lazy initialization; tests will patch _openai directly
         global _openai

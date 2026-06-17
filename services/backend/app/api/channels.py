@@ -1,3 +1,6 @@
+# services/backend/app/api/channels.py
+"""CCTV 채널 CRUD API. MediaMTX 경로·Redis 카메라 키·DB 채널을 함께 관리한다."""
+
 import json
 import logging
 import uuid
@@ -171,6 +174,7 @@ async def create_channel(
 
     await _redis.set(f"{cam_prefix}:source_url", ingestion_url)
     await _redis.set(f"{cam_prefix}:source_type", ingestion_type)
+    await _redis.set(f"{cam_prefix}:camera_name", body.channelName)
     if body.zone:
         await _redis.set(f"{cam_prefix}:zone", body.zone)
         note = _get_zone_note(body.zone, site_id_str)

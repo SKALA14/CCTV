@@ -87,33 +87,33 @@ async def overview(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin),
 ) -> list[dict]:
-    """현장 요약: 카메라 수, 오늘 이벤트 수·위험도 분포, 계정 수. (자기 현장만)"""
-    sites = (await db.execute(
-        select(Site).where(Site.id == current_user.site_id).order_by(Site.name)
+    """구역별 요약: 카메라 수, 오늘 이벤트 수. (자기 현장만)"""
+    channels = (await db.execute(
+        select(CctvChannel).where(CctvChannel.site_id == current_user.site_id)
     )).scalars().all()
+
     today = _today_start()
+    redis = _get_redis()
+    site_id_str = str(current_user.site_id)
+
+    zone_cameras: dict[str, list[str]] = {}
+    for ch in channels:
+        zone = await redis.get(f"camera:{site_id_str}:{ch.camera_id}:zone") or "미지정"
+        zone_cameras.setdefault(zone, []).append(ch.camera_id)
+
     result = []
-    for site in sites:
-        cam_count = await db.scalar(
-            select(func.count()).select_from(CctvChannel).where(CctvChannel.site_id == site.id)
-        )
-        acct_count = await db.scalar(
-            select(func.count()).select_from(User).where(User.site_id == site.id)
-        )
-        rows = (await db.execute(
-            select(EventLog.danger_level, func.count())
-            .where(EventLog.site_id == site.id)
+    for zone_name in sorted(zone_cameras, key=lambda z: (z == "미지정", z)):
+        camera_ids = zone_cameras[zone_name]
+        event_count = await db.scalar(
+            select(func.count()).select_from(EventLog)
+            .where(EventLog.site_id == current_user.site_id)
+            .where(EventLog.camera_id.in_(camera_ids))
             .where(EventLog.occurred_at >= today)
-            .group_by(EventLog.danger_level)
-        )).all()
-        danger = {level: cnt for level, cnt in rows}
+        ) or 0
         result.append({
-            "site_id": str(site.id),
-            "name": site.name,
-            "camera_count": cam_count or 0,
-            "account_count": acct_count or 0,
-            "today_event_count": sum(danger.values()),
-            "danger_breakdown": danger,
+            "zone": zone_name,
+            "camera_count": len(camera_ids),
+            "today_event_count": event_count,
         })
     return result
 
@@ -123,25 +123,27 @@ async def devices(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin),
 ) -> list[dict]:
-    """CCTV별 온라인 상태 — frames 스트림 최신 프레임 기준. (자기 현장만)"""
+    """CCTV별 온라인 상태 + 구역. (자기 현장만)"""
     channels = (await db.execute(
-        select(CctvChannel, Site.name)
-        .join(Site, Site.id == CctvChannel.site_id)
+        select(CctvChannel)
         .where(CctvChannel.site_id == current_user.site_id)
-        .order_by(Site.name, CctvChannel.camera_id)
-    )).all()
+        .order_by(CctvChannel.camera_id)
+    )).scalars().all()
 
     raw = await _get_redis().xrevrange(config.FRAMES_STREAM, count=_FRAMES_SCAN_COUNT)
     entries = [fields for _id, fields in raw]
     latest = _latest_frame_ts(entries)
     now = time.time()
+    site_id_str = str(current_user.site_id)
+    redis = _get_redis()
 
     result = []
-    for ch, site_name in channels:
-        key = (str(ch.site_id), ch.camera_id)
+    for ch in channels:
+        key = (site_id_str, ch.camera_id)
         last_ts = latest.get(key)
+        zone = await redis.get(f"camera:{site_id_str}:{ch.camera_id}:zone") or "미지정"
         result.append({
-            "site_name": site_name,
+            "zone": zone,
             "camera_id": ch.camera_id,
             "camera_name": ch.camera_name,
             "source_type": ch.source_type,
@@ -149,6 +151,54 @@ async def devices(
             "last_seen": datetime.fromtimestamp(last_ts, tz=timezone.utc).isoformat() if last_ts else None,
         })
     return result
+
+
+@router.get("/today-events")
+async def today_events(
+    zone: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> list[dict]:
+    """오늘(KST) 이벤트 목록 — 구역 필터 지원."""
+    today = _today_start()
+    site_id_str = str(current_user.site_id)
+    redis = _get_redis()
+
+    camera_ids: list[str] | None = None
+    if zone is not None:
+        channels = (await db.execute(
+            select(CctvChannel).where(CctvChannel.site_id == current_user.site_id)
+        )).scalars().all()
+        camera_ids = [
+            ch.camera_id for ch in channels
+            if (await redis.get(f"camera:{site_id_str}:{ch.camera_id}:zone") or "미지정") == zone
+        ]
+        if not camera_ids:
+            return []
+
+    query = (
+        select(EventLog)
+        .where(EventLog.site_id == current_user.site_id)
+        .where(EventLog.occurred_at >= today)
+        .order_by(EventLog.occurred_at.desc())
+        .limit(300)
+    )
+    if camera_ids is not None:
+        query = query.where(EventLog.camera_id.in_(camera_ids))
+
+    rows = (await db.execute(query)).scalars().all()
+    return [
+        {
+            "event_id":     str(e.event_id),
+            "occurred_at":  e.occurred_at.isoformat(),
+            "camera_id":    e.camera_id,
+            "camera_name":  e.camera_name or e.camera_id,
+            "event_type":   e.event_type,
+            "danger_level": e.danger_level,
+            "pipeline":     e.pipeline,
+        }
+        for e in rows
+    ]
 
 
 @router.get("/accounts")

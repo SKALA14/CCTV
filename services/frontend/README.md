@@ -205,8 +205,9 @@ src/
    ChannelGrid → ChannelCard → useWebRTC(`/webrtc/{mtxPath}/whep`)  # 영상
    WS 알림 → eventStore → NotificationToast                          # 알림
 
-[콘솔] (별도 창) /search · /manual · /status · /admin · /profile
+[콘솔] (별도 창) /search · /zones · /manual · /reports · /status · /admin · /profile
    각 view → api/*.js → /api/...   (쿠키 인증)
+   상태 점등(App.vue) → GET /status/health   ·   리포트 → GET /reports/summary
 
 [매뉴얼] ManualView → analyze/refine/confirm → 구역별 체크리스트(ChecklistReview/Item)
 ```

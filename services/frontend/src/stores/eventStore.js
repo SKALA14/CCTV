@@ -1,3 +1,4 @@
+// 이벤트 전역 상태 — 실시간 이벤트·토스트·알림 히스토리
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { TOAST_DURATION } from '../constants/events.js'
@@ -45,9 +46,9 @@ export const useEventStore = defineStore('event', () => {
             s => s && String(s.camera_id || s.channelName || '') === cameraId
         )
         if (slot !== -1) {
-            // 위험도 체계: emergency 파이프라인=위험(빨강), 일반 critical/high/medium=경고(주황)
+            // 위험도 체계: emergency 파이프라인=위험(빨강), 일반 critical/high/low=경고(주황)
             const alertLvl = event.pipeline === 'emergency' ? 'emergency'
-                : (level === 'critical' || level === 'high' || level === 'medium') ? 'warning' : null
+                : (level === 'critical' || level === 'high' || level === 'low') ? 'warning' : null
             if (alertLvl) channelStore.setAlertLevel(slot, alertLvl)
         }
 

@@ -79,8 +79,8 @@ async def analyze_camera(
         return
     elapsed = time.monotonic() - t0
 
-    if result.get("result") == "normal":
-        logger.info("[static.vlm] ← normal (%.1fs): camera=%s", elapsed, camera_id)
+    if result.get("result") != "anomaly":
+        logger.info("[static.vlm] ← %s (%.1fs): camera=%s", result.get("result"), elapsed, camera_id)
         return
 
     if not should_publish(result, full_cam_id, "static"):

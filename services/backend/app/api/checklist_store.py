@@ -1,8 +1,8 @@
-"""체크리스트 구조화 JSON ↔ 파생물(.md/Redis) 변환·저장·로드·병합.
+"""체크리스트 구조화 JSON ↔ 파생물(.json/Redis) 변환·저장·로드·병합.
 
 순수 함수 + Redis를 인자로 주입받는 async 함수로 구성해 단위테스트가 쉽다.
 구조화 JSON 형태:
-  {"static": {"categories": [{"code","label","items":[...]}]},
+  {"static": {"categories": [{"code","label","severity","items":[...]}]},
    "dynamic": {"categories": [...]},
    "zones": [{"zone","static":[...],"dynamic":[...]}]}
 """
@@ -14,6 +14,7 @@ import re
 from pathlib import Path
 
 _NUM_PREFIX = re.compile(r"^\s*\d+\.\s+")
+_VALID_SEVERITIES = frozenset({"critical", "high", "low", "none"})
 
 
 def flatten_categories(categories: list[dict]) -> list[str]:
@@ -25,10 +26,32 @@ def flatten_categories(categories: list[dict]) -> list[str]:
 
 
 def format_numbered(items: list[str]) -> str:
-    """번호 형식 텍스트. 인퍼런스가 읽는 .md 포맷과 동일."""
+    """번호 형식 텍스트. 레거시 .md 역구성용."""
     if not items:
         return ""
     return "\n".join(f"{i + 1}. {item}" for i, item in enumerate(items))
+
+
+def format_checklist_json(categories: list[dict]) -> str:
+    """체크리스트를 {id, text, severity} JSON Lines 형태로 포맷. 인퍼런스 프롬프트에 주입."""
+    lines = []
+    idx = 1
+    for cat in categories:
+        raw = cat.get("severity", "low")
+        sev = raw if raw in _VALID_SEVERITIES else "low"
+        for item in cat.get("items", []):
+            lines.append(json.dumps({"id": idx, "text": item, "severity": sev}, ensure_ascii=False))
+            idx += 1
+    return "\n".join(lines)
+
+
+def format_checklist_json_for_zone(items: list[str], sev_lookup: dict[str, str]) -> str:
+    """구역 항목 리스트를 {id, text, severity} JSON Lines 형태로 포맷."""
+    lines = []
+    for idx, item in enumerate(items, 1):
+        sev = sev_lookup.get(item, "low")
+        lines.append(json.dumps({"id": idx, "text": item, "severity": sev}, ensure_ascii=False))
+    return "\n".join(lines)
 
 
 def item_to_code(categories: list[dict]) -> dict[str, str]:
@@ -41,6 +64,17 @@ def item_to_code(categories: list[dict]) -> dict[str, str]:
     return lookup
 
 
+def item_to_severity(categories: list[dict]) -> dict[str, str]:
+    """항목 문자열 → severity lookup. 유효하지 않은 값은 'low'로 고정."""
+    lookup: dict[str, str] = {}
+    for cat in categories:
+        raw = cat.get("severity", "low")
+        sev = raw if raw in _VALID_SEVERITIES else "low"
+        for item in cat.get("items", []):
+            lookup[item] = sev
+    return lookup
+
+
 def categories_map(categories: list[dict]) -> dict[str, str]:
     """1-based 인덱스(str) → 코드. Redis HSET용. 빈 입력이면 {}."""
     items = flatten_categories(categories)
@@ -50,11 +84,27 @@ def categories_map(categories: list[dict]) -> dict[str, str]:
     return {str(i + 1): lookup.get(item, "GENERAL") for i, item in enumerate(items)}
 
 
+def severities_map(categories: list[dict]) -> dict[str, str]:
+    """1-based 인덱스(str) → severity. Redis HSET용. 빈 입력이면 {}."""
+    items = flatten_categories(categories)
+    if not items:
+        return {}
+    lookup = item_to_severity(categories)
+    return {str(i + 1): lookup.get(item, "low") for i, item in enumerate(items)}
+
+
 def items_map(items: list[str], lookup: dict[str, str]) -> dict[str, str]:
     """구역 항목 리스트 → 1-based 인덱스(str)→코드. lookup에 없으면 GENERAL."""
     if not items:
         return {}
     return {str(i + 1): lookup.get(item, "GENERAL") for i, item in enumerate(items)}
+
+
+def severity_map_for_items(items: list[str], lookup: dict[str, str]) -> dict[str, str]:
+    """구역 항목 리스트 → 1-based 인덱스(str)→severity. lookup에 없으면 'low'."""
+    if not items:
+        return {}
+    return {str(i + 1): lookup.get(item, "low") for i, item in enumerate(items)}
 
 
 async def _write_map(redis, key: str, mapping: dict[str, str]) -> None:
@@ -77,22 +127,22 @@ async def persist(site_dir: Path, redis, sid: str, data: dict) -> None:
 
     s_cats = data.get("static", {}).get("categories", [])
     d_cats = data.get("dynamic", {}).get("categories", [])
-    s_items = flatten_categories(s_cats)
-    d_items = flatten_categories(d_cats)
 
-    (site_dir / "static_checklist.md").write_text(format_numbered(s_items), encoding="utf-8")
-    (site_dir / "dynamic_checklist.md").write_text(format_numbered(d_items), encoding="utf-8")
+    (site_dir / "static_checklist.json").write_text(format_checklist_json(s_cats), encoding="utf-8")
+    (site_dir / "dynamic_checklist.json").write_text(format_checklist_json(d_cats), encoding="utf-8")
     await _write_map(redis, f"checklist:{sid}:static:categories", categories_map(s_cats))
     await _write_map(redis, f"checklist:{sid}:dynamic:categories", categories_map(d_cats))
 
     s_lookup = item_to_code(s_cats)
     d_lookup = item_to_code(d_cats)
+    s_sev_lookup = item_to_severity(s_cats)
+    d_sev_lookup = item_to_severity(d_cats)
     for zone in data.get("zones", []):
         safe = zone["zone"].replace(" ", "_")
         zs = zone.get("static", [])
         zd = zone.get("dynamic", [])
-        (site_dir / f"zone_{safe}_static.md").write_text(format_numbered(zs), encoding="utf-8")
-        (site_dir / f"zone_{safe}_dynamic.md").write_text(format_numbered(zd), encoding="utf-8")
+        (site_dir / f"zone_{safe}_static.json").write_text(format_checklist_json_for_zone(zs, s_sev_lookup), encoding="utf-8")
+        (site_dir / f"zone_{safe}_dynamic.json").write_text(format_checklist_json_for_zone(zd, d_sev_lookup), encoding="utf-8")
         await _write_map(redis, f"checklist:{sid}:zone_{safe}:static:categories", items_map(zs, s_lookup))
         await _write_map(redis, f"checklist:{sid}:zone_{safe}:dynamic:categories", items_map(zd, d_lookup))
 

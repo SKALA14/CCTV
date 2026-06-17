@@ -1,3 +1,4 @@
+// 라우트 정의 + 인증/권한 네비게이션 가드
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/authStore.js'
 import DashboardView      from '../views/DashboardView.vue'
@@ -24,7 +25,7 @@ const routes = [
     { path: '/admin',           name: 'admin',            component: AdminView,          meta: { adminOnly: true } },
     { path: '/status',          name: 'status',           component: StatusView,         meta: { adminOnly: true } },
     { path: '/profile',         name: 'profile',          component: ProfileView },
-    { path: '/password-change', name: 'password-change',  component: PasswordChangeView },
+    { path: '/password-change', name: 'password-change',  component: PasswordChangeView, meta: { bare: true } },
 ]
 
 const router = createRouter({

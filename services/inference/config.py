@@ -47,7 +47,7 @@ class Settings(BaseSettings):
 
     # Pose
     POSE_MODEL_PATH: str = "models/yolo26m-pose.pt"
-    POSE_CONF: float = 0.5
+    POSE_CONF: float = 0.3
     POSE_KEYPOINT_CONF: float = 0.3
     FALL_TORSO_ANGLE_THRESH: float = 45.0   # 옆 낙상: torso 기울기 임계값 (기존 55→45)
     FALL_BBOX_RATIO_THRESH: float = 1.3
@@ -65,7 +65,7 @@ class Settings(BaseSettings):
 
     # Dynamic (Dual-EMA Trigger + VLM)
     GENERAL_WINDOW_SEC: float = 10.0
-    GENERAL_MIN_FRAMES: int = 3
+    GENERAL_MIN_FRAMES: int = 2
     GENERAL_BUFFER_SIZE: int = 5
     GENERAL_MIN_CALL_INTERVAL: float = 30.0
 

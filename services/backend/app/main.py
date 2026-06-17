@@ -1,7 +1,6 @@
 # FastAPI 앱 팩토리.
-# lifespan에서 DB 테이블 자동 생성 및 event worker 백그라운드 태스크를 시작한다.
-# CORS 미들웨어 설정 및 라우터(events, ws)를 등록한다.
-# FastAPI 앱 팩토리. 서버 시작 시 DB 테이블 생성과 Redis 워커를 초기화하고, 라우터와 CORS를 등록한다.
+# lifespan에서 DB 테이블 생성·계정 시드·채널 복구 후 event worker 백그라운드 태스크를 시작한다.
+# CORS·rate-limit 미들웨어와 도메인별 라우터를 등록한다.
 
 import asyncio
 import logging
@@ -74,6 +73,11 @@ async def lifespan(app: FastAPI):
                     must_change_password=False,
                 ))
                 logger.info("admin 계정 자동 생성: username=%s site_id=%s", config.ADMIN_USERNAME, site.id)
+            else:
+                # .env의 ADMIN_PASSWORD와 DB 해시가 다르면 동기화
+                if not _pwd_context.verify(config.ADMIN_PASSWORD, existing_admin.hashed_password):
+                    existing_admin.hashed_password = _pwd_context.hash(config.ADMIN_PASSWORD)
+                    logger.info("admin 비밀번호 .env 값으로 갱신: username=%s", existing_admin.username)
 
     # 기존 cctv_channels 중 site_id가 NULL인 레코드 backfill
     async with AsyncSessionLocal() as session:
@@ -131,6 +135,7 @@ async def lifespan(app: FastAPI):
                 }
                 await _r.set(f"camera:{site_id_str}:{ch.camera_id}:source_url",  ch.source_url)
                 await _r.set(f"camera:{site_id_str}:{ch.camera_id}:source_type", ch.source_type)
+                await _r.set(f"camera:{site_id_str}:{ch.camera_id}:camera_name", ch.camera_name)
                 if ch.description:
                     await _r.set(f"camera_instruction:{site_id_str}:{ch.camera_id}", ch.description)
         finally:

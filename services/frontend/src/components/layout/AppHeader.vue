@@ -1,3 +1,4 @@
+<!-- 상단 헤더 — 로고·사용자·로그아웃 -->
 <template>
   <header class="app-header">
     <span class="logo">AI CCTV</span>

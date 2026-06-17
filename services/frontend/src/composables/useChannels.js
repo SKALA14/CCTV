@@ -1,3 +1,4 @@
+// 채널 스토어를 컴포넌트에서 쓰기 위한 composable
 import { useChannelStore } from '../stores/channelStore.js'
 import { storeToRefs } from 'pinia'
 

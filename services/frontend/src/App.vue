@@ -1,43 +1,22 @@
+<!-- 루트 컴포넌트 — 사이드바 레이아웃 + 라우터 뷰 -->
 <template>
   <div class="flex h-full">
     <!-- 좌측 사이드바 (로그인·월 등 크롬 없는 화면에서는 숨김) -->
     <aside
       v-if="!route.meta.public && !route.meta.bare"
-      class="flex flex-col items-center w-16 border-r flex-shrink-0 py-3"
-      style="background: var(--bg-card); border-color: var(--border);"
+      class="flex flex-col flex-shrink-0 border-r py-4"
+      style="background: var(--bg-card); border-color: var(--border); width: 220px;"
     >
       <!-- 앱 로고 -->
-      <div class="mb-5 flex flex-col items-center gap-0.5">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.8">
-          <path d="M15 10l4.553-2.277A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14"/>
-          <rect x="2" y="6" width="13" height="12" rx="2"/>
-        </svg>
-        <span class="text-[9px] font-semibold tracking-widest" style="color: var(--text-muted);">CCTV</span>
-      </div>
-
-      <!-- 시스템 상태 점등 (채널 온라인 n/N) -->
-      <div v-if="authStore.isLoggedIn && health.total > 0"
-        class="mb-4 flex flex-col items-center gap-0.5" :title="healthTitle">
-        <span class="w-2 h-2 rounded-full" :style="`background: ${healthColor}`"></span>
-        <span class="text-[9px] font-mono" style="color: var(--text-muted);">{{ health.online }}/{{ health.total }}</span>
+      <div class="flex items-center gap-2 px-5 mb-6">
+        <img src="/pic.png" alt="" style="height:32px; object-fit:contain;"/>
+        <img src="/letter.png" alt="SIREN" style="height:20px; object-fit:contain;"/>
       </div>
 
       <!-- 네비게이션 -->
-      <AppNav class="w-full" />
+      <AppNav class="w-full px-3" />
 
       <div class="flex-1"></div>
-
-      <!-- 프로필 진입 (모든 역할) — 계정·비밀번호·테마·로그아웃은 프로필 페이지에서 -->
-      <div v-if="authStore.isLoggedIn" class="w-full px-1.5 flex flex-col items-center">
-        <div class="nav-divider"></div>
-        <router-link to="/profile" class="nav-tab" active-class="active" :title="accountTitle">
-          <div
-            class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold"
-            :style="avatarStyle"
-          >{{ userInitial }}</div>
-          <span>프로필</span>
-        </router-link>
-      </div>
     </aside>
 
     <!-- 우측 메인 영역 -->
@@ -47,9 +26,11 @@
         <div v-if="isLiveView" style="height: 100%">
           <DashboardView />
         </div>
-        <keep-alive include="ManualView">
-          <router-view v-if="!isLiveView" />
-        </keep-alive>
+        <router-view v-if="!isLiveView" v-slot="{ Component }">
+          <keep-alive include="ManualView,ZoneView">
+            <component :is="Component" />
+          </keep-alive>
+        </router-view>
       </main>
     </div>
   </div>

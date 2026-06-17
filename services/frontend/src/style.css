@@ -203,23 +203,30 @@ body {
 /* ── 사이드바 네비 아이템 ── */
 .nav-tab {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
-    justify-content: center;
-    gap: 4px;
-    width: 48px;
-    padding: 10px 4px;
+    justify-content: flex-start;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 14px;
     border-radius: 10px;
     color: var(--text-muted);
-    font-size: 9px;
+    font-size: 14px;
     font-weight: 500;
     text-decoration: none;
     transition: background 0.15s, color 0.15s;
-    /* button 요소로도 쓰이므로 기본 크롬 리셋 */
     background: none;
     border: 0;
     cursor: pointer;
     font-family: inherit;
+    white-space: nowrap;
+}
+
+.nav-tab svg,
+.nav-tab i {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
 }
 
 .nav-tab:hover {
@@ -228,12 +235,17 @@ body {
 }
 
 .nav-tab.active {
-    background: var(--sidebar-hover);
-    color: var(--text-primary);
+    background: rgba(220, 38, 38, 0.15);
+    color: #ef4444;
+}
+
+html.light .nav-tab.active {
+    background: rgba(220, 38, 38, 0.1);
+    color: #dc2626;
 }
 
 .nav-divider {
-    width: 28px;
+    width: 100%;
     height: 1px;
     background: var(--border);
     margin: 6px 0;
@@ -285,14 +297,14 @@ body {
     color: #fff;
 }
 
-.danger-badge.medium {
-    background: var(--badge-medium);
-    color: var(--badge-medium-text, #fff);
-}
-
 .danger-badge.low {
     background: var(--badge-low);
     color: #fff;
+}
+
+.danger-badge.none {
+    background: #374151;
+    color: #9ca3af;
 }
 
 /* ── 드롭다운(select) 공통 ── */

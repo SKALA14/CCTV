@@ -1,3 +1,6 @@
+# services/backend/app/api/agent/checklist_agent.py
+"""안전 매뉴얼 PDF 기반 체크리스트 LLM 에이전트 — 분석·정제·구역 배분·카테고리화·증분 비교."""
+
 import json
 import logging
 import uuid
@@ -162,7 +165,7 @@ async def refine_checklist(session_id: str, feedback: str) -> dict:
     return result
 
 
-_NORMALIZE_SYSTEM = (
+_NORMALIZE_BASE = (
     "다음은 CCTV 안전 체크리스트 항목들이다.\n"
     "의미가 겹치거나 같은 위험 유형에 속하는 항목들을 묶어 카테고리를 만들어라.\n"
     "반드시 JSON 형식으로만 응답하라.\n\n"
@@ -170,22 +173,47 @@ _NORMALIZE_SYSTEM = (
     "- 카테고리 코드: 영문+언더스코어, 20자 이내, 명사형 (예: PPE_MISSING, ACCESS_VIOLATION)\n"
     "- 의미가 명확히 다른 항목은 별도 카테고리로 분리\n"
     "- 항목이 1개만 있어도 카테고리로 만들 것\n"
-    "- 항목 원문은 절대 수정하지 말 것\n\n"
-    '{"categories": [{"code": "...", "label": "...(한국어 명사형)", "items": ["원문 질문?"]}]}'
+    "- 항목 원문은 절대 수정하지 말 것\n"
+    "- 각 카테고리에 severity(critical/high/low/none 중 하나)를 반드시 지정할 것\n\n"
+)
+
+_SEVERITY_STATIC = (
+    "[severity 기준 — static]\n"
+    "- none:     이상 없음 (위험 없음)\n"
+    "- low:      경미한 위반, 즉각 위험 없음 (예: 소화기 위치 부적절, 표지판 훼손)\n"
+    "- high:     명확한 위반, 작업 중단 권고 수준 (예: 안전통로 차단, PPE 미착용 위험구역)\n"
+    "- critical: 즉각적 인명·재산 위험 (예: 구조물 손상, 위험물 노출)\n\n"
+)
+
+_SEVERITY_DYNAMIC = (
+    "[severity 기준 — dynamic]\n"
+    "- none:     정상 움직임 (위험 없음)\n"
+    "- low:      이상 가능성 있으나 불명확 (예: 급격한 방향 전환, 비정상적 속도)\n"
+    "- high:     명확한 이상 행동, 개입 필요 (예: 무단 침입, 충돌 직전)\n"
+    "- critical: 즉각 응급 대응 필요 (예: 낙상, 폭력, 의식 불명)\n\n"
+)
+
+_NORMALIZE_SCHEMA = (
+    '{"categories": [{"code": "...", "label": "...(한국어 명사형)", "severity": "high", "items": ["원문 질문?"]}]}'
 )
 
 
-async def normalize_categories(items: list[str]) -> list[dict]:
-    """항목 리스트를 의미 기반으로 카테고리 코드와 함께 묶어 반환.
+def _normalize_system(track: str) -> str:
+    criteria = _SEVERITY_DYNAMIC if track == "dynamic" else _SEVERITY_STATIC
+    return _NORMALIZE_BASE + criteria + _NORMALIZE_SCHEMA
 
-    반환: [{"code": "PPE_MISSING", "label": "보호장비 미착용", "items": [...]}]
+
+async def normalize_categories(items: list[str], track: str = "static") -> list[dict]:
+    """항목 리스트를 의미 기반으로 카테고리 코드·severity와 함께 묶어 반환.
+
+    반환: [{"code": "PPE_MISSING", "label": "보호장비 미착용", "severity": "high", "items": [...]}]
     빈 입력이면 [] 반환. API 오류·파싱 실패 시 GENERAL 단일 카테고리로 fallback.
     """
     if not items:
         return []
 
     messages = [
-        {"role": "system", "content": _NORMALIZE_SYSTEM},
+        {"role": "system", "content": _normalize_system(track)},
         {"role": "user", "content": json.dumps(items, ensure_ascii=False)},
     ]
     try:

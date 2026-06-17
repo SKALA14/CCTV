@@ -1,99 +1,80 @@
+# Slack 알림 페이로드 생성·전송 로직.
+# events(일반)·alerts(긴급) 메시지를 Slack Block Kit 형식으로 변환해 Webhook으로 전송한다.
+
 import logging
 import os
 import time
+from datetime import datetime, timezone, timedelta
 from typing import Any
 
 import requests
 
 logger = logging.getLogger(__name__)
 
-HIGH_SEVERITIES = {"critical", "high"}
+_KST = timezone(timedelta(hours=9))  # 발생 시각을 한국 표준시로 표기
+INCIDENT_GAP_SEC: float = float(os.environ.get("INCIDENT_GAP_SEC", "10"))  # 이 간격 안에 또 오면 같은 사건으로 보고 알림 skip
 
-INCIDENT_GAP_SEC: float = float(os.environ.get("INCIDENT_GAP_SEC", "10"))
+# 같은 (camera_id, event_type) 알림을 마지막으로 보낸 시각(monotonic)을 기억해 중복 전송을 막는다.
 _last_sent: dict[tuple[str, str], float] = {}
 
 
 def should_notify_general(vlm_result: dict[str, Any]) -> bool:
-    if not vlm_result.get("is_anomaly", False):
-        return False
-
-    severity = str(vlm_result.get("danger_level", "")).lower()
-    if not severity:
-        return True
-    return severity in HIGH_SEVERITIES
+    """anomaly_type이 있고 normal이 아니면 일반 알림 대상으로 판단한다."""
+    anomaly_type = str(vlm_result.get("anomaly_type", "")).lower()
+    return bool(anomaly_type) and anomaly_type != "normal"
 
 
 def build_general_payload(vlm_result: dict[str, Any]) -> dict[str, Any]:
-    severity = str(vlm_result.get("danger_level", "")).lower()
-    camera_id = vlm_result.get("camera_id", "unknown")
-    timestamp = vlm_result.get("timestamp", "")
-    event_type = vlm_result.get("event_type", "general")
-    score = vlm_result.get("score", "")
-    reason = vlm_result.get("reason") or vlm_result.get("description", "")
-    rule = vlm_result.get("rule", "")
-    frame = vlm_result.get("frame", "")
+    """일반 이상상황 VLM 결과를 Slack 메시지 페이로드(text + blocks)로 변환한다."""
+    camera_id    = vlm_result.get("camera_id", "unknown")
+    raw_ts       = vlm_result.get("timestamp", "")
+    try:
+        timestamp = datetime.fromtimestamp(float(raw_ts), tz=_KST).strftime("%Y-%m-%d %H:%M:%S")
+    except (TypeError, ValueError):
+        timestamp = raw_ts
+    anomaly_type = vlm_result.get("event_type") or vlm_result.get("anomaly_type", "general")
+    description  = vlm_result.get("reason") or vlm_result.get("description", "")
 
-    fallback_text = f"[{severity}] {camera_id} | {timestamp} | {event_type} | {reason}"
+    fallback_text = f"[이상상황] {camera_id} | {timestamp} | {anomaly_type}"
 
-    payload = {
+    return {
         "text": fallback_text,
         "blocks": [
             {
                 "type": "header",
-                "text": {
-                    "type": "plain_text",
-                    "text": "이상 상황 감지 알림",
-                },
-            },
-            {
-                "type": "section",
-                "fields": [
-                    {"type": "mrkdwn", "text": f"*카메라 ID:*\n{camera_id}"},
-                    {"type": "mrkdwn", "text": f"*발생 시각:*\n{timestamp}"},
-                    {"type": "mrkdwn", "text": f"*이벤트 유형:*\n{event_type}"},
-                    {"type": "mrkdwn", "text": f"*위험도:*\n{severity}"},
-                    {"type": "mrkdwn", "text": f"*점수:*\n{score}"},
-                    {"type": "mrkdwn", "text": f"*프레임:*\n{frame}"},
-                ],
+                "text": {"type": "plain_text", "text": "이상 상황 감지 알림"},
             },
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*판단 근거:*\n{reason}",
+                    "text": (
+                        f"*카메라 ID:* {camera_id}\n"
+                        f"*발생 시각:* {timestamp}\n"
+                        f"*이상 유형:* {anomaly_type}\n"
+                        f"*설명:* {description}"
+                    ),
                 },
             },
+            {"type": "divider"},
         ],
     }
 
-    if rule:
-        payload["blocks"].append(
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"*적용 규칙 / 참고 기준:*\n{rule}",
-                },
-            }
-        )
 
-    payload["blocks"].append({"type": "divider"})
-    return payload
+_ANOMALY_TYPE_DISPLAY = {"fallen": "fall"}  # 내부 라벨 → 표시용 라벨 매핑
 
 
 def build_emergency_payload(alert: dict[str, Any]) -> dict[str, Any]:
-    camera_id    = alert.get("camera_id", "unknown")
-    timestamp    = alert.get("timestamp", "")
-    anomaly_type = alert.get("anomaly_type", "emergency")
-    danger_level = alert.get("danger_level", "critical")
-    description  = alert.get("description", "")
-    frame        = alert.get("frame", "")
-    source_model = alert.get("source_model", "")
-    confidence   = alert.get("confidence", "")
+    """긴급 상황 alert를 Slack 메시지 페이로드(text + blocks)로 변환한다."""
+    camera_id    = alert.get("camera_name") or alert.get("camera_id", "unknown")
+    raw_ts       = alert.get("timestamp", "")
     try:
-        conf_display = f"{float(confidence):.2f}"
+        timestamp = datetime.fromtimestamp(float(raw_ts), tz=_KST).strftime("%Y-%m-%d %H:%M:%S")
     except (TypeError, ValueError):
-        conf_display = "-"
+        timestamp = raw_ts
+    raw_type     = alert.get("anomaly_type", "emergency")
+    anomaly_type = _ANOMALY_TYPE_DISPLAY.get(raw_type, raw_type)
+    description  = alert.get("description", "")
 
     fallback_text = f"[EMERGENCY] {camera_id} | {timestamp} | {anomaly_type}"
 
@@ -102,26 +83,19 @@ def build_emergency_payload(alert: dict[str, Any]) -> dict[str, Any]:
         "blocks": [
             {
                 "type": "header",
-                "text": {"type": "plain_text", "text": "긴급 상황 감지 알림"},
+                "text": {"type": "plain_text", "text": "🚨 긴급 상황 감지"},
             },
             {
                 "type": "section",
-                "fields": [
-                    {"type": "mrkdwn", "text": f"*카메라 ID:*\n{camera_id}"},
-                    {"type": "mrkdwn", "text": f"*발생 시각:*\n{timestamp}"},
-                    {"type": "mrkdwn", "text": f"*이상 유형:*\n{anomaly_type}"},
-                    {"type": "mrkdwn", "text": f"*위험도:*\n{danger_level}"},
-                    {"type": "mrkdwn", "text": f"*신뢰도:*\n{conf_display}"},
-                    {"type": "mrkdwn", "text": f"*프레임:*\n{frame}"},
-                ],
-            },
-            {
-                "type": "section",
-                "text": {"type": "mrkdwn", "text": f"*탐지 모델:*\n{source_model}"},
-            },
-            {
-                "type": "section",
-                "text": {"type": "mrkdwn", "text": f"*설명:*\n{description}"},
+                "text": {
+                    "type": "mrkdwn",
+                    "text": (
+                        f"*카메라 ID:* {camera_id}\n"
+                        f"*발생 시각:* {timestamp}\n"
+                        f"*이상 유형:* {anomaly_type}\n"
+                        f"*설명:* {description}"
+                    ),
+                },
             },
             {"type": "divider"},
         ],
@@ -129,6 +103,7 @@ def build_emergency_payload(alert: dict[str, Any]) -> dict[str, Any]:
 
 
 def _normalize_event_type(event_type: str) -> str:
+    """smoke를 fire로 통일한다(dedup 시 연기·화재를 같은 사건으로 묶기 위함)."""
     return "fire" if event_type == "smoke" else event_type
 
 
@@ -142,8 +117,9 @@ def _dedup(camera_id: str, event_type: str) -> bool:
 
 
 def _post_to_slack(webhook_url: str, payload: dict[str, Any]) -> None:
+    """Webhook으로 페이로드를 전송한다(URL 미설정 시 skip, 응답이 비정상이면 예외)."""
     if not webhook_url:
-        logger.warning("SLACK_WEBHOOK_URL is not configured; skip Slack notification")
+        logger.warning("SLACK_WEBHOOK_URL 미설정 — Slack 알림 skip")
         return
 
     response = requests.post(webhook_url, json=payload, timeout=5)
@@ -154,24 +130,26 @@ def _post_to_slack(webhook_url: str, payload: dict[str, Any]) -> None:
 
 
 def send_emergency_alert(alert: dict[str, Any], webhook_url: str) -> None:
+    """긴급 alert를 dedup 검사 후 Slack으로 전송한다(같은 사건이면 skip)."""
     camera_id    = str(alert.get("camera_id", "unknown"))
     anomaly_type = str(alert.get("anomaly_type", "emergency"))
     if _dedup(camera_id, anomaly_type):
-        logger.info("emergency alert deduped (incident): camera=%s type=%s", camera_id, anomaly_type)
+        logger.info("긴급 알림 중복 제거(같은 사건): camera=%s type=%s", camera_id, anomaly_type)
         return
 
     _post_to_slack(webhook_url, build_emergency_payload(alert))
 
 
 def send_general_alert(vlm_result: dict[str, Any], webhook_url: str) -> None:
+    """일반 이상상황을 알림 조건·dedup 검사 후 Slack으로 전송한다."""
     if not should_notify_general(vlm_result):
-        logger.info("general alert condition not met; skip Slack notification")
+        logger.info("일반 알림 조건 미충족 — Slack 알림 skip")
         return
 
     camera_id  = str(vlm_result.get("camera_id", "unknown"))
     event_type = str(vlm_result.get("anomaly_type") or vlm_result.get("event_type", "general"))
     if _dedup(camera_id, event_type):
-        logger.info("general alert deduped (incident): camera=%s type=%s", camera_id, event_type)
+        logger.info("일반 알림 중복 제거(같은 사건): camera=%s type=%s", camera_id, event_type)
         return
 
     _post_to_slack(webhook_url, build_general_payload(vlm_result))

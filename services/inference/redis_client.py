@@ -11,6 +11,7 @@ from config import config
 
 _client: _redis.Redis | None = None
 _async_client: _aioredis.Redis | None = None
+_pubsub_client: _aioredis.Redis | None = None
 
 
 def get_client() -> _redis.Redis:
@@ -25,8 +26,26 @@ def get_async_client() -> _aioredis.Redis:
     """asyncio 환경용 lazy-initialized Redis 클라이언트 반환."""
     global _async_client
     if _async_client is None:
-        _async_client = _aioredis.from_url(config.REDIS_URL, decode_responses=True)
+        _async_client = _aioredis.from_url(
+            config.REDIS_URL,
+            decode_responses=True,
+            health_check_interval=30,
+            socket_keepalive=True,
+        )
     return _async_client
+
+
+def get_pubsub_client() -> _aioredis.Redis:
+    """pubsub 전용 클라이언트 — health_check_interval 없이 블로킹 대기."""
+    global _pubsub_client
+    if _pubsub_client is None:
+        _pubsub_client = _aioredis.from_url(
+            config.REDIS_URL,
+            decode_responses=True,
+            socket_keepalive=True,
+            socket_timeout=None,
+        )
+    return _pubsub_client
 
 
 def ensure_group(stream: str, group: str) -> None:

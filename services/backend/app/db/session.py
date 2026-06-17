@@ -1,3 +1,6 @@
+# services/backend/app/db/session.py
+"""SQLAlchemy 비동기 엔진·세션 팩토리·ORM Base 정의. get_db로 요청별 세션을 주입한다."""
+
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
