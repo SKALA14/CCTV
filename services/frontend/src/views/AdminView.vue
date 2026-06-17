@@ -274,9 +274,9 @@ async function handleCreateUser() {
   userFormError.value = null
   try {
     const res = await createUser(siteId.value, newUser.value)
-    users.value.push(res)
+    users.value.push(res.user)
     showUserForm.value = false
-    passwordModal.value = { open: true, password: res.initial_password, targetUsername: res.username }
+    passwordModal.value = { open: true, password: res.initial_password, targetUsername: res.user.username }
   } catch (e) {
     userFormError.value = e.response?.data?.detail ?? e.message
   } finally {

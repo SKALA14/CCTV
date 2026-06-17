@@ -675,7 +675,7 @@ i { display: inline-flex; align-items: center; justify-content: center; }
 }
 .modal-panel {
   width: 100%; max-width: 640px; max-height: 80vh;
-  background: var(--c-bg-card); border: 1px solid var(--c-border);
+  background: #ffffff; border: 1px solid #e5e7eb;
   border-radius: 16px; display: flex; flex-direction: column;
   box-shadow: 0 20px 60px rgba(0,0,0,0.15); overflow: hidden;
 }
@@ -683,7 +683,7 @@ i { display: inline-flex; align-items: center; justify-content: center; }
 .modal-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 18px 20px; flex-shrink: 0;
-  border-bottom: 1px solid var(--c-border-light);
+  border-bottom: 1px solid #f0f0f0;
 }
 .modal-header-left { display: flex; align-items: center; gap: 10px; }
 .modal-header-icon {
@@ -691,16 +691,16 @@ i { display: inline-flex; align-items: center; justify-content: center; }
   background: var(--c-amber-soft); display: flex; align-items: center; justify-content: center;
 }
 .modal-header-icon i { color: var(--c-amber); font-size: 15px; }
-.modal-title { font-size: 14px; font-weight: 600; color: var(--c-text); }
-.modal-sub { font-size: 11px; color: var(--c-text-muted); margin-top: 1px; }
+.modal-title { font-size: 14px; font-weight: 600; color: #111827; }
+.modal-sub { font-size: 11px; color: #9ca3af; margin-top: 1px; }
 
 .modal-close {
-  width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--c-border);
-  background: var(--c-bg-elevated); display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: 8px; border: 1px solid #e5e7eb;
+  background: #f3f4f6; display: flex; align-items: center; justify-content: center;
   transition: all 0.15s;
 }
-.modal-close:hover { background: var(--c-border); }
-.modal-close i { font-size: 14px; color: var(--c-text-secondary); }
+.modal-close:hover { background: #e5e7eb; }
+.modal-close i { font-size: 14px; color: #4b5563; }
 
 .modal-body { flex: 1; overflow-y: auto; padding: 0; }
 .modal-body .data-table thead { position: sticky; top: 0; z-index: 1; }
@@ -708,9 +708,9 @@ i { display: inline-flex; align-items: center; justify-content: center; }
 .modal-footer {
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px 20px; flex-shrink: 0;
-  border-top: 1px solid var(--c-border-light);
+  border-top: 1px solid #f0f0f0;
 }
-.modal-footer-hint { font-size: 11px; color: var(--c-text-muted); }
+.modal-footer-hint { font-size: 11px; color: #9ca3af; }
 
 /* ═══════════════════════════ Buttons ═══════════════════════════ */
 .btn-ghost {

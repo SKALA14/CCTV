@@ -73,6 +73,11 @@ async def lifespan(app: FastAPI):
                     must_change_password=False,
                 ))
                 logger.info("admin 계정 자동 생성: username=%s site_id=%s", config.ADMIN_USERNAME, site.id)
+            else:
+                # .env의 ADMIN_PASSWORD와 DB 해시가 다르면 동기화
+                if not _pwd_context.verify(config.ADMIN_PASSWORD, existing_admin.hashed_password):
+                    existing_admin.hashed_password = _pwd_context.hash(config.ADMIN_PASSWORD)
+                    logger.info("admin 비밀번호 .env 값으로 갱신: username=%s", existing_admin.username)
 
     # 기존 cctv_channels 중 site_id가 NULL인 레코드 backfill
     async with AsyncSessionLocal() as session:

@@ -265,8 +265,8 @@ const data = ref(null)
 const loading = ref(false)
 const error = ref('')
 
-const dangerOrder = ['critical', 'high', 'low', 'info']
-const dangerLabel = { critical: '심각', high: '높음', low: '낮음', info: '정보' }
+const dangerOrder = ['critical', 'high', 'low']
+const dangerLabel = { critical: '심각', high: '높음', low: '낮음' }
 
 /* ── Computed ── */
 const dangerMax = computed(() => {

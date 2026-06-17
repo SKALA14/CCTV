@@ -136,6 +136,24 @@
         </div>
       </div>
     </div>
+
+    <div v-if="showDeleteModal" class="modal-overlay delete-overlay" @click.self="closeDeleteModal">
+      <div class="delete-modal-card">
+        <div class="delete-modal-body">
+          <div class="delete-modal-icon">
+            <i class="ri-delete-bin-6-line"></i>
+          </div>
+          <div class="delete-copy">
+            <p class="delete-title">채널을 삭제하시겠습니까?</p>
+            <p class="delete-desc">삭제 후에는 해당 슬롯의 채널 정보와 연결이 제거됩니다.</p>
+          </div>
+        </div>
+        <div class="delete-modal-footer">
+          <button type="button" class="delete-btn-cancel" @click="closeDeleteModal">취소</button>
+          <button type="button" class="delete-btn-confirm" @click="confirmRemove">확인</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -169,11 +187,13 @@ onMounted(() => { updateClock(); clockTimer = setInterval(updateClock, 1000) })
 onUnmounted(() => { if (clockTimer) clearInterval(clockTimer) })
 
 const showModal = ref(false)
+const showDeleteModal = ref(false)
 const editingChannel = ref(null)
 const activeSlot = ref(0)
 const error = ref('')
 const submitting = ref(false)
 const zones = ref([])
+const pendingDeleteSlot = ref(null)
 
 const formData = ref({ name: '', sourceType: 'url', rtspUrl: '', zone: '' })
 
@@ -204,6 +224,7 @@ async function openEditModal(channel) {
 }
 
 function closeModal() { showModal.value = false; editingChannel.value = null; error.value = '' }
+function closeDeleteModal() { showDeleteModal.value = false; pendingDeleteSlot.value = null }
 
 async function handleSubmit() {
   error.value = ''
@@ -247,11 +268,17 @@ async function handleSubmit() {
 }
 
 function handleRemove(slot) {
-  if (confirm('채널을 삭제하시겠습니까?')) {
-    const ch = slots.value[slot]
-    removeChannel(slot)
-    if (ch) deleteChannel(`cam${slot}`).catch(console.error)
-  }
+  pendingDeleteSlot.value = slot
+  showDeleteModal.value = true
+}
+
+function confirmRemove() {
+  if (pendingDeleteSlot.value === null || pendingDeleteSlot.value === undefined) return
+  const slot = pendingDeleteSlot.value
+  const ch = slots.value[slot]
+  removeChannel(slot)
+  if (ch) deleteChannel(`cam${slot}`).catch(console.error)
+  closeDeleteModal()
 }
 
 const events = computed(() => eventStore.notifHistory)
@@ -458,6 +485,71 @@ function dangerLabel(level) {
 .btn-save:hover:not(:disabled) { background: var(--c-accent-hover); }
 .btn-save:disabled { background: #dbe6bd; color: var(--c-accent-hover); cursor: not-allowed; }
 
+.delete-overlay { z-index: 60; background: rgba(17, 24, 39, 0.18); backdrop-filter: blur(3px); }
+.delete-modal-card {
+  width: min(100%, 420px);
+  margin: 0 16px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(182, 199, 122, 0.32);
+  border-radius: 18px;
+  box-shadow: 0 18px 45px rgba(17, 24, 39, 0.18);
+  overflow: hidden;
+  animation: scaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.delete-modal-body {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 22px 28px;
+}
+.delete-modal-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: var(--c-accent-soft);
+  border: 1px solid var(--c-accent-border);
+}
+.delete-modal-icon i { font-size: 18px; color: var(--c-accent-hover); }
+.delete-copy { min-width: 0; }
+.delete-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
+.delete-desc {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.45;
+}
+.delete-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 18px 14px;
+  border-top: 1px solid #edf0e5;
+}
+.delete-btn-cancel,
+.delete-btn-confirm {
+  min-width: 56px;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+.delete-btn-cancel { color: #9ca3af; }
+.delete-btn-cancel:hover { color: #6b7280; }
+.delete-btn-confirm { color: #77942e; }
+.delete-btn-confirm:hover { color: #64731e; }
+
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
 /* ── Dark mode ── */
@@ -534,4 +626,15 @@ function dangerLabel(level) {
 .dashboard-root.dark .modal-divider { background: #263040; }
 .dashboard-root.dark .btn-cancel { background: #1f2937; border-color: #2d3548; color: #d1d5db; }
 .dashboard-root.dark .btn-cancel:hover { background: #263040; }
+.dashboard-root.dark .delete-overlay { background: rgba(0, 0, 0, 0.36); }
+.dashboard-root.dark .delete-modal-card { background: rgba(26, 31, 46, 0.96); border-color: #2d3548; box-shadow: 0 18px 45px rgba(0,0,0,0.42); }
+.dashboard-root.dark .delete-modal-icon { background: var(--c-accent-soft-dark); border-color: var(--c-accent-border-dark); }
+.dashboard-root.dark .delete-modal-icon i { color: #c7d99a; }
+.dashboard-root.dark .delete-title { color: #f3f4f6; }
+.dashboard-root.dark .delete-desc { color: #9ca3af; }
+.dashboard-root.dark .delete-modal-footer { border-top-color: #263040; }
+.dashboard-root.dark .delete-btn-cancel { color: #6b7280; }
+.dashboard-root.dark .delete-btn-cancel:hover { color: #d1d5db; }
+.dashboard-root.dark .delete-btn-confirm { color: #c7d99a; }
+.dashboard-root.dark .delete-btn-confirm:hover { color: #dbe8b2; }
 </style>
