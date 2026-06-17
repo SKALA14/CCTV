@@ -16,6 +16,8 @@
 
     <!-- Main Content -->
     <main class="main-content">
+      <!-- ADMIN: 전체 관리 화면 -->
+      <template v-if="isAdmin">
       <!-- Page Header -->
       <div class="page-header">
         <div class="page-header-icon">
@@ -261,6 +263,45 @@
           </div>
         </div>
       </div>
+      </template>
+
+      <!-- USER: 읽기 전용 화면 -->
+      <template v-else>
+        <!-- 등록된 매뉴얼 -->
+        <div class="card card-glow ro-card">
+          <h2 class="card-title mb">등록된 매뉴얼</h2>
+          <div v-if="roLoading" class="empty-hint">불러오는 중...</div>
+          <div v-else-if="roManuals.length" class="ro-manual-list">
+            <div v-for="m in roManuals" :key="m.id || m.name" class="ro-manual-row">
+              <i class="ri-file-line"></i>
+              <span>{{ m.name }}</span>
+            </div>
+          </div>
+          <p v-else class="empty-hint">등록된 매뉴얼이 없습니다</p>
+        </div>
+
+        <!-- 체크리스트 (읽기 전용) -->
+        <div class="card card-glow ro-card">
+          <h2 class="card-title">체크리스트</h2>
+          <p class="card-hint">현장에 적용 중인 안전 점검 항목입니다.</p>
+          <div class="ro-checklist-cols">
+            <div class="ro-col">
+              <p class="ro-col-title">Static (정적 상태)</p>
+              <div v-if="roStatic.length" class="ro-items">
+                <div v-for="(it, i) in roStatic" :key="'ros'+i" class="ro-item">{{ it }}</div>
+              </div>
+              <p v-else class="empty-hint">항목이 없습니다</p>
+            </div>
+            <div class="ro-col">
+              <p class="ro-col-title">Dynamic (행동·이벤트)</p>
+              <div v-if="roDynamic.length" class="ro-items">
+                <div v-for="(it, i) in roDynamic" :key="'rod'+i" class="ro-item">{{ it }}</div>
+              </div>
+              <p v-else class="empty-hint">항목이 없습니다</p>
+            </div>
+          </div>
+        </div>
+      </template>
     </main>
   </div>
 </template>
@@ -270,21 +311,56 @@ export default { name: 'ManualPage' }
 </script>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTheme } from '../composables/useTheme.js'
 import { useManualStore } from '../stores/manualStore.js'
+import { useAuthStore } from '../stores/authStore.js'
 import ChecklistReview from '../components/manual/ChecklistReview.vue'
-import { analyzeManual, refineManual, confirmManual, registerZones, fetchZones } from '../api/manuals.js'
+import { analyzeManual, refineManual, confirmManual, registerZones, fetchZones, fetchManuals, fetchChecklist, uploadManual } from '../api/manuals.js'
 
 /* ── Theme ── */
 const { isDark, toggle: toggleTheme } = useTheme()
+
+/* ── Auth ── */
+const auth = useAuthStore()
+const isAdmin = computed(() => auth.isAdmin)
 
 /* ── Store ── */
 const store = useManualStore()
 const { docFiles, uploadError, zoneFile, csvError, registeredZones } = storeToRefs(store)
 const checklist = store.checklist
 const zoneRegister = store.zoneRegister
+
+/* ── 읽기 전용(user) 데이터 ── */
+const roManuals = ref([])
+const roStatic = ref([])
+const roDynamic = ref([])
+const roLoading = ref(false)
+
+function parseNumbered(text) {
+  if (!text) return []
+  return String(text)
+    .split('\n')
+    .map(l => l.replace(/^\s*\d+\.\s*/, '').trim())
+    .filter(Boolean)
+}
+
+async function loadReadonly() {
+  roLoading.value = true
+  try {
+    const [manuals, cl] = await Promise.all([fetchManuals(), fetchChecklist()])
+    roManuals.value = Array.isArray(manuals) ? manuals : []
+    roStatic.value = parseNumbered(cl?.static)
+    roDynamic.value = parseNumbered(cl?.dynamic)
+  } catch {
+    roManuals.value = []
+    roStatic.value = []
+    roDynamic.value = []
+  } finally {
+    roLoading.value = false
+  }
+}
 
 /* ── UI-only state ── */
 const isDragging = ref(false)
@@ -369,6 +445,10 @@ async function onRegisterZones() {
 }
 
 onMounted(() => {
+  if (!isAdmin.value) {
+    loadReadonly()
+    return
+  }
   if (registeredZones.value.length === 0) loadRegisteredZones()
 })
 
@@ -468,6 +548,18 @@ async function onConfirm({ sessionId, static: staticItems, dynamic: dynamicItems
     checklist.saved = true
     checklist.zoneSaved = false
     store.zoneViewLoaded = false
+
+    // 분석에 사용한 PDF를 '등록된 매뉴얼' 목록에 반영 (이미 등록된 파일명은 제외)
+    try {
+      const existing = await fetchManuals()
+      const names = new Set((existing || []).map(m => m.name))
+      for (const f of docFiles.value) {
+        if (!names.has(f.name)) {
+          await uploadManual(f)
+          names.add(f.name)
+        }
+      }
+    } catch { /* 등록 실패는 확정 성공에 영향 없음 */ }
   } catch {
     checklist.error = 'Save failed. Please try again.'
   } finally {
@@ -827,6 +919,24 @@ i { display: inline-flex; align-items: center; justify-content: center; }
   border-radius: 10px; cursor: grab; transition: all 0.15s; user-select: none;
 }
 .checklist-item:hover { border-color: var(--c-text-muted); }
+
+/* ═══════════════════════════ Read-only (user) view ═══════════════════════════ */
+.ro-card { margin-bottom: 16px; }
+.ro-manual-list { display: flex; flex-direction: column; gap: 8px; }
+.ro-manual-row {
+  display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+  background: var(--c-bg-elevated); border: 1px solid var(--c-border);
+  border-radius: 10px; font-size: 13px; color: var(--c-text);
+}
+.ro-manual-row i { color: var(--c-text-muted); font-size: 15px; flex-shrink: 0; }
+.ro-checklist-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.ro-col-title { font-size: 12px; font-weight: 500; color: var(--c-text-secondary); margin-bottom: 10px; }
+.ro-items { display: flex; flex-direction: column; gap: 8px; }
+.ro-item {
+  padding: 12px 16px; background: var(--c-bg-card); border: 1px solid var(--c-border);
+  border-radius: 10px; font-size: 13px; color: var(--c-text); line-height: 1.45;
+}
+@media (max-width: 980px) { .ro-checklist-cols { grid-template-columns: 1fr; } }
 .checklist-item:active { cursor: grabbing; opacity: 0.7; }
 .checklist-item input[type="checkbox"] {
   width: 16px; height: 16px; border-radius: 4px; accent-color: var(--c-accent); cursor: pointer; flex-shrink: 0;

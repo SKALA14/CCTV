@@ -115,12 +115,6 @@
           </p>
         </form>
       </div>
-
-      <div class="indicator-dots">
-        <div class="dot active"></div>
-        <div class="dot"></div>
-        <div class="dot"></div>
-      </div>
     </div>
   </div>
 </template>
@@ -468,17 +462,6 @@ async function handleLogin() {
 }
 
 .forgot-text a:hover { color: var(--c-accent-hover); }
-
-.indicator-dots {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 24px;
-}
-
-.dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(148, 163, 184, 0.28); }
-.dot.active { background: var(--c-accent); }
 
 /* ── Responsive: mobile shows only login panel ── */
 @media (max-width: 1023px) {

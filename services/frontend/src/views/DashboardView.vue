@@ -197,7 +197,12 @@ const pendingDeleteSlot = ref(null)
 
 const formData = ref({ name: '', sourceType: 'url', rtspUrl: '', zone: '' })
 
-function openConsole() { window.open('/search', 'cctv-console', 'width=1440,height=900,left=120,top=80') }
+function openConsole() {
+  // Chrome --app(런처) 모드에서 같은 출처 window.open이 메인(월) 창으로 가로채여 navigate되는 문제 방지:
+  // target '_blank' + 'popup' 기능으로 항상 별도 팝업 창을 강제한다.
+  const w = window.open('/search', '_blank', 'popup,width=1440,height=900,left=120,top=80')
+  if (w) w.focus()
+}
 function handleLogout() { localStorage.removeItem('auth_token'); localStorage.removeItem('auth_user'); router.push('/login') }
 
 async function openAddModal(slot) {
