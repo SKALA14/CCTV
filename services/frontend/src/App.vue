@@ -4,31 +4,19 @@
     <!-- 좌측 사이드바 (로그인·월 등 크롬 없는 화면에서는 숨김) -->
     <aside
       v-if="!route.meta.public && !route.meta.bare"
-      class="flex flex-col items-center w-16 border-r flex-shrink-0 py-3"
-      style="background: var(--bg-card); border-color: var(--border);"
+      class="flex flex-col flex-shrink-0 border-r py-4"
+      style="background: var(--bg-card); border-color: var(--border); width: 220px;"
     >
       <!-- 앱 로고 -->
-      <div class="mb-5 flex flex-col items-center">
-        <img src="/logo2.png" alt="SIREN" style="width:36px; height:36px; object-fit:contain;"/>
+      <div class="flex items-center gap-2 px-5 mb-6">
+        <img src="/pic.png" alt="" style="height:32px; object-fit:contain;"/>
+        <img src="/letter.png" alt="SIREN" style="height:20px; object-fit:contain;"/>
       </div>
-
 
       <!-- 네비게이션 -->
-      <AppNav class="w-full" />
+      <AppNav class="w-full px-3" />
 
       <div class="flex-1"></div>
-
-      <!-- 프로필 진입 (모든 역할) — 계정·비밀번호·테마·로그아웃은 프로필 페이지에서 -->
-      <div v-if="authStore.isLoggedIn" class="w-full px-1.5 flex flex-col items-center">
-        <div class="nav-divider"></div>
-        <router-link to="/profile" class="nav-tab" active-class="active" :title="accountTitle">
-          <div
-            class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold"
-            :style="avatarStyle"
-          >{{ userInitial }}</div>
-          <span>프로필</span>
-        </router-link>
-      </div>
     </aside>
 
     <!-- 우측 메인 영역 -->
