@@ -155,7 +155,6 @@
                   <th class="th-zone">username</th>
                   <th class="th-cam">role</th>
                   <th class="th-seen">마지막 로그인</th>
-                  <th class="th-status">상태</th>
                 </tr>
               </thead>
               <tbody>
@@ -168,12 +167,6 @@
                     <span class="role-chip" :class="'role-' + a.role">{{ a.role }}</span>
                   </td>
                   <td class="td-muted td-mono">{{ fmt(a.last_login) }}</td>
-                  <td>
-                    <span class="account-status" :class="a.is_active ? 'account-active' : 'account-inactive'">
-                      <span class="device-status-dot"></span>
-                      {{ a.is_active ? '활성' : '비활성' }}
-                    </span>
-                  </td>
                 </tr>
               </tbody>
             </table>
@@ -647,15 +640,6 @@ i { display: inline-flex; align-items: center; justify-content: center; }
   font-size: 10px; font-weight: 600; background: var(--c-amber-soft); color: var(--c-amber);
   vertical-align: middle;
 }
-
-.account-status {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: 12px; font-weight: 500;
-}
-.account-active { color: var(--c-green); }
-.account-active .device-status-dot { background: var(--c-green); box-shadow: 0 0 6px rgba(34,197,94,0.4); }
-.account-inactive { color: var(--c-text-muted); }
-.account-inactive .device-status-dot { background: var(--c-text-muted); }
 
 /* ═══════════════════════════ Danger Badge ═══════════════════════════ */
 .danger-badge {

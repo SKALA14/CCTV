@@ -80,7 +80,6 @@
                 <th class="th-main">username</th>
                 <th class="th-sm">role</th>
                 <th class="th-md">마지막 로그인</th>
-                <th class="th-sm">상태</th>
                 <th class="th-actions">작업</th>
               </tr>
             </thead>
@@ -94,12 +93,6 @@
                   <span class="role-chip" :class="'role-' + u.role">{{ u.role }}</span>
                 </td>
                 <td class="td-muted td-mono">{{ formatTime(u.last_login) }}</td>
-                <td>
-                  <span class="account-status" :class="u.is_active ? 'account-active' : 'account-inactive'">
-                    <span class="status-dot-sm"></span>
-                    {{ u.is_active ? '활성' : '비활성' }}
-                  </span>
-                </td>
                 <td class="td-actions">
                   <div class="action-btns">
                     <button class="btn-sm btn-warn" :disabled="loading" @click="handleResetPassword(u)">초기화</button>
@@ -514,12 +507,6 @@ i { display: inline-flex; align-items: center; justify-content: center; }
 }
 
 /* ══ Account Status ══ */
-.account-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; }
-.status-dot-sm { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.account-active  { color: var(--c-green); }
-.account-active  .status-dot-sm { background: var(--c-green); box-shadow: 0 0 6px rgba(34,197,94,0.4); }
-.account-inactive { color: var(--c-text-muted); }
-.account-inactive .status-dot-sm { background: var(--c-text-muted); }
 
 /* ══ Action Buttons ══ */
 .action-btns { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
