@@ -7,14 +7,6 @@
 
 ---
 
-## 임시 적용 사항
-
-| 위치 | 내용 | 비고 |
-|------|------|------|
-| `services/frontend/src/stores/eventStore.js` | 동일 카메라 + 동일 이벤트 타입 알림 **5분 쿨다운** | 추후 별도 파일로 분리 예정 |
-
----
-
 ## 전체 데이터 흐름
 
 ```
@@ -31,7 +23,7 @@ Redis Streams : frames
     ▼
 [inference service]
     ├── emergency pipeline : YOLO (화재·낙상) → 즉시 alerts 발행
-    ├── dynamic pipeline   : Optical Flow 변화 감지 → VLM 분석
+    ├── dynamic pipeline   : Dual-EMA Trigger 변화 감지 → VLM 분석
     └── static pipeline    : 정기 VLM 분석 (침입·PPE 등)
     ▼
 Redis Streams : events  /  alerts
@@ -43,7 +35,7 @@ Redis Streams : events  /  alerts
     │
     ▼
 [notification service]
-    │  alerts 구독 → Slack Webhook 발송
+    │  alerts·events 구독 → Slack Webhook 발송
     │
 [frontend dashboard]
     DashboardView / SearchView / ManualView
@@ -82,9 +74,10 @@ CCTV/
 │   │   │   ├── pose_worker.py
 │   │   │   ├── aggregator.py
 │   │   │   └── process.py
-│   │   ├── dynamic/                 # Optical Flow 기반 변화 감지 → VLM 분석
+│   │   ├── dynamic/                 # Dual-EMA Trigger 기반 변화 감지 → VLM 분석
 │   │   │   ├── buffer.py
-│   │   │   ├── optical_flow.py
+│   │   │   ├── optical_flow.py      # FrameFeatureExtractor (시각 feature 추출)
+│   │   │   ├── trigger.py           # RealtimeTriggerSelector (Dual-EMA)
 │   │   │   ├── vlm_worker.py
 │   │   │   └── process.py
 │   │   ├── static/                  # 정기 VLM 분석 (침입·PPE 등)
@@ -93,7 +86,7 @@ CCTV/
 │   │   ├── cleaner/                 # 처리 완료 프레임 파일 정리
 │   │   │   └── process.py
 │   │   ├── models/                  # YOLO 모델 래퍼
-│   │   │   ├── fire.py              # 화재 감지 (fire.pt)
+│   │   │   ├── fire.py              # 화재·연기 감지 (fire_smoke.pt)
 │   │   │   ├── pose.py              # 낙상 감지 (yolo26m-pose.pt)
 │   │   │   └── common.py
 │   │   ├── vlm/
@@ -108,15 +101,22 @@ CCTV/
 │   │   ├── app/
 │   │   │   ├── main.py
 │   │   │   ├── config.py
-│   │   │   ├── worker.py            # Redis 구독 → PostgreSQL 저장
+│   │   │   ├── worker.py            # Redis events·alerts 구독 → 임베딩 → PostgreSQL 저장
 │   │   │   ├── db/
-│   │   │   │   ├── models.py        # CctvChannel, EventLog (pgvector 임베딩)
+│   │   │   │   ├── models.py        # Site, User, CctvChannel, EventLog (pgvector 임베딩)
 │   │   │   │   └── session.py
 │   │   │   └── api/
+│   │   │       ├── auth.py          # 로그인·로그아웃·세션 (JWT 쿠키)
+│   │   │       ├── sites.py         # 현장 조회
+│   │   │       ├── users.py         # 계정 CRUD·비밀번호 변경
 │   │   │       ├── events.py        # 이벤트 조회 + 시맨틱 검색
-│   │   │       ├── channels.py      # 채널 CRUD
+│   │   │       ├── channels.py      # 채널 CRUD + per-camera 지시문
 │   │   │       ├── manuals.py       # 매뉴얼 PDF 업로드·체크리스트 관리
+│   │   │       ├── status.py        # 운영 현황 (admin)
+│   │   │       ├── reports.py       # 안전 이벤트 집계 (admin)
 │   │   │       ├── ws.py            # WebSocket 실시간 푸시
+│   │   │       ├── checklist_store.py  # 현장별 체크리스트 저장/로드
+│   │   │       ├── deps.py             # 인증·권한 의존성
 │   │   │       ├── embed_describer.py  # 이벤트 설명 임베딩 생성
 │   │   │       ├── query_expander.py   # 검색 쿼리 확장 (LLM)
 │   │   │       ├── time_parser.py      # 자연어 시간 파싱
@@ -125,9 +125,8 @@ CCTV/
 │   │   │           ├── pdf_parser.py       # PDF 텍스트 추출
 │   │   │           ├── checklist_agent.py  # 체크리스트 생성 AI 에이전트
 │   │   │           └── instruction_agent.py
-│   │   ├── prompts/
-│   │   │   ├── static_checklist.md
-│   │   │   └── dynamic_checklist.md
+│   │   ├── prompts/                 # 현장별 체크리스트(checklist.json)·구역 저장
+│   │   │   └── {site_id}/
 │   │   ├── tests/
 │   │   ├── Dockerfile
 │   │   └── requirements.txt
@@ -155,7 +154,7 @@ CCTV/
 │   │
 │   └── notification/                # Slack 알림 발송 서비스
 │       ├── main.py
-│       ├── slack.py                 # alerts 구독 → Slack Webhook
+│       ├── slack.py                 # alerts·events 구독 → Slack Webhook
 │       └── Dockerfile
 │
 ├── infra/
@@ -190,12 +189,12 @@ CCTV/
 | 기능 | 설명 |
 |------|------|
 | 멀티 카메라 수집 | cam0~cam3 독립 ingestion 컨테이너, RTSP·파일·YouTube 소스 지원 |
-| 이중 YOLO 파이프라인 | 화재(fire.pt) + 낙상(yolo26m-pose) 긴급 감지 후 즉시 alerts 발행 |
-| Dynamic / Static VLM | Optical Flow로 변화 감지 → VLM 분석 / 정기 VLM 분석 병렬 운용 |
+| 이중 YOLO 파이프라인 | 화재·연기(fire_smoke.pt) + 낙상(yolo26m-pose) 긴급 감지 후 즉시 alerts 발행 |
+| Dynamic / Static VLM | Dual-EMA Trigger로 변화 감지 → VLM 분석 / 정기 VLM 분석 병렬 운용 |
 | 시맨틱 검색 | 이벤트 설명 OpenAI 임베딩(1536d) → pgvector 유사도 검색 |
 | 매뉴얼 AI 에이전트 | PDF 업로드 → 체크리스트 자동 생성·정제 (checklist_agent) |
-| 실시간 WebSocket | 이벤트 발생 즉시 대시보드 푸시, 5분 쿨다운 중복 방지 |
-| Slack 알림 | 긴급 이벤트(alerts 스트림) → Slack Webhook 자동 발송 |
+| 실시간 WebSocket | 이벤트 발생 즉시 대시보드 푸시, 10초 사건 갭으로 중복 알림 억제 |
+| Slack 알림 | 긴급(alerts)·일반(events) 이벤트 → Slack Webhook 자동 발송 |
 
 ---
 
@@ -204,7 +203,9 @@ CCTV/
 ```bash
 # 1. 환경변수 설정
 cp infra/.env.example infra/.env
-# infra/.env에 OPENAI_API_KEY, SLACK_WEBHOOK_URL 입력
+# infra/.env에 OPENAI_API_KEY, AUTH_SECRET, ADMIN_PASSWORD 입력 (필수)
+# SLACK_WEBHOOK_URL은 선택 (미설정 시 Slack 알림만 skip)
+# ※ AUTH_SECRET·ADMIN_PASSWORD 미설정 시 backend가 기동을 거부함
 
 # 2. 테스트 영상을 sample/ 디렉토리에 준비 (fall.mp4, fire.mp4 등)
 
@@ -225,4 +226,5 @@ open http://localhost:8000/docs
 - [inference README](services/inference/README.md)
 - [backend README](services/backend/README.md)
 - [frontend README](services/frontend/README.md)
+- [notification README](services/notification/README.md)
 - [infra README](infra/README.md)

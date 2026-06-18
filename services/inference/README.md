@@ -26,6 +26,7 @@ dynamic 프로세스 내부:
 
 ```
 dynamic (Process)
+  ├── 메인 루프          # FrameFeatureExtractor + Dual-EMA Trigger로 후보 선별
   └── dynamic-vlm-thread  (Thread)  # VLMClient → events stream
 ```
 
@@ -67,14 +68,21 @@ Redis frames stream (EMERGENCY_GROUP)
 
 ### Dynamic 트랙
 
+Optical Flow 단일 임계값이 아니라 **Dual-EMA Trigger**로 후보를 선별한다.
+카메라별로 fast/slow 두 EMA를 유지하며, 평소 상태(slow) 대비 최근 변화(fast)의
+신규성(novelty) 점수가 임계를 넘을 때만 VLM 호출 후보로 인정(admit)한다.
+
 ```
 Redis frames stream (DYNAMIC_GROUP)
         │
         │ xreadgroup (block=100ms, count=1)
         ▼
-[dynamic/process] Optical Flow 점수 계산
-        │
-        │ score < FLOW_THRESHOLD → ACK 후 스킵
+[dynamic/process] FrameFeatureExtractor.extract()
+        │   배경차분·옵티컬플로우·전경 통계 feature 추출
+        ▼
+  RealtimeTriggerSelector.process()  (Dual-EMA)
+        │   warmup 경과 + score_threshold 이상 → admit
+        │   admitted_trigger == False → ACK 후 스킵
         ▼
   DynamicBuffer에 적재
         │
@@ -83,7 +91,7 @@ Redis frames stream (DYNAMIC_GROUP)
         ▼
   job_queue (최대 VLM_QUEUE_SIZE=4)
         │
-[dynamic-vlm-thread] VLM 분석
+[dynamic-vlm-thread] VLM 분석 (dynamic_prompt.j2)
         │
         │ result == "normal" → 발행 생략
         ▼
@@ -137,8 +145,8 @@ detection 스키마:
 - `fire`, `smoke`: `FIRE_DEDUP_SEC` 내 동일 `(camera, type)` 중복 발행 억제
 - `fallen`: camera별 `FALL_WINDOW_SEC` 내 `FALL_MIN_FRAMES` 이상 누적 시 발행 후 카운터 초기화
 
-### dynamic (Optical Flow → VLM 검증 → events stream)
-1. Optical Flow 점수가 `FLOW_THRESHOLD` 미만이면 무시
+### dynamic (Dual-EMA Trigger → VLM 검증 → events stream)
+1. Dual-EMA Trigger가 admit하지 않은 프레임은 무시(`admitted_trigger == False`)
 2. `GENERAL_WINDOW_SEC` 윈도우 만료 시 `GENERAL_MIN_FRAMES` 미달 또는 쿨다운 중이면 스킵
 3. 조건 충족 시 최대 `GENERAL_BUFFER_SIZE`장을 VLM에 전달
 4. VLM이 `normal`로 판정하면 발행 생략, 이상이면 `events` stream에 XADD
@@ -153,30 +161,37 @@ detection 스키마:
 
 | 설정 | 기본값 | 설명 |
 |------|--------|------|
-| `FRAME_RESULT_TIMEOUT_SEC` | 5.0s | 모든 모델 결과 대기 최대 시간 |
+| `FRAME_RESULT_TIMEOUT_SEC` | 30.0s | 모든 모델 결과 대기 최대 시간 (CPU 추론 지연 대비) |
+| `FIRE_MODEL_PATH` | `models/fire_smoke.pt` | 화재·연기 YOLO 모델 경로 |
 | `FIRE_DEDUP_SEC` | 2.0s | fire/smoke 동일 카메라·타입 중복 발행 억제 시간 |
+| `POSE_MODEL_PATH` | `models/yolo26m-pose.pt` | 낙상 감지 Pose YOLO 모델 경로 |
 | `FALL_MIN_FRAMES` | 3 | 낙상 판정 최소 누적 프레임 수 |
 | `FALL_WINDOW_SEC` | 5.0s | 낙상 누적 시간 윈도우 |
-| `FLOW_THRESHOLD` | 500.0 | Optical Flow 최소 점수 (미달 시 dynamic 스킵) |
 | `GENERAL_WINDOW_SEC` | 10.0s | dynamic 후보 수집 윈도우 |
 | `GENERAL_MIN_FRAMES` | 3 | VLM 호출 최소 프레임 수 |
 | `GENERAL_BUFFER_SIZE` | 5 | VLM에 전달하는 최대 프레임 수 |
 | `GENERAL_MIN_CALL_INTERVAL` | 30.0s | camera별 VLM 호출 최소 간격 (쿨다운) |
 | `STATIC_INTERVAL_SEC` | 1800.0s | static 스캔 주기 |
-| `MODEL_QUEUE_SIZE` | 30 | 모델별 입력 큐 최대 크기 |
+| `MODEL_QUEUE_SIZE` | 10 | 모델별 입력 큐 최대 크기 |
 | `RESULT_QUEUE_SIZE` | 90 | 결과 큐 최대 크기 |
+
+> Dual-EMA Trigger 세부 파라미터(warmup·fast/slow τ·score_threshold 등)는 `config.py`가 아니라
+> `dynamic/trigger.py`의 `TriggerConfig` 데이터클래스에 정의된다.
 
 ---
 
 ## Redis 인터페이스
 
+> Redis 키는 현장 격리를 위해 `{site_id}` 세그먼트를 포함하는 멀티테넌시 포맷이다.
+
 | 방향 | 키 / 스트림 | 내용 |
 |------|------------|------|
-| 입력 | `frames` stream | `{frame_path, camera_id, timestamp}` |
+| 입력 | `frames` stream | `{frame_path, camera_id, site_id, timestamp}` |
 | 출력 | `alerts` stream | emergency 이벤트 (fire·smoke·fallen) |
 | 출력 | `events` stream | dynamic·static 이벤트 (VLM 검증 후) |
-| 읽기 | `camera:*:source_url` | 활성 카메라 목록 (static 트랙) |
-| 읽기 | `camera_instruction:{camera_id}` | 카메라별 추가 VLM 지시 |
+| 읽기 | `camera:{site_id}:{cam_id}:source_url` | 활성 카메라 목록 (static 트랙이 `camera:*:source_url` 스캔) |
+| 읽기 | `camera:{site_id}:{cam_id}:zone` | 카메라별 구역명 (프롬프트 주입) |
+| 읽기 | `camera_instruction:{site_id}:{cam_id}` | 카메라별 추가 VLM 지시 |
 
 ---
 
@@ -186,4 +201,4 @@ detection 스키마:
 python main.py
 ```
 
-모델 파일(`models/fire.pt`, `models/yolo26m-pose.pt`)이 실행 디렉토리 기준으로 존재해야 합니다.
+모델 파일(`models/fire_smoke.pt`, `models/yolo26m-pose.pt`)이 실행 디렉토리 기준으로 존재해야 합니다.
