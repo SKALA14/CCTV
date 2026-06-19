@@ -25,7 +25,7 @@ const routes = [
     { path: '/admin',           name: 'admin',            component: AdminView,          meta: { adminOnly: true } },
     { path: '/status',          name: 'status',           component: StatusView,         meta: { adminOnly: true } },
     { path: '/profile',         name: 'profile',          component: ProfileView },
-    { path: '/password-change', name: 'password-change',  component: PasswordChangeView },
+    { path: '/password-change', name: 'password-change',  component: PasswordChangeView, meta: { bare: true } },
 ]
 
 const router = createRouter({

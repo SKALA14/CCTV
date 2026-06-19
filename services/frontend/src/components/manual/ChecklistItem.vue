@@ -38,11 +38,11 @@
         ref="inputEl"
         v-model="draft"
         class="flex-1 text-sm px-2 py-1 rounded focus:outline-none"
-        style="background: var(--bg-card); border: 1px solid var(--blue); color: var(--text-primary);"
+        style="background: var(--bg-card); border: 1px solid #b6c77a; color: var(--text-primary);"
         @keydown.enter.prevent="save"
         @keydown.esc.prevent="cancel"
       />
-      <button class="flex-shrink-0 text-xs px-2 py-1 rounded bg-blue-600 text-white" @click="save">저장</button>
+      <button class="flex-shrink-0 text-xs px-2 py-1 rounded text-white" style="background: #77942e;" @click="save">저장</button>
       <button class="flex-shrink-0 text-xs px-1.5 py-1 rounded" style="color: var(--text-muted);" @click="cancel">취소</button>
     </template>
   </div>

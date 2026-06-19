@@ -1,6 +1,6 @@
 <!-- 좌측 네비게이션 탭 -->
 <template>
-  <nav class="flex flex-col items-center gap-1 px-2">
+  <nav class="flex flex-col gap-1">
     <router-link to="/search" class="nav-tab" active-class="active">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <circle cx="11" cy="11" r="7"/>
