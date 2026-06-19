@@ -39,11 +39,16 @@ Redis Streams : frames
 | `REDIS_URL` | `redis://redis:6379` | Redis 연결 URL |
 
 ## Redis 키 규칙
+현장 격리를 위해 `{site_id}` 세그먼트를 포함하는 멀티테넌시 포맷을 사용한다.
+컨테이너는 `camera:*:{CAMERA_ID}:source_url` 패턴으로 자기 슬롯에 등록된 현장을 찾고,
+`source_url`에서 추출한 `site_id`를 `frames` 메시지에 함께 실어 발행한다.
+
 | 키 | 설명 |
 |----|------|
-| `camera:{CAMERA_ID}:source_url` | 백엔드가 기록하는 영상 소스 URL |
-| `camera:{CAMERA_ID}:source_type` | 백엔드가 기록하는 소스 타입 |
-| `camera:{CAMERA_ID}:instructions` | inference가 읽는 per-camera 감지 지시문 |
+| `camera:{site_id}:{CAMERA_ID}:source_url` | 백엔드가 기록하는 영상 소스 URL |
+| `camera:{site_id}:{CAMERA_ID}:source_type` | 백엔드가 기록하는 소스 타입 |
+| `camera:{site_id}:{CAMERA_ID}:zone` | 카메라별 구역명 (inference가 프롬프트에 주입) |
+| `camera_instruction:{site_id}:{CAMERA_ID}` | inference가 읽는 per-camera 감지 지시문 |
 
 ## 실행 방법
 
